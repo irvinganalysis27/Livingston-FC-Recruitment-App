@@ -31,7 +31,14 @@ with left:
         st.image(logo, use_container_width=True)
 
 with mid:
-    st.title("Livingston FC Recruitment App")
+    st.markdown(
+        """
+        <div style='text-align: center;'>
+            <h1>Livingston FC Recruitment<br>App</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 with right:
     if logo:
