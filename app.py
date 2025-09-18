@@ -3,6 +3,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+from pathlib import Path
+from PIL import Image  # add "Pillow" to requirements.txt if it's not already there
+
+APP_DIR = Path(__file__).parent
+ASSETS_DIR = APP_DIR / "assets"
+
+def open_image(path: Path):
+    try:
+        return Image.open(path)
+    except Exception:
+        return None
 
 # --- Basic password protection ---
 PASSWORD = "Livi2025"
@@ -10,19 +21,21 @@ PASSWORD = "Livi2025"
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
 # ---------- Club Branding Row ----------
-col1, col2, col3 = st.columns([1, 4, 1])  # adjust ratios to balance width
+left, mid, right = st.columns([1, 6, 1])
 
-with col1:
-    st.image("assets/Livingston_FC_club_badge_new.png", width=120)  # left logo
+logo_path = ASSETS_DIR / "club_logo.png"   # EXACT file name (case matters on Linux!)
+logo = open_image(logo_path)
 
-with col2:
-    st.markdown(
-        "<h1 style='text-align: center;'>Livingston FC Recruitment App</h1>",
-        unsafe_allow_html=True
-    )
+with left:
+    if logo:
+        st.image(logo, use_container_width=True)
 
-with col3:
-    st.image("assets/club_logo.png", width=120)  # right logo
+with mid:
+    st.title("Livingston FC Recruitment App")
+
+with right:
+    if logo:
+        st.image(logo, use_container_width=True)
 
 # Ask for password
 pwd = st.text_input("Enter password:", type="password")
