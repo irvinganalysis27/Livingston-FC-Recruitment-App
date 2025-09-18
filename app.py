@@ -13,11 +13,11 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 col1, col2, col3 = st.columns([1, 4, 1])  # adjust ratios to balance width
 
 with col1:
-    st.image("assets/club_logo.png", width=120)  # left logo
+    st.image("assets/Livingston_FC_club_badge_new.png", width=120)  # left logo
 
 with col2:
     st.markdown(
-        "<h1 style='text-align: center;'>⚽ Radar Chart and Ranking App</h1>",
+        "<h1 style='text-align: center;'>Livingston FC Recruitment App</h1>",
         unsafe_allow_html=True
     )
 
