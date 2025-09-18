@@ -5,11 +5,24 @@ import matplotlib.pyplot as plt
 import re
 
 # --- Basic password protection ---
-PASSWORD = "cowboy"
+PASSWORD = "Livi2025"
 
-st.set_page_config(page_title="Comparison Radar", layout="centered")
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-st.title("⚽ Radar Chart and Ranking App")
+# ---------- Club Branding Row ----------
+col1, col2, col3 = st.columns([1, 4, 1])  # adjust ratios to balance width
+
+with col1:
+    st.image("assets/club_logo.png", width=120)  # left logo
+
+with col2:
+    st.markdown(
+        "<h1 style='text-align: center;'>⚽ Radar Chart and Ranking App</h1>",
+        unsafe_allow_html=True
+    )
+
+with col3:
+    st.image("assets/club_logo.png", width=120)  # right logo
 
 # Ask for password
 pwd = st.text_input("Enter password:", type="password")
