@@ -23,7 +23,7 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 # ---------- Club Branding Row ----------
 left, mid, right = st.columns([1, 6, 1])
 
-logo_path = ASSETS_DIR / "club_logo.png"   # EXACT file name (case matters on Linux!)
+logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"   # EXACT file name (case matters on Linux!)
 logo = open_image(logo_path)
 
 with left:
