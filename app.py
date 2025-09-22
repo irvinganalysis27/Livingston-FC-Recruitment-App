@@ -23,7 +23,7 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 # ---------- Club Branding Row ----------
 left, mid, right = st.columns([1, 6, 1])
 
-logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"   # EXACT file name (case matters on Linux!)
+logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"
 logo = open_image(logo_path)
 
 with left:
@@ -50,49 +50,16 @@ if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
-# ========== 6-position mapping ==========
-SIX_GROUPS = [
+# ===================== 7 POSITIONS (NEW) =====================
+SEVEN_GROUPS = [
     "Goalkeeper",
-    "Wide Defender",
-    "Central Defender",
-    "Central Midfielder",
-    "Wide Midfielder",
-    "Central Forward"
+    "Centre Back",
+    "Full Back",
+    "Number 6",
+    "Number 8",
+    "Winger",
+    "Striker",
 ]
-
-RAW_TO_SIX = {
-    # Goalkeeper
-    "GK": "Goalkeeper", "GKP": "Goalkeeper", "GOALKEEPER": "Goalkeeper",
-
-    # Wide Defender
-    "RB": "Wide Defender", "LB": "Wide Defender",
-    "RWB": "Wide Defender", "LWB": "Wide Defender", "RFB": "Wide Defender", "LFB": "Wide Defender",
-
-    # Central Defender
-    "CB": "Central Defender", "RCB": "Central Defender", "LCB": "Central Defender",
-    "CBR": "Central Defender", "CBL": "Central Defender", "SW": "Central Defender",
-
-    # Central Midfielder
-    "CMF": "Central Midfielder", "CM": "Central Midfielder",
-    "RCMF": "Central Midfielder", "RCM": "Central Midfielder",
-    "LCMF": "Central Midfielder", "LCM": "Central Midfielder",
-    "DMF": "Central Midfielder", "DM": "Central Midfielder", "CDM": "Central Midfielder",
-    "RDMF": "Central Midfielder", "RDM": "Central Midfielder",
-    "LDMF": "Central Midfielder", "LDM": "Central Midfielder",
-    "AMF": "Central Midfielder", "AM": "Central Midfielder", "CAM": "Central Midfielder",
-    "SS": "Central Midfielder", "10": "Central Midfielder",
-
-    # Wide Midfielder
-    "LWF": "Wide Midfielder", "RWF": "Wide Midfielder",
-    "RW": "Wide Midfielder", "LW": "Wide Midfielder",
-    "LAMF": "Wide Midfielder", "RAMF": "Wide Midfielder",
-    "RM": "Wide Midfielder", "LM": "Wide Midfielder",
-    "WF": "Wide Midfielder", "RWG": "Wide Midfielder", "LWG": "Wide Midfielder", "W": "Wide Midfielder",
-
-    # Central Forward
-    "CF": "Central Forward", "ST": "Central Forward", "9": "Central Forward",
-    "FW": "Central Forward", "STK": "Central Forward", "CFW": "Central Forward"
-}
 
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
@@ -107,470 +74,99 @@ def parse_first_position(cell) -> str:
     first = re.split(r"[,/]", str(cell))[0].strip()
     return _clean_pos_token(first)
 
+# Map raw position tokens into your 7 buckets
+RAW_TO_SEVEN = {
+    # Goalkeeper
+    "GK":"Goalkeeper", "GKP":"Goalkeeper", "GOALKEEPER":"Goalkeeper",
+
+    # Centre Back
+    "CB":"Centre Back", "RCB":"Centre Back", "LCB":"Centre Back",
+    "CBR":"Centre Back", "CBL":"Centre Back", "SW":"Centre Back", "CDF":"Centre Back",
+
+    # Full Back
+    "RB":"Full Back", "LB":"Full Back", "RWB":"Full Back", "LWB":"Full Back",
+    "RFB":"Full Back", "LFB":"Full Back", "WB":"Full Back",
+
+    # Number 6 (defensive CM)
+    "DMF":"Number 6", "DM":"Number 6", "CDM":"Number 6",
+    "RDMF":"Number 6", "LDMF":"Number 6",
+
+    # Number 8 (all-round CM / CM/AM hybrid)
+    "CMF":"Number 8", "CM":"Number 8", "RCMF":"Number 8", "LCMF":"Number 8",
+    "AMF":"Number 8", "AM":"Number 8", "CAM":"Number 8", "SS":"Number 8", "10":"Number 8",
+
+    # Winger
+    "RW":"Winger", "LW":"Winger", "RWF":"Winger", "LWF":"Winger",
+    "RM":"Winger", "LM":"Winger", "WF":"Winger", "W":"Winger",
+
+    # Striker
+    "CF":"Striker", "ST":"Striker", "9":"Striker", "FW":"Striker", "STK":"Striker", "CFW":"Striker"
+}
+
 def map_first_position_to_group(cell) -> str:
     tok = parse_first_position(cell)
-    return RAW_TO_SIX.get(tok, "Wide Midfielder")  # safe default
+    return RAW_TO_SEVEN.get(tok, "Winger")  # safe-ish default wide
 
-# ========== Default template mapping (must match position_metrics keys) ==========
-DEFAULT_TEMPLATE = {
-    "Goalkeeper": "Goalkeeper",
-    "Wide Defender": "Wide Defender, Full Back",
-    "Central Defender": "Central Defender, All Round",
-    "Central Midfielder": "Central Midfielder, All Round CM",
-    "Wide Midfielder": "Wide Midfielder, Touchline Winger",
-    "Central Forward": "Striker, All Round CF"
+# ===================== TEMPLATES (7 ONLY) =====================
+# These are the *display* metric labels we want to plot for each position.
+# A resolver below will match them to real CSV columns via regex synonyms.
+position_templates = {
+    "Goalkeeper": [
+        "Save%", "Goals Conceded", "Claims%", "GK Aggressive Dist.", "Goalkeeper OBV",
+        "Pass OBV", "Long Balls", "LBP/Pass%",  # distribution
+    ],
+    "Centre Back": [
+        # Defensive
+        "Defensive Duels", "Defensive Duels Won%", "Aerial Duels", "Aerial Duels Won%",
+        "Blocks", "Interceptions", "Clearances",
+        # Possession
+        "Accurate Passes%", "Forward Passes", "Accurate Forward Passes%",
+        "Passes to Final Third", "Accurate Passes to Final Third%",
+        "Dribbles", "Successful Dribbles%",
+    ],
+    "Full Back": [
+        # Defensive
+        "Successful Defensive Actions", "Defensive Duels", "Defensive Duels Won%", "Interceptions",
+        # Possession / crossing threat
+        "Crosses", "Accurate Crosses%", "Passes to Final Third", "Accurate Passes to Final Third%",
+        "Dribbles", "Successful Dribbles%",
+        # Attacking
+        "xG Assisted", "Assists", "Shot Assists"
+    ],
+    "Number 6": [
+        # Defensive screen
+        "Successful Defensive Actions", "Defensive Duels", "Defensive Duels Won%",
+        "Aerial Duels", "Aerial Duels Won%", "Interceptions",
+        # Build-up
+        "Accurate Passes%", "Forward Passes", "Accurate Forward Passes%",
+        "Passes to Final Third", "Accurate Passes to Final Third%",
+        "Pass OBV"
+    ],
+    "Number 8": [
+        # Attacking & box arrivals
+        "NP Goals", "xG", "Shots", "Shots on Target%", "Goal Conversion%",
+        "Assists", "xG Assisted",
+        # Progression
+        "Forward Passes", "Accurate Forward Passes%", "Passes to Final Third", "Accurate Passes to Final Third%",
+        # Carry & dribble
+        "Dribbles", "Successful Dribbles%"
+    ],
+    "Winger": [
+        "NP Goals", "xG", "Assists", "xG Assisted",
+        "Crosses", "Accurate Crosses%", "Dribbles", "Successful Dribbles%",
+        "Fouls Suffered", "Shot Assists",
+        "Passes to Penalty Area", "Accurate Passes to Penalty Area%",
+        "Touches In Box"
+    ],
+    "Striker": [
+        "Successful Defensive Actions", "Aerial Duels", "Aerial Duels Won%",
+        "NP Goals", "xG", "Shots", "Shots on Target%", "Goal Conversion%",
+        "Assists", "xG Assisted", "Shot Assists",
+        "Touches In Box"
+    ],
 }
 
-# ========== Metric sets ==========
-position_metrics = {
-    # ================== GOALKEEPER ==================
-    "Goalkeeper": {
-        "metrics": [
-            "Clean sheets per 90", "Conceded goals per 90", "Prevented goals per 90",
-            "Save rate, %", "Shots against per 90", "Aerial duels per 90", "Exits per 90",
-            "Passes per 90", "Accurate passes, %", "Short / medium passes per 90",
-            "Accurate short / medium passes, %", "Long passes per 90", "Accurate long passes, %"
-        ],
-        "groups": {
-            "Clean sheets per 90": "Goalkeeping",
-            "Conceded goals per 90": "Goalkeeping",
-            "Prevented goals per 90": "Goalkeeping",
-            "Save rate, %": "Goalkeeping",
-            "Shots against per 90": "Goalkeeping",
-            "Aerial duels per 90": "Goalkeeping",
-            "Exits per 90": "Goalkeeping",
-            "Passes per 90": "Possession",
-            "Accurate passes, %": "Possession",
-            "Short / medium passes per 90": "Possession",
-            "Accurate short / medium passes, %": "Possession",
-            "Long passes per 90": "Possession",
-            "Accurate long passes, %": "Possession"
-        }
-    },
-
-    # ================== CENTRAL DEFENDERS ==================
-    "Central Defender, Ball Winning": {
-        "metrics": [
-            "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %",
-            "Shots blocked per 90", "PAdj Interceptions",
-            "Head goals per 90", "Successful dribbles, %", "Accurate passes, %"
-        ],
-        "groups": {
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Aerial duels per 90": "Defensive",
-            "Aerial duels won, %": "Defensive",
-            "Shots blocked per 90": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Head goals per 90": "Attacking",
-            "Successful dribbles, %": "Possession",
-            "Accurate passes, %": "Possession"
-        }
-    },
-    "Central Defender, Ball Playing": {
-        "metrics": [
-            "Defensive duels per 90", "Defensive duels won, %",
-            "Shots blocked per 90", "PAdj Interceptions",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Accurate passes, %", "Dribbles per 90", "Successful dribbles, %"
-        ],
-        "groups": {
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Shots blocked per 90": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Accurate passes, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession"
-        }
-    },
-    "Central Defender, All Round": {
-        "metrics": [
-            "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %",
-            "Shots blocked per 90", "PAdj Interceptions",
-            "Accurate passes, %", "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %"
-        ],
-        "groups": {
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Aerial duels per 90": "Defensive",
-            "Aerial duels won, %": "Defensive",
-            "Shots blocked per 90": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Accurate passes, %": "Possession",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession"
-        }
-    },
-
-    # ================== WIDE DEFENDERS ==================
-    "Wide Defender, Full Back": {
-        "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "PAdj Interceptions", "Crosses per 90", "Accurate crosses, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %",
-            "xA per 90", "Assists per 90"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "xA per 90": "Attacking",
-            "Assists per 90": "Attacking"
-        }
-    },
-    "Wide Defender, Wing Back": {
-        "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "Dribbles per 90", "Successful dribbles, %", "Offensive duels per 90", "Offensive duels won, %",
-            "Crosses per 90", "Accurate crosses, %", "Passes to final third per 90",
-            "xA per 90", "Assists per 90", "Shot assists per 90"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "xA per 90": "Attacking",
-            "Assists per 90": "Attacking",
-            "Shot assists per 90": "Attacking"
-        }
-    },
-    "Wide Defender, Inverted": {
-        "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "PAdj Interceptions", "Forward passes per 90", "Accurate forward passes, %",
-            "Through passes per 90", "Accurate through passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "xA per 90", "Assists per 90"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Through passes per 90": "Possession",
-            "Accurate through passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "xA per 90": "Attacking",
-            "Assists per 90": "Attacking"
-        }
-    },
-
-    # ================== CENTRAL MIDFIELDERS ==================
-    "Central Midfielder, Creative": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Goal conversion, %",
-            "Assists per 90", "xA per 90", "Shots per 90", "Shots on target, %",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "Through passes per 90", "Accurate through passes, %",
-            "Dribbles per 90", "Successful dribbles, %"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Through passes per 90": "Possession",
-            "Accurate through passes, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession"
-        }
-    },
-    "Central Midfielder, Defensive": {
-        "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %", "PAdj Interceptions",
-            "Successful dribbles, %", "Offensive duels per 90", "Offensive duels won, %",
-            "Accurate passes, %", "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Aerial duels per 90": "Defensive",
-            "Aerial duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Successful dribbles, %": "Possession",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Accurate passes, %": "Possession",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession"
-        }
-    },
-    "Central Midfielder, All Round CM": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Goal conversion, %",
-            "Assists per 90", "xA per 90", "Shots per 90", "Shots on target, %",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %",
-            "Successful defensive actions per 90", "Defensive duels per 90",
-            "Defensive duels won, %", "PAdj Interceptions"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive"
-        }
-    },
-
-    # ================== WIDE MIDFIELDERS ==================
-    "Wide Midfielder, Touchline Winger": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Assists per 90", "xA per 90",
-            "Crosses per 90", "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
-            "Fouls suffered per 90", "Shot assists per 90",
-            "Passes to penalty area per 90", "Accurate passes to penalty area, %"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Fouls suffered per 90": "Possession",
-            "Shot assists per 90": "Possession",
-            "Passes to penalty area per 90": "Possession",
-            "Accurate passes to penalty area, %": "Possession"
-        }
-    },
-    "Wide Midfielder, Inverted Winger": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Assists per 90", "xA per 90",
-            "Dribbles per 90", "Successful dribbles, %",
-            "Fouls suffered per 90", "Shot assists per 90",
-            "Passes to penalty area per 90", "Accurate passes to penalty area, %",
-            "Deep completions per 90"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Fouls suffered per 90": "Possession",
-            "Shot assists per 90": "Possession",
-            "Passes to penalty area per 90": "Possession",
-            "Accurate passes to penalty area, %": "Possession",
-            "Deep completions per 90": "Possession"
-        }
-    },
-    "Wide Midfielder, Defensive Wide Midfielder": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Assists per 90", "xA per 90",
-            "Crosses per 90", "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
-            "Fouls suffered per 90", "Shot assists per 90",
-            "Successful defensive actions per 90", "Defensive duels won, %", "PAdj Interceptions"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Fouls suffered per 90": "Possession",
-            "Shot assists per 90": "Possession",
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive"
-        }
-    },
-
-    # ================== STRIKERS ==================
-    "Striker, Number 10": {
-        "metrics": [
-            "Successful defensive actions per 90",
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Assists per 90", "xA per 90", "Shot assists per 90",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Through passes per 90", "Accurate through passes, %"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Off The Ball",
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shot assists per 90": "Attacking",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Through passes per 90": "Possession",
-            "Accurate through passes, %": "Possession"
-        }
-    },
-    "Striker, Target Man": {
-        "metrics": [
-            "Aerial duels per 90", "Aerial duels won, %",
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Head goals per 90", "Assists per 90", "xA per 90", "Shot assists per 90",
-            "Offensive duels per 90", "Offensive duels won, %",
-            "Passes to penalty area per 90", "Accurate passes to penalty area, %"
-        ],
-        "groups": {
-            "Aerial duels per 90": "Off The Ball",
-            "Aerial duels won, %": "Off The Ball",
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Head goals per 90": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shot assists per 90": "Attacking",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Passes to penalty area per 90": "Possession",
-            "Accurate passes to penalty area, %": "Possession"
-        }
-    },
-    "Striker, Penalty Box Striker": {
-        "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Shot assists per 90", "Touches in penalty area per 90",
-            "Offensive duels per 90", "Offensive duels won, %",
-            "Dribbles per 90", "Successful dribbles, %"
-        ],
-        "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Shot assists per 90": "Attacking",
-            "Touches in penalty area per 90": "Attacking",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession"
-        }
-    },
-    "Striker, All Round CF": {
-        "metrics": [
-            "Successful defensive actions per 90", "Aerial duels per 90", "Aerial duels won, %",
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Assists per 90", "xA per 90", "Shot assists per 90",
-            "Offensive duels per 90", "Offensive duels won, %"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Off The Ball",
-            "Aerial duels per 90": "Off The Ball",
-            "Aerial duels won, %": "Off The Ball",
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shot assists per 90": "Attacking",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession"
-        }
-    },
-    "Striker, Pressing Forward": {
-        "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %", "PAdj Interceptions",
-            "Offensive duels per 90", "Offensive duels won, %",
-            "Dribbles per 90", "Successful dribbles, %",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "xA per 90", "Shot assists per 90"
-        ],
-        "groups": {
-            "Successful defensive actions per 90": "Off The Ball",
-            "Defensive duels per 90": "Off The Ball",
-            "Defensive duels won, %": "Off The Ball",
-            "Aerial duels per 90": "Off The Ball",
-            "Aerial duels won, %": "Off The Ball",
-            "PAdj Interceptions": "Off The Ball",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "xA per 90": "Attacking",
-            "Shot assists per 90": "Attacking"
-        }
-    }
-}
-
-# Colors
+# Group colors (kept)
 group_colors = {
     "Off The Ball": "crimson",
     "Attacking": "royalblue",
@@ -579,28 +175,172 @@ group_colors = {
     "Goalkeeping": "purple"
 }
 
+# Metric groups per template (display labels → group)
+position_groups = {
+    "Goalkeeper": {
+        "Save%":"Goalkeeping", "Goals Conceded":"Goalkeeping", "Claims%":"Goalkeeping",
+        "GK Aggressive Dist.":"Goalkeeping", "Goalkeeper OBV":"Goalkeeping",
+        "Pass OBV":"Possession", "Long Balls":"Possession", "LBP/Pass%":"Possession",
+    },
+    "Centre Back": {
+        "Defensive Duels":"Defensive", "Defensive Duels Won%":"Defensive",
+        "Aerial Duels":"Defensive", "Aerial Duels Won%":"Defensive",
+        "Blocks":"Defensive", "Interceptions":"Defensive", "Clearances":"Defensive",
+        "Accurate Passes%":"Possession", "Forward Passes":"Possession", "Accurate Forward Passes%":"Possession",
+        "Passes to Final Third":"Possession", "Accurate Passes to Final Third%":"Possession",
+        "Dribbles":"Possession", "Successful Dribbles%":"Possession"
+    },
+    "Full Back": {
+        "Successful Defensive Actions":"Defensive", "Defensive Duels":"Defensive",
+        "Defensive Duels Won%":"Defensive", "Interceptions":"Defensive",
+        "Crosses":"Possession", "Accurate Crosses%":"Possession",
+        "Passes to Final Third":"Possession", "Accurate Passes to Final Third%":"Possession",
+        "Dribbles":"Possession", "Successful Dribbles%":"Possession",
+        "xG Assisted":"Attacking", "Assists":"Attacking", "Shot Assists":"Attacking"
+    },
+    "Number 6": {
+        "Successful Defensive Actions":"Defensive", "Defensive Duels":"Defensive",
+        "Defensive Duels Won%":"Defensive", "Aerial Duels":"Defensive",
+        "Aerial Duels Won%":"Defensive", "Interceptions":"Defensive",
+        "Accurate Passes%":"Possession", "Forward Passes":"Possession",
+        "Accurate Forward Passes%":"Possession", "Passes to Final Third":"Possession",
+        "Accurate Passes to Final Third%":"Possession", "Pass OBV":"Possession"
+    },
+    "Number 8": {
+        "NP Goals":"Attacking", "xG":"Attacking", "Shots":"Attacking",
+        "Shots on Target%":"Attacking", "Goal Conversion%":"Attacking",
+        "Assists":"Attacking", "xG Assisted":"Attacking",
+        "Forward Passes":"Possession", "Accurate Forward Passes%":"Possession",
+        "Passes to Final Third":"Possession", "Accurate Passes to Final Third%":"Possession",
+        "Dribbles":"Possession", "Successful Dribbles%":"Possession"
+    },
+    "Winger": {
+        "NP Goals":"Attacking", "xG":"Attacking", "Assists":"Attacking", "xG Assisted":"Attacking",
+        "Crosses":"Possession", "Accurate Crosses%":"Possession",
+        "Dribbles":"Possession", "Successful Dribbles%":"Possession",
+        "Fouls Suffered":"Possession", "Shot Assists":"Attacking",
+        "Passes to Penalty Area":"Possession", "Accurate Passes to Penalty Area%":"Possession",
+        "Touches In Box":"Attacking"
+    },
+    "Striker": {
+        "Successful Defensive Actions":"Off The Ball", "Aerial Duels":"Off The Ball", "Aerial Duels Won%":"Off The Ball",
+        "NP Goals":"Attacking", "xG":"Attacking", "Shots":"Attacking", "Shots on Target%":"Attacking",
+        "Goal Conversion%":"Attacking", "Assists":"Attacking", "xG Assisted":"Attacking", "Shot Assists":"Attacking",
+        "Touches In Box":"Attacking"
+    },
+}
+
+# Default template per bucket (same-name now)
+DEFAULT_TEMPLATE = {g: g for g in SEVEN_GROUPS}
+
+# ===================== METRIC SYNONYMS (resolver) =====================
+# Left side: the *display* label we use in charts.
+# Right side: list of regex patterns it should match in your CSV.
+METRIC_SYNONYMS = {
+    # GK
+    "Save%": [r"^Save%$"],
+    "Goals Conceded": [r"Goals Conceded"],
+    "Claims%": [r"Claims%"],
+    "GK Aggressive Dist.": [r"GK Aggressive Dist\.?"],
+    "Goalkeeper OBV": [r"Goalkeeper OBV"],
+    "Pass OBV": [r"Pass OBV"],
+    "Long Balls": [r"Long Balls", r"Long Pass(es)?"],
+    "LBP/Pass%": [r"LBP/Pass%"],
+
+    # Def actions
+    "Defensive Duels": [r"Defensive Duels(?! Won)"],
+    "Defensive Duels Won%": [r"Defensive Duels Won.*%"],
+    "Aerial Duels": [r"Aerial Duels(?! Won)"],
+    "Aerial Duels Won%": [r"Aerial Duels Won.*%"],
+    "Blocks": [r"Blocks"],
+    "Interceptions": [r"Interceptions|PAdj Interceptions"],
+    "Clearances": [r"Clearances"],
+    "Successful Defensive Actions": [r"Successful Defensive Actions"],
+
+    # Possession / Passing
+    "Accurate Passes%": [r"Accurate Pass(es)?\,?\s*%|Pass Accuracy%"],
+    "Forward Passes": [r"Forward Pass(es)?"],
+    "Accurate Forward Passes%": [r"Accurate Forward Pass(es)?.*%"],
+    "Passes to Final Third": [r"Pass(es)? to Final Third"],
+    "Accurate Passes to Final Third%": [r"Accurate Pass(es)? to Final Third.*%"],
+    "Passes to Penalty Area": [r"Pass(es)? to Penalty Area"],
+    "Accurate Passes to Penalty Area%": [r"Accurate Pass(es)? to Penalty Area.*%"],
+
+    # Carry/Dribble/Cross
+    "Dribbles": [r"Dribbles(?!.*%)"],
+    "Successful Dribbles%": [r"Successful Dribbles.*%"],
+    "Crosses": [r"Cross(es)?(?!.*Acc)"],
+    "Accurate Crosses%": [r"(Accurate )?Cross.*%"],
+
+    # Attacking
+    "NP Goals": [r"NP Goals"],
+    "xG": [r"^xG$"],
+    "Shots": [r"^Shots$"],
+    "Shots on Target%": [r"Shots on target.*%|SOT%"],
+    "Goal Conversion%": [r"Goal Conversion%"],
+    "Assists": [r"^Assists$"],
+    "xG Assisted": [r"xG Assisted|xA"],
+    "Shot Assists": [r"Shot Assists|Key Pass(es)?"],
+    "Fouls Suffered": [r"Fouls Suffered"],
+    "Touches In Box": [r"Touches In Box"],
+}
+
+def resolve_metric_columns(df_cols, desired_labels):
+    """
+    Returns:
+      rename_map: dict of {actual_col_name: display_label}
+      missing: list of display_labels we couldn't find
+    """
+    rename_map = {}
+    missing = []
+    for disp in desired_labels:
+        patterns = METRIC_SYNONYMS.get(disp, [])
+        found = None
+        for pat in patterns:
+            rx = re.compile(pat, re.I)
+            for c in df_cols:
+                if rx.search(str(c)):
+                    found = c
+                    break
+            if found:
+                break
+        if found:
+            rename_map[found] = disp
+        else:
+            missing.append(disp)
+    return rename_map, missing
+
 # ---------- File upload ----------
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload your CSV or Excel file", type=["csv", "xlsx"])
 if not uploaded_file:
     st.stop()
 
-df = pd.read_excel(uploaded_file)
+# Load CSV (preferred) or Excel
+if uploaded_file.name.lower().endswith(".csv"):
+    df = pd.read_csv(uploaded_file)
+else:
+    df = pd.read_excel(uploaded_file)
 
-# ---------- Positions ----------
-if "Position" in df.columns:
-    df["Positions played"] = df["Position"].astype(str)
+# ---------- Position labelling ----------
+pos_col_name = "Position" if "Position" in df.columns else None
+if pos_col_name:
+    df["Positions played"] = df[pos_col_name].astype(str)
+    df["Seven-Group Position"] = df[pos_col_name].apply(map_first_position_to_group)
 else:
     df["Positions played"] = np.nan
-
-df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group) if "Position" in df.columns else np.nan
+    df["Seven-Group Position"] = np.nan
 
 # ---------- Minutes filter ----------
-minutes_col = "Minutes played"
+minutes_col = "Minutes played" if "Minutes played" in df.columns else None
 min_minutes = st.number_input("Minimum minutes to include", min_value=0, value=1000, step=50)
-df["_minutes_numeric"] = pd.to_numeric(df.get(minutes_col, np.nan), errors="coerce")
-df = df[df["_minutes_numeric"] >= min_minutes].copy()
+if minutes_col:
+    df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+    df = df[df["_minutes_numeric"] >= min_minutes].copy()
+else:
+    st.info("No 'Minutes played' column found; minutes filter skipped.")
+
 if df.empty:
-    st.warning("No players meet the minutes threshold. Lower the minimum.")
+    st.warning("No players meet the minutes threshold. Lower the minimum or check your data file.")
     st.stop()
 
 # ---------- Age slider filter ----------
@@ -616,15 +356,22 @@ if "Age" in df.columns:
 else:
     st.info("No Age column found, age filter skipped.")
 
-st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
+if minutes_col:
+    st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
+else:
+    st.caption(f"Players remaining, {len(df)}")
 
-# ---------- 6-group filter ----------
-available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
+# ---------- 7-group filter ----------
+if "Seven-Group Position" in df.columns:
+    available_groups = [g for g in SEVEN_GROUPS if g in df["Seven-Group Position"].dropna().unique()]
+else:
+    available_groups = []
+
 selected_groups = st.multiselect("Include groups", options=available_groups, default=[], label_visibility="collapsed")
 if selected_groups:
-    df = df[df["Six-Group Position"].isin(selected_groups)].copy()
+    df = df[df["Seven-Group Position"].isin(selected_groups)].copy()
     if df.empty:
-        st.warning("No players after 6-group filter. Clear filters or choose different groups.")
+        st.warning("No players after position filter. Clear filters or pick different groups.")
         st.stop()
 
 # Track if exactly one group is selected
@@ -643,127 +390,72 @@ if "ec_rows" not in st.session_state:
 # Initialise template once (prefer single-group default)
 if st.session_state.selected_template is None:
     if current_single_group:
-        st.session_state.selected_template = DEFAULT_TEMPLATE.get(current_single_group, list(position_metrics.keys())[0])
+        st.session_state.selected_template = DEFAULT_TEMPLATE.get(current_single_group, list(position_templates.keys())[0])
         st.session_state.last_auto_group = current_single_group
     else:
-        st.session_state.selected_template = list(position_metrics.keys())[0]
+        st.session_state.selected_template = list(position_templates.keys())[0]
 
-# If the 6-group selection changed to a *new* single group, snap to that default
+# If the 7-group selection changed to a *new* single group, snap to that default
 if current_single_group is not None and current_single_group != st.session_state.last_auto_group:
     st.session_state.selected_template = DEFAULT_TEMPLATE.get(current_single_group, st.session_state.selected_template)
     st.session_state.last_auto_group = current_single_group
-# If zero/multiple groups, don't auto-change the template.
 
-# ---------- Build metric pool for Essential Criteria (needs current template) ----------
-current_template_name = st.session_state.selected_template or list(position_metrics.keys())[0]
-current_metrics = position_metrics[current_template_name]["metrics"]
-for m in current_metrics:
-    if m not in df.columns:
-        df[m] = 0
-df[current_metrics] = df[current_metrics].fillna(0)
+# ---------- Template select ----------
+template_names = list(position_templates.keys())
+tpl_index = template_names.index(st.session_state.selected_template) if st.session_state.selected_template in template_names else 0
+selected_position_template = st.selectbox(
+    "Choose a position template for the chart",
+    template_names,
+    index=tpl_index,
+    key="template_select"
+)
+st.session_state.selected_template = selected_position_template
 
-# ---------- Essential Criteria (multiple AND rules) ----------
-with st.expander("Essential Criteria", expanded=False):
-    use_all_cols = st.checkbox(
-        "Pick from all numeric columns",
-        value=False,
-        help="Unchecked, only metrics in the selected template are shown"
+# ---------- Resolve metrics from new provider ----------
+desired_metrics = position_templates[selected_position_template]
+rename_map, missing_metrics = resolve_metric_columns(df.columns, desired_metrics)
+
+if missing_metrics:
+    st.warning(
+        "Some metrics weren’t found in your file and will be filled with 0s: " +
+        ", ".join(missing_metrics)
     )
-    numeric_cols_all = sorted([c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])])
-    metric_pool_base = numeric_cols_all if use_all_cols else current_metrics
 
-    cbtn1, cbtn2, cbtn3 = st.columns(3)
-    with cbtn1:
-        if st.button("Add criterion"):
-            st.session_state.ec_rows += 1
-    with cbtn2:
-        if st.button("Remove last", disabled=st.session_state.ec_rows <= 1):
-            st.session_state.ec_rows = max(1, st.session_state.ec_rows - 1)
-    with cbtn3:
-        apply_nonneg = st.checkbox("Apply all criteria", value=False)
+# Make a working copy with resolved column names renamed to the *display* labels
+df_work = df.copy()
+df_work = df_work.rename(columns=rename_map)
 
-    if len(metric_pool_base) == 0:
-        st.info("No numeric metrics available to filter.")
-        apply_nonneg = False
-        st.session_state.ec_rows = 1
+# Ensure all desired metric columns exist
+for disp in desired_metrics:
+    if disp not in df_work.columns:
+        df_work[disp] = 0
 
-    criteria = []
-    for i in range(st.session_state.ec_rows):
-        st.markdown(f"**Criterion {i+1}**")
-        c1, c2, c3, c4 = st.columns([3, 2, 2, 3])
+# ---------- Metric groups for the chosen template ----------
+metric_groups = position_groups[selected_position_template]
+sel_metrics = list(metric_groups.keys())
 
-        prev_key_metric = f"ec_metric_{i}"
-        prev_metric = st.session_state.get(prev_key_metric, None)
-        metric_pool_display = list(metric_pool_base)
-        # Keep previous metric visible even if pool changed (prevents jumpiness)
-        if prev_metric and prev_metric not in metric_pool_display and prev_metric in numeric_cols_all:
-            metric_pool_display = [prev_metric] + [m for m in metric_pool_display if m != prev_metric]
+# ---------- Percentiles & base columns ----------
+metrics_df = df_work[sel_metrics].copy()
+percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
 
-        with c1:
-            metric_name = st.selectbox("Metric", metric_pool_display, key=prev_key_metric)
+keep_cols = ["Player", "Team within selected timeframe", "Team", "Age", "Height", "Positions played", "Minutes played"]
+for c in keep_cols:
+    if c not in df_work.columns:
+        df_work[c] = np.nan
 
-        with c2:
-            mode = st.radio("Apply to", ["Raw", "Percentile"], horizontal=True, key=f"ec_mode_{i}")
+plot_data = pd.concat([df_work[keep_cols], metrics_df, percentile_df.add_suffix(" (percentile)")], axis=1)
 
-        with c3:
-            op = st.selectbox("Operator", [">=", ">", "<=", "<"], index=0, key=f"ec_op_{i}")
+percentiles_all = plot_data[[m + " (percentile)" for m in sel_metrics]]
+z_scores_all = (percentiles_all - 50) / 15
+plot_data["Avg Z Score"] = z_scores_all.mean(axis=1)
+plot_data["Rank"] = plot_data["Avg Z Score"].rank(ascending=False, method="min").astype(int)
 
-        with c4:
-            if mode == "Percentile":
-                default_thr = 50.0
-            else:
-                default_thr = float(np.nanmedian(pd.to_numeric(df[metric_name], errors="coerce")))
-                if not np.isfinite(default_thr):
-                    default_thr = 0.0
-            thr_str = st.text_input("Threshold", value=str(int(default_thr)), key=f"ec_thr_{i}")
-            try:
-                thr_val = float(thr_str)
-            except ValueError:
-                thr_val = default_thr
+# ---------- Player select ----------
+if "Player" not in df_work.columns:
+    st.error("No 'Player' column found in data.")
+    st.stop()
 
-        criteria.append((metric_name, mode, op, thr_val))
-
-    if apply_nonneg and len(criteria) > 0:
-        temp_cols = []
-        mask_all = pd.Series(True, index=df.index)
-
-        for metric_name, mode, op, thr_val in criteria:
-            if mode == "Percentile":
-                df[metric_name] = pd.to_numeric(df[metric_name], errors="coerce")
-                perc_series = (df[metric_name].rank(pct=True) * 100).round(1)
-                tmp_col = f"__tmp_percentile__{metric_name}"
-                df[tmp_col] = perc_series
-                filter_col = tmp_col
-                temp_cols.append(tmp_col)
-            else:
-                filter_col = metric_name
-                df[filter_col] = pd.to_numeric(df[filter_col], errors="coerce")
-
-            if op == ">=":
-                mask = df[filter_col] >= thr_val
-            elif op == ">":
-                mask = df[filter_col] > thr_val
-            elif op == "<=":
-                mask = df[filter_col] <= thr_val
-            else:
-                mask = df[filter_col] < thr_val
-
-            mask_all &= mask
-
-        kept = int(mask_all.sum())
-        dropped = int((~mask_all).sum())
-        df = df[mask_all].copy()
-
-        if temp_cols:
-            df.drop(columns=temp_cols, inplace=True, errors="ignore")
-
-        summary = " AND ".join(
-            [f"{m} {o} {t}{'%' if md=='Percentile' else ''}" for m, md, o, t in criteria]
-        )
-        st.caption(f"Essential Criteria applied: {summary}. Kept {kept}, removed {dropped} players.")
-
-# ---------- Player select (after EC). Changing player NEVER changes template ----------
-players = df["Player"].dropna().unique().tolist()
+players = df_work["Player"].dropna().astype(str).unique().tolist()
 if not players:
     st.warning("No players available after filters.")
     st.stop()
@@ -778,43 +470,6 @@ selected_player = st.selectbox(
     key="player_select"
 )
 st.session_state.selected_player = selected_player
-
-# ---------- Template select (user-controlled). Only auto-snaps when single-group changes ----------
-template_names = list(position_metrics.keys())
-tpl_index = template_names.index(st.session_state.selected_template) if st.session_state.selected_template in template_names else 0
-selected_position_template = st.selectbox(
-    "Choose a position template for the chart",
-    template_names,
-    index=tpl_index,
-    key="template_select"
-)
-st.session_state.selected_template = selected_position_template
-
-# ---------- Metrics for selected template, then percentiles ----------
-metrics = position_metrics[selected_position_template]["metrics"]
-metric_groups = position_metrics[selected_position_template]["groups"]
-
-# Ensure columns exist + fill
-for m in metrics:
-    if m not in df.columns:
-        df[m] = 0
-df[metrics] = df[metrics].fillna(0)
-
-metrics_df = df[metrics].copy()
-percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
-
-keep_cols = ["Player", "Team within selected timeframe", "Team", "Age", "Height", "Positions played", "Minutes played"]
-for c in keep_cols:
-    if c not in df.columns:
-        df[c] = np.nan
-
-plot_data = pd.concat([df[keep_cols], metrics_df, percentile_df.add_suffix(" (percentile)")], axis=1)
-
-sel_metrics = list(metric_groups.keys())
-percentiles_all = plot_data[[m + " (percentile)" for m in sel_metrics]]
-z_scores_all = (percentiles_all - 50) / 15
-plot_data["Avg Z Score"] = z_scores_all.mean(axis=1)
-plot_data["Rank"] = plot_data["Avg Z Score"].rank(ascending=False, method="min").astype(int)
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
@@ -842,13 +497,17 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    ax.bar(angles, percentiles, width=2*np.pi/num_bars*0.9, color=colors, edgecolor=colors, alpha=0.75)
+    ax.bar(angles, percentiles, width=2*np.pi/num_bars*0.9, edgecolor=None, alpha=0.75, color=colors)
 
     for angle, raw_val in zip(angles, raw):
-        ax.text(angle, 50, f"{raw_val:.2f}", ha="center", va="center", color="black", fontsize=10, fontweight="bold")
+        try:
+            ax.text(angle, 50, f"{float(raw_val):.2f}", ha="center", va="center", color="black", fontsize=10, fontweight="bold")
+        except Exception:
+            ax.text(angle, 50, "-", ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
     for i, angle in enumerate(angles):
-        label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
+        label = sel_metrics_loc[i]
+        label = label.replace(" per 90", "").replace(", %", " (%)")
         ax.text(angle, 108, label, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
     group_positions = {}
@@ -858,14 +517,14 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         mean_angle = np.mean(group_angles)
         ax.text(mean_angle, 125, group, ha="center", va="center", fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
 
-    age = row["Age"].values[0]
-    height = row["Height"].values[0]
-    team = row["Team within selected timeframe"].values[0]
+    age = row["Age"].values[0] if "Age" in row else np.nan
+    height = row["Height"].values[0] if "Height" in row else np.nan
+    team = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else np.nan
     mins = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
     rank_val = int(row["Rank"].values[0]) if "Rank" in row else None
 
-    age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
-    height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
+    age_str = f"{int(age)} years old" if pd.notnull(age) else ""
+    height_str = f"{int(height)} cm" if pd.notnull(height) else ""
     parts = [player_name]
     if age_str: parts.append(age_str)
     if height_str: parts.append(height_str)
@@ -905,6 +564,9 @@ if st.session_state.selected_player:
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Z-Score")
 cols_for_table = ["Player", "Positions played", "Age", "Team", "Team within selected timeframe", "Minutes played", "Avg Z Score", "Rank"]
+for c in cols_for_table:
+    if c not in plot_data.columns:
+        plot_data[c] = np.nan
 z_ranking = (plot_data[cols_for_table].sort_values(by="Avg Z Score", ascending=False).reset_index(drop=True))
 z_ranking[["Team", "Team within selected timeframe"]] = z_ranking[["Team", "Team within selected timeframe"]].fillna("N/A")
 if "Age" in z_ranking:
