@@ -878,42 +878,42 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     else:
         comp = ""
 
-    # --- Weighted Z Score ---
-z_scores = (percentiles - 50) / 15
-avg_z = float(np.mean(z_scores))
-
-mult = row["Multiplier"].values[0] if "Multiplier" in row.columns else 1.0
-if pd.isnull(mult):
-    mult = 1.0
-
-weighted_z = avg_z * float(mult)
-
-# Rating by weighted z
-if weighted_z >= 1.0:
-    rating, badge_color = "Excellent", "#228B22"
-elif weighted_z >= 0.3:
-    rating, badge_color = "Good", "#1E90FF"
-elif weighted_z >= -0.3:
-    rating, badge_color = "Average", "#DAA520"
-else:
-    rating, badge_color = "Below Average", "#DC143C"
-
-# Title strings
-age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
-height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
-parts = [player_name]
-if age_str: parts.append(age_str)
-if height_str: parts.append(height_str)
-line1 = " | ".join(parts)
-
-team_str = f"{team}" if team else ""
-comp_str = f"{comp}" if comp else ""
-mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
-rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
-z_str = f"Z {weighted_z:.2f} ({rating})"
-
-line2 = " | ".join([p for p in [role, team_str, comp_str, mins_str, rank_str, z_str] if p])
-ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+        # --- Weighted Z Score ---
+    z_scores = (percentiles - 50) / 15
+    avg_z = float(np.mean(z_scores))
+    
+    mult = row["Multiplier"].values[0] if "Multiplier" in row.columns else 1.0
+    if pd.isnull(mult):
+        mult = 1.0
+    
+    weighted_z = avg_z * float(mult)
+    
+    # Rating by weighted z
+    if weighted_z >= 1.0:
+        rating, badge_color = "Excellent", "#228B22"
+    elif weighted_z >= 0.3:
+        rating, badge_color = "Good", "#1E90FF"
+    elif weighted_z >= -0.3:
+        rating, badge_color = "Average", "#DAA520"
+    else:
+        rating, badge_color = "Below Average", "#DC143C"
+    
+    # Title strings
+    age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
+    height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
+    parts = [player_name]
+    if age_str: parts.append(age_str)
+    if height_str: parts.append(height_str)
+    line1 = " | ".join(parts)
+    
+    team_str = f"{team}" if team else ""
+    comp_str = f"{comp}" if comp else ""
+    mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
+    rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
+    z_str = f"Z {weighted_z:.2f} ({rating})"
+    
+    line2 = " | ".join([p for p in [role, team_str, comp_str, mins_str, rank_str, z_str] if p])
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
     # Line 1: Player | age | height
     age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
