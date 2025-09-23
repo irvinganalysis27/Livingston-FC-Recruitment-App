@@ -527,7 +527,7 @@ with st.expander("Essential Criteria", expanded=False):
         st.caption(f"Essential Criteria applied: {summary}. Kept {kept}, removed {dropped} players.")
 
 # ---------- Build "Player (Role)" for plotting and ranking ----------
-df["Player (Role)"] = df["Player"].astype(str) + " — " + df["Six-Group Position"].astype(str)
+df["Player (Role)"] = df["Player"].astype(str)
 
 # ---------- Player select (after EC). Changing player NEVER changes template ----------
 players = df["Player (Role)"].dropna().unique().tolist()
@@ -673,7 +673,7 @@ if st.session_state.selected_player:
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Z-Score")
 cols_for_table = [
-    "Player (Role)", "Player", "Six-Group Position", "Positions played",
+    "Player (Role)", "Player", "Positions played",
     "Age", "Team", "Team within selected timeframe",
     "Minutes played", "Avg Z Score", "Rank"
 ]
