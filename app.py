@@ -343,24 +343,30 @@ df = pd.read_excel(uploaded_file)
 # ---------- Positions ----------
 if "Position" in df.columns:
     df["Positions played"] = df["Position"].astype(str)
+    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
 else:
     df["Positions played"] = np.nan
+    df["Six-Group Position"] = np.nan
 
-df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group) if "Position" in df.columns else np.nan
+# Keep player names clean in UI (no role suffix)
+df["Player (Role)"] = df["Player"].astype(str)
 
-# Duplicate generic "Centre Midfield" rows into both Number 6 and Number 8
+# ---------- Expand generic CMs into both Number 6 and Number 8 ----------
 if "Six-Group Position" in df.columns:
-    cm_rows = df[df["Six-Group Position"] == "Centre Midfield"].copy()
-    if not cm_rows.empty:
-        cm6 = cm_rows.copy()
-        cm6["Six-Group Position"] = "Number 6"
-        cm8 = cm_rows.copy()
-        cm8["Six-Group Position"] = "Number 8"
-        # Append back to dataframe
-        df = pd.concat([df, cm6, cm8], ignore_index=True)
+    cm_mask = df["Six-Group Position"] == "Centre Midfield"
+    if cm_mask.any():
+        cm_rows = df.loc[cm_mask].copy()
+
+        cm_as_6 = cm_rows.copy()
+        cm_as_6["Six-Group Position"] = "Number 6"
+
+        cm_as_8 = cm_rows.copy()
+        cm_as_8["Six-Group Position"] = "Number 8"
+
+        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
 # Add a combined label to disambiguate duplicates in UI and tables
-df["Player (Role)"] = df["Player"].astype(str) + " — " + df["Six-Group Position"].astype(str)
+df["Player (Role)"] = df["Player"].astype(str)
 
 # ---------- Minutes filter ----------
 minutes_col = "Minutes played"
