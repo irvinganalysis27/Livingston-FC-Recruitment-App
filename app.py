@@ -790,7 +790,6 @@ plot_data["Multiplier"] = plot_data["Multiplier"].fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 plot_data["Rank"] = plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
 
-# ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
     row = plot_data[plot_data["Player"] == player_name]
     if row.empty:
@@ -811,14 +810,15 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     ax.set_facecolor("white")
     ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
-    ax.set_ylim(0, 100)
+    ax.set_ylim(0, 130)  # a little headroom for labels
     ax.set_yticklabels([])
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
+    # Bars
     ax.bar(angles, percentiles, width=2*np.pi/num_bars*0.9, color=colors, edgecolor=colors, alpha=0.75)
 
-    # Raw value labels on bars (optional)
+    # Raw numbers on rings
     for angle, raw_val in zip(angles, raw):
         try:
             ax.text(angle, 50, f"{float(raw_val):.2f}", ha="center", va="center", color="black", fontsize=10, fontweight="bold")
@@ -838,13 +838,19 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         mean_angle = np.mean(group_angles)
         ax.text(mean_angle, 125, group, ha="center", va="center", fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
 
-        # --- Title ---
+    # ---- Title (no league weight shown) ----
     age = row["Age"].values[0]
     height = row["Height"].values[0]
     team = row["Team within selected timeframe"].values[0]
     mins = row["Minutes played"].values[0]
-    rank_val = int(row["Rank"].values[0])
-    comp = row["Competition_norm"].values[0] if pd.notnull(row["Competition_norm"].values[0]) else row["Competition"].values[0]
+    rank_val = int(row["Rank"].values[0]) if pd.notnull(row["Rank"].values[0]) else None
+
+    # Competition display (use normalized if present)
+    comp = None
+    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
+        comp = row["Competition_norm"].values[0]
+    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
+        comp = row["Competition"].values[0]
 
     age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
     height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
@@ -855,40 +861,41 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
 
     comp_str = f"{comp}" if comp else ""
     mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
-    rank_str = f"Rank #{rank_val}" if pd.notnull(rank_val) else ""
-    role_str = row["Six-Group Position"].values[0] if pd.notnull(row["Six-Group Position"].values[0]) else ""
-
-    # ⚠️ removed multiplier completely
+    rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
+    role_str = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns and pd.notnull(row["Six-Group Position"].values[0]) else ""
     line2 = " | ".join([p for p in [role_str, team, comp_str, mins_str, rank_str] if p])
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-    # Badge (based on weighted Z)
+    # ---- Z score + Rating (inside radar). Uses multiplier if present, otherwise plain Z. ----
     z_scores = (percentiles - 50) / 15
     avg_z = float(np.mean(z_scores))
-    weighted_z = float(avg_z * (mult if pd.notnull(mult) else 1.0))
 
-    if weighted_z >= 1.0:
-        badge = ("Excellent", "#228B22")
-    elif weighted_z >= 0.3:
-        badge = ("Good", "#1E90FF")
-    elif weighted_z >= -0.3:
-        badge = ("Average", "#DAA520")
+    # safe multiplier pull (won't crash if missing)
+    mult = row["Multiplier"].values[0] if "Multiplier" in row.columns else np.nan
+    z_for_display = avg_z * (float(mult) if pd.notnull(mult) else 1.0)
+
+    # Rating by (weighted) z
+    if z_for_display >= 1.0:
+        rating, badge_color = "Excellent", "#228B22"
+    elif z_for_display >= 0.3:
+        rating, badge_color = "Good", "#1E90FF"
+    elif z_for_display >= -0.3:
+        rating, badge_color = "Average", "#DAA520"
     else:
-        badge = ("Below Average", "#DC143C")
+        rating, badge_color = "Below Average", "#DC143C"
 
-    st.markdown(
-        f"<div style='text-align:center; margin-top: 20px;'>"
-        f"<span style='font-size:24px; font-weight:bold;'>Weighted Z Score, {weighted_z:.2f}</span><br>"
-        f"<span style='background-color:{badge[1]}; color:white; padding:5px 10px; border-radius:8px; font-size:20px;'>{badge[0]}</span></div>",
-        unsafe_allow_html=True
-    )
+    # Write Z + Rating on the chart (near centre but not covering the logo)
+    ax.text(0, 18, f"Z: {z_for_display:.2f}", ha="center", va="center", fontsize=16, fontweight="bold", color="black")
+    ax.text(0, 10, rating, ha="center", va="center",
+            fontsize=13, fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor=badge_color, edgecolor="none"))
 
-    # Club logo in centre
+    # Club logo in the centre
     if logo is not None:
         try:
             img = np.array(logo)
-            imagebox = OffsetImage(img, zoom=0.2)
+            imagebox = OffsetImage(img, zoom=0.18)
             ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
             ax.add_artist(ab)
         except Exception as e:
