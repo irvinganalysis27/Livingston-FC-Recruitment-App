@@ -51,6 +51,127 @@ if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
+# --- League name normalisation: StatsBomb -> your Opta names ---
+LEAGUE_SYNONYMS = {
+    # Australia
+    "A-League": "Australia A-League Men",
+
+    # Austria
+    "2. Liga": "Austria 2. Liga",
+
+    # Belgium
+    "Challenger Pro League": "Belgium Challenger Pro League",
+
+    # Bulgaria
+    "First League": "Bulgaria First League",
+
+    # Croatia
+    "1. HNL": "Croatia 1. HNL",
+    "HNL": "Croatia 1. HNL",
+
+    # Czech Republic
+    "Czech Liga": "Czech First Tier",
+
+    # Denmark
+    "1st Division": "Denmark 1st Division",
+    "Superliga": "Denmark Superliga",
+
+    # England
+    "League One": "England League One",
+    "League Two": "England League Two",
+    "National League": "England National League",
+    "National League N / S": "England National League N/S",
+
+    # Estonia
+    "Premium Liiga": "Estonia Premium Liiga",
+
+    # Finland
+    "Veikkausliiga": "Finland Veikkausliiga",
+
+    # France
+    "Championnat National": "France National 1",
+
+    # Germany
+    "3. Liga": "Germany 3. Liga",
+
+    # Greece
+    "Super League": "Greece Super League 1",
+
+    # Hungary
+    "NB I": "Hungary NB I",
+
+    # Iceland
+    "Besta deild karla": "Iceland Besta Deild",
+
+    # Italy
+    "Serie C": "Italy Serie C",
+
+    # Japan
+    "J2 League": "Japan J2 League",
+
+    # Latvia
+    "Virsliga": "Latvia Virsliga",
+
+    # Lithuania
+    "A Lyga": "Lithuania A Lyga",
+
+    # Morocco
+    "Botola Pro": "Morocco Botola Pro",
+
+    # Netherlands
+    "Eerste Divisie": "Netherlands Eerste Divisie",
+
+    # Northern Ireland
+    "Premiership": "Northern Ireland Premiership",
+
+    # Norway
+    "1. Division": "Norway 1. Division",
+    "Eliteserien": "Norway Eliteserien",
+
+    # Poland
+    "I Liga": "Poland 1 Liga",
+    "Ekstraklasa": "Poland Ekstraklasa",
+
+    # Portugal
+    "Segunda Liga": "Portugal Segunda Liga",
+    "Liga Pro": "Portugal Segunda Liga",
+
+    # Republic of Ireland
+    "Premier Division": "Republic of Ireland Premier Division",
+
+    # Romania
+    "Liga 1": "Romania Liga 1",
+
+    # Scotland
+    "Championship": "Scotland Championship",
+    "Scottish Premiership": "Scotland Premiership",
+
+    # Serbia
+    "Super Liga": "Serbia Super Liga",
+
+    # Slovakia
+    "1. Liga": "Slovakia 1. Liga",
+
+    # Slovenia
+    "1. Liga (SVN)": "Slovenia 1. Liga",
+
+    # South Africa
+    "PSL": "South Africa Premier Division",
+
+    # Sweden
+    "Allsvenskan": "Sweden Allsvenskan",
+    "Superettan": "Sweden Superettan",
+
+    # Switzerland
+    "Challenge League": "Switzerland Challenge League",
+
+    # Tunisia
+    "Ligue 1": "Tunisia Ligue 1",
+
+    # USA
+    "USL Championship": "USA USL Championship",
+}
+
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
     "Goalkeeper",
@@ -115,7 +236,6 @@ RAW_TO_SIX = {
 }
 
 def parse_first_position(cell) -> str:
-    # We’ll use PRIMARY position only for mapping; UI will show both
     if pd.isna(cell):
         return ""
     return _clean_pos_token(str(cell))
@@ -135,7 +255,7 @@ DEFAULT_TEMPLATE = {
     "Striker": "Striker"
 }
 
-# ========== Radar metric sets ==========
+# ========== Radar metric sets (your new-provider metric names) ==========
 position_metrics = {
     "Goalkeeper": {
         "metrics": [
@@ -374,6 +494,29 @@ if not uploaded_file:
 
 df = pd.read_excel(uploaded_file)
 
+# Normalise Competition name and merge league multipliers
+if "Competition" in df.columns:
+    df["Competition_norm"] = (
+        df["Competition"]
+        .astype(str)
+        .str.strip()
+        .map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+    )
+else:
+    df["Competition_norm"] = np.nan
+
+# Load your multipliers (Excel with columns: League, Multiplier)
+try:
+    multipliers_df = pd.read_excel("league_multipliers.xlsx")
+    if {"League", "Multiplier"}.issubset(multipliers_df.columns):
+        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+    else:
+        st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
+        df["Multiplier"] = 1.0
+except Exception:
+    st.info("No league_multipliers.xlsx found. Using 1.0 for all leagues.")
+    df["Multiplier"] = 1.0
+
 # ---------- NORMALISE new-provider identifiers ----------
 rename_map = {}
 if "Name" in df.columns: rename_map["Name"] = "Player"
@@ -385,7 +528,7 @@ df.rename(columns=rename_map, inplace=True)
 if "Position" in df.columns:
     if "Secondary Position" in df.columns:
         df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
-            df["Secondary Position"].notna() & (df["Secondary Position"].astype(str)!=""),
+            df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
             ", " + df["Secondary Position"].astype(str),
             ""
         )
@@ -394,14 +537,13 @@ if "Position" in df.columns:
 else:
     df["Positions played"] = np.nan
 
-# Team within selected timeframe fallback
+# Fallbacks
 if "Team within selected timeframe" not in df.columns:
     if "Team" in df.columns:
         df["Team within selected timeframe"] = df["Team"]
     else:
         df["Team within selected timeframe"] = np.nan
 
-# Height fallback
 if "Height" not in df.columns:
     df["Height"] = np.nan
 
@@ -411,7 +553,7 @@ if "Position" in df.columns:
 else:
     df["Six-Group Position"] = np.nan
 
-# ---------- Duplicate generic CMs into both 6 & 8 ----------
+# Duplicate generic CMs into both 6 & 8
 if "Six-Group Position" in df.columns:
     cm_mask = df["Six-Group Position"] == "Centre Midfield"
     if cm_mask.any():
@@ -627,7 +769,11 @@ df[metrics] = df[metrics].fillna(0)
 metrics_df = df[metrics].copy()
 percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
 
-keep_cols = ["Player", "Team within selected timeframe", "Team", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position"]
+# Keep base columns
+keep_cols = [
+    "Player", "Team within selected timeframe", "Team", "Age", "Height",
+    "Positions played", "Minutes played", "Six-Group Position", "Competition", "Competition_norm", "Multiplier"
+]
 for c in keep_cols:
     if c not in df.columns:
         df[c] = np.nan
@@ -637,8 +783,12 @@ plot_data = pd.concat([df[keep_cols], metrics_df, percentile_df.add_suffix(" (pe
 sel_metrics = list(metric_groups.keys())
 percentiles_all = plot_data[[m + " (percentile)" for m in sel_metrics]]
 z_scores_all = (percentiles_all - 50) / 15
+
+# Average Z and weighted Z
 plot_data["Avg Z Score"] = z_scores_all.mean(axis=1)
-plot_data["Rank"] = plot_data["Avg Z Score"].rank(ascending=False, method="min").astype(int)
+plot_data["Multiplier"] = plot_data["Multiplier"].fillna(1.0)
+plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
+plot_data["Rank"] = plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
@@ -694,6 +844,8 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     team = row["Team within selected timeframe"].values[0]
     mins = row["Minutes played"].values[0]
     rank_val = int(row["Rank"].values[0])
+    comp = row["Competition_norm"].values[0] if pd.notnull(row["Competition_norm"].values[0]) else row["Competition"].values[0]
+    mult = row["Multiplier"].values[0]
 
     age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
     height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
@@ -702,30 +854,32 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     if height_str: parts.append(height_str)
     line1 = " | ".join(parts)
 
-    team_str = f"{team}" if pd.notnull(team) else ""
+    comp_str = f"{comp}" if comp else ""
     mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
     rank_str = f"Rank #{rank_val}" if pd.notnull(rank_val) else ""
     role_str = row["Six-Group Position"].values[0] if pd.notnull(row["Six-Group Position"].values[0]) else ""
-    line2 = " | ".join([p for p in [role_str, team_str, mins_str, rank_str] if p])
+    mult_str = f"League weight ×{mult:.2f}" if pd.notnull(mult) else ""
+    line2 = " | ".join([p for p in [role_str, team, comp_str, mins_str, mult_str, rank_str] if p])
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-    # Badge
+    # Badge (based on weighted Z)
     z_scores = (percentiles - 50) / 15
     avg_z = float(np.mean(z_scores))
+    weighted_z = float(avg_z * (mult if pd.notnull(mult) else 1.0))
 
-    if avg_z >= 1.0:
+    if weighted_z >= 1.0:
         badge = ("Excellent", "#228B22")
-    elif avg_z >= 0.3:
+    elif weighted_z >= 0.3:
         badge = ("Good", "#1E90FF")
-    elif avg_z >= -0.3:
+    elif weighted_z >= -0.3:
         badge = ("Average", "#DAA520")
     else:
         badge = ("Below Average", "#DC143C")
 
     st.markdown(
         f"<div style='text-align:center; margin-top: 20px;'>"
-        f"<span style='font-size:24px; font-weight:bold;'>Average Z Score, {avg_z:.2f}</span><br>"
+        f"<span style='font-size:24px; font-weight:bold;'>Weighted Z Score, {weighted_z:.2f}</span><br>"
         f"<span style='background-color:{badge[1]}; color:white; padding:5px 10px; border-radius:8px; font-size:20px;'>{badge[0]}</span></div>",
         unsafe_allow_html=True
     )
@@ -746,17 +900,18 @@ if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 
 # ---------- Ranking table ----------
-st.markdown("### Players Ranked by Z-Score")
+st.markdown("### Players Ranked by Weighted Z-Score")
 cols_for_table = [
-    "Player", "Positions played",
+    "Player", "Positions played", "Competition_norm", "Multiplier",
     "Age", "Team", "Team within selected timeframe",
-    "Minutes played", "Avg Z Score", "Rank"
+    "Minutes played", "Avg Z Score", "Weighted Z Score", "Rank"
 ]
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-z_ranking = plot_data[cols_for_table].sort_values(by="Avg Z Score", ascending=False).reset_index(drop=True)
+z_ranking = plot_data[cols_for_table].sort_values(by="Weighted Z Score", ascending=False).reset_index(drop=True)
+z_ranking.rename(columns={"Competition_norm": "Competition (norm)"}, inplace=True)
 z_ranking[["Team", "Team within selected timeframe"]] = z_ranking[["Team", "Team within selected timeframe"]].fillna("N/A")
 if "Age" in z_ranking:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
