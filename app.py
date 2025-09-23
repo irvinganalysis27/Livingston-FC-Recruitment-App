@@ -821,46 +821,86 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     ax.set_facecolor("white")
     ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
-    ax.set_ylim(0, 100)                 # keep your original scale
-    ax.set_yticklabels([])              # clean rings
-    ax.set_xticks([])                   # no tick spokes
+    ax.set_ylim(0, 100)
+    ax.set_yticklabels([])
+    ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # Bars (keep the same style/colors)
-    ax.bar(
-        angles, percentiles,
-        width=2*np.pi/num_bars*0.9,
-        color=colors, edgecolor=colors, alpha=0.75
-    )
+    # Bars
+    ax.bar(angles, percentiles, width=2*np.pi/num_bars*0.9,
+           color=colors, edgecolor=colors, alpha=0.75)
 
-    # Raw value labels on the ring
+    # Raw numbers on ring
     for angle, raw_val in zip(angles, raw):
         try:
             ax.text(angle, 50, f"{float(raw_val):.2f}",
-                    ha="center", va="center",
-                    color="black", fontsize=10, fontweight="bold")
+                    ha="center", va="center", color="black",
+                    fontsize=10, fontweight="bold")
         except Exception:
-            ax.text(angle, 50, "-",
-                    ha="center", va="center",
+            ax.text(angle, 50, "-", ha="center", va="center",
                     color="black", fontsize=10, fontweight="bold")
 
-    # Metric labels outside the ring
+    # Metric labels
     for i, angle in enumerate(angles):
         label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
-        ax.text(angle, 108, label,
-                ha="center", va="center",
+        ax.text(angle, 108, label, ha="center", va="center",
                 color="black", fontsize=10, fontweight="bold")
 
-    # Group labels (same positions/colors)
+    # Group labels
     group_positions = {}
     for g, a in zip(groups, angles):
         group_positions.setdefault(g, []).append(a)
     for group, group_angles in group_positions.items():
         mean_angle = np.mean(group_angles)
-        ax.text(mean_angle, 125, group,
-                ha="center", va="center",
-                fontsize=20, fontweight="bold",
-                color=group_colors.get(group, "grey"))
+        ax.text(mean_angle, 125, group, ha="center", va="center",
+                fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
+
+    # ---------- Title (WEIGHTED Z) ----------
+    age     = row["Age"].values[0] if "Age" in row else np.nan
+    height  = row["Height"].values[0] if "Height" in row else np.nan
+    team    = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
+    mins    = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
+    role    = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
+    rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
+
+    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
+        comp = row["Competition_norm"].values[0]
+    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
+        comp = row["Competition"].values[0]
+    else:
+        comp = ""
+
+    # Weighted Z
+    z_scores = (percentiles - 50) / 15
+    avg_z = float(np.mean(z_scores))
+    multiplier = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
+    weighted_z = avg_z * multiplier
+
+    line1 = " | ".join([
+        player_name,
+        *(f"{int(age)} years old",) if not pd.isnull(age) else (),
+        *(f"{int(height)} cm",)    if not pd.isnull(height) else (),
+    ])
+    line2 = " | ".join([
+        *(role,) if role else (),
+        *(team,) if team else (),
+        *(comp,) if comp else (),
+        *(f"{int(mins)} mins",) if pd.notnull(mins) else (),
+        *(f"Rank #{rank_val}",) if rank_val is not None else (),
+        f"Z {weighted_z:.2f}",
+    ])
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+
+    # Badge in the middle (optional; safe if logo is None)
+    try:
+        if logo is not None:
+            imagebox = OffsetImage(np.array(logo), zoom=0.18)
+            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
+            ax.add_artist(ab)
+    except Exception:
+        pass
+
+    st.pyplot(fig, use_container_width=True)
 
         # ---------- Title (weighted Z in title) ----------
     age     = row["Age"].values[0] if "Age" in row else np.nan
