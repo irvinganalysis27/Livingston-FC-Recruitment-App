@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import re
 from pathlib import Path
 from PIL import Image  # add "Pillow" to requirements.txt if it's not already there
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 APP_DIR = Path(__file__).parent
 ASSETS_DIR = APP_DIR / "assets"
@@ -664,6 +665,16 @@ def plot_radial_bar_grouped(player_role, plot_data, metric_groups, group_colors)
         f"<span style='background-color:{badge[1]}; color:white; padding:5px 10px; border-radius:8px; font-size:20px;'>{badge[0]}</span></div>",
         unsafe_allow_html=True
     )
+
+        # --- Add club logo in centre ---
+    if logo is not None:
+        try:
+            img = np.array(logo)  # Convert PIL image to numpy
+            imagebox = OffsetImage(img, zoom=0.2)  # adjust zoom for size
+            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
+            ax.add_artist(ab)
+        except Exception as e:
+            st.error(f"Could not add logo to chart: {e}")
 
     st.pyplot(fig, use_container_width=True)
 
