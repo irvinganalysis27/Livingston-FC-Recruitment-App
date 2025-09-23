@@ -901,20 +901,32 @@ if st.session_state.selected_player:
 
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Weighted Z-Score")
+
+# Slimmer, re-ordered columns (no 'Team within selected timeframe', no 'Multiplier')
 cols_for_table = [
-    "Player", "Positions played", "Competition_norm", "Multiplier",
-    "Age", "Team", "Team within selected timeframe",
-    "Minutes played", "Avg Z Score", "Weighted Z Score", "Rank"
+    "Player", "Positions played", "Competition_norm",  # will be renamed to 'League'
+    "Avg Z Score", "Weighted Z Score",
+    "Age", "Team", "Minutes played", "Rank"
 ]
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-z_ranking = plot_data[cols_for_table].sort_values(by="Weighted Z Score", ascending=False).reset_index(drop=True)
-z_ranking.rename(columns={"Competition_norm": "Competition (norm)"}, inplace=True)
-z_ranking[["Team", "Team within selected timeframe"]] = z_ranking[["Team", "Team within selected timeframe"]].fillna("N/A")
+z_ranking = (
+    plot_data[cols_for_table]
+    .sort_values(by="Weighted Z Score", ascending=False)
+    .reset_index(drop=True)
+)
+
+# Rename league column for display
+z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
+
+# Light cleanup/formatting
+z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
+
+# Pretty index
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
