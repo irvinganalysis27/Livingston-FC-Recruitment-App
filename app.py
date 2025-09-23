@@ -838,14 +838,13 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         mean_angle = np.mean(group_angles)
         ax.text(mean_angle, 125, group, ha="center", va="center", fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
 
-    # Title
+        # --- Title ---
     age = row["Age"].values[0]
     height = row["Height"].values[0]
     team = row["Team within selected timeframe"].values[0]
     mins = row["Minutes played"].values[0]
     rank_val = int(row["Rank"].values[0])
     comp = row["Competition_norm"].values[0] if pd.notnull(row["Competition_norm"].values[0]) else row["Competition"].values[0]
-    mult = row["Multiplier"].values[0]
 
     age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
     height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
@@ -858,8 +857,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
     rank_str = f"Rank #{rank_val}" if pd.notnull(rank_val) else ""
     role_str = row["Six-Group Position"].values[0] if pd.notnull(row["Six-Group Position"].values[0]) else ""
-    mult_str = f"League weight ×{mult:.2f}" if pd.notnull(mult) else ""
-    line2 = " | ".join([p for p in [role_str, team, comp_str, mins_str, mult_str, rank_str] if p])
+
+    # ⚠️ removed multiplier completely
+    line2 = " | ".join([p for p in [role_str, team, comp_str, mins_str, rank_str] if p])
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
