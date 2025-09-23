@@ -131,7 +131,7 @@ DEFAULT_TEMPLATE = {
     "Striker": "Striker"
 }
 
-# ========== Metric sets (7 templates) ==========
+# ========== Metric sets (7 templates, using your role names + new-provider metric labels) ==========
 position_metrics = {
     # ================== GOALKEEPER ==================
     "Goalkeeper": {
@@ -158,163 +158,165 @@ position_metrics = {
         }
     },
 
-    # ================== CENTRE BACK (All-Round CB) ==================
+    # ================== CENTRE BACK (from CB radar) ==================
     "Centre Back": {
         "metrics": [
-            "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %",
-            "Shots blocked per 90", "PAdj Interceptions",
-            "Accurate passes, %", "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %"
+            "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
+            "Defensive Actions", "Ball Recoveries",
+            "Aerial Wins%", "Aerial Wins",
+            "Passing%", "Pass OBV",
+            "Unpressured Long Balls",  # appears on your CB radar
+            "Pressures", "PAdj Pressures"  # pressing load from the radar set
         ],
         "groups": {
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Aerial duels per 90": "Defensive",
-            "Aerial duels won, %": "Defensive",
-            "Shots blocked per 90": "Defensive",
             "PAdj Interceptions": "Defensive",
-            "Accurate passes, %": "Possession",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession"
+            "PAdj Tackles": "Defensive",
+            "Tack/Dribbled Past%": "Defensive",
+            "Defensive Actions": "Defensive",
+            "Ball Recoveries": "Defensive",
+            "Aerial Wins%": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Passing%": "Possession",
+            "Pass OBV": "Possession",
+            "Unpressured Long Balls": "Possession",
+            "Pressures": "Off The Ball",
+            "PAdj Pressures": "Off The Ball"
         }
     },
 
-    # ================== FULL BACK (unified RB/LB/RWB/LWB) ==================
+    # ================== FULL BACK (from FB radar) ==================
     "Full Back": {
         "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "PAdj Interceptions", "Crosses per 90", "Accurate crosses, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %",
-            "xA per 90", "Assists per 90"
+            "Pass OBV", "Passing%", "OP Passes Into Box",
+            "Deep Progressions", "Deep Completions",
+            "Successful 1v1 Dribbles", "Dribbles",
+            "Turnovers",
+            "Defensive Actions",
+            "Aerial Wins%", "Aerial Wins",
+            "Pressures", "PAdj Pressures",
+            "Tack/Dribbled Past%"
         ],
         "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "xA per 90": "Attacking",
-            "Assists per 90": "Attacking"
+            "Pass OBV": "Possession",
+            "Passing%": "Possession",
+            "OP Passes Into Box": "Possession",
+            "Deep Progressions": "Possession",
+            "Deep Completions": "Possession",
+            "Successful 1v1 Dribbles": "Possession",
+            "Dribbles": "Possession",
+            "Turnovers": "Possession",
+            "Defensive Actions": "Defensive",
+            "Aerial Wins%": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Pressures": "Off The Ball",
+            "PAdj Pressures": "Off The Ball",
+            "Tack/Dribbled Past%": "Defensive"
         }
     },
 
-    # ================== NUMBER 6 (Defensive CM) ==================
+    # ================== NUMBER 6 (from “6 Livingston FC” radar) ==================
     "Number 6": {
         "metrics": [
-            "Successful defensive actions per 90", "Defensive duels per 90", "Defensive duels won, %",
-            "Aerial duels per 90", "Aerial duels won, %", "PAdj Interceptions",
-            "Successful dribbles, %", "Offensive duels per 90", "Offensive duels won, %",
-            "Accurate passes, %", "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %"
+            "Passing%", "Deep Progressions", "Pass OBV",
+            "PAdj Interceptions", "PAdj Tackles", "Ball Recoveries",
+            "Tack/Dribbled Past%", "Aggressive Actions",
+            "Aerial Wins%", "Aerial Wins",
+            "Turnovers",
+            "Pressures", "PAdj Pressures"
         ],
         "groups": {
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "Aerial duels per 90": "Defensive",
-            "Aerial duels won, %": "Defensive",
+            "Passing%": "Possession",
+            "Deep Progressions": "Possession",
+            "Pass OBV": "Possession",
             "PAdj Interceptions": "Defensive",
-            "Successful dribbles, %": "Possession",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession",
-            "Accurate passes, %": "Possession",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession"
+            "PAdj Tackles": "Defensive",
+            "Ball Recoveries": "Defensive",
+            "Tack/Dribbled Past%": "Defensive",
+            "Aggressive Actions": "Off The Ball",
+            "Aerial Wins%": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Turnovers": "Possession",
+            "Pressures": "Off The Ball",
+            "PAdj Pressures": "Off The Ball"
         }
     },
 
-    # ================== NUMBER 8 (All-Round CM) ==================
+    # ================== NUMBER 8 (from “8 Livingston FC” radar) ==================
     "Number 8": {
         "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Goal conversion, %",
-            "Assists per 90", "xA per 90", "Shots per 90", "Shots on target, %",
-            "Forward passes per 90", "Accurate forward passes, %",
-            "Passes to final third per 90", "Accurate passes to final third, %",
-            "Dribbles per 90", "Successful dribbles, %",
-            "Successful defensive actions per 90", "Defensive duels per 90",
-            "Defensive duels won, %", "PAdj Interceptions"
+            "Passing%", "Deep Progressions",
+            "xGChain", "xGBuildup",
+            "xG Assisted", "OP Passes Into Box", "Pass OBV",
+            "xG", "Shots", "xG/Shot",
+            "Pressure Regains", "Aggressive Actions"
         ],
         "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Forward passes per 90": "Possession",
-            "Accurate forward passes, %": "Possession",
-            "Passes to final third per 90": "Possession",
-            "Accurate passes to final third, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Successful defensive actions per 90": "Defensive",
-            "Defensive duels per 90": "Defensive",
-            "Defensive duels won, %": "Defensive",
-            "PAdj Interceptions": "Defensive"
+            "Passing%": "Possession",
+            "Deep Progressions": "Possession",
+            "xGChain": "Attacking",
+            "xGBuildup": "Attacking",
+            "xG Assisted": "Attacking",
+            "OP Passes Into Box": "Possession",
+            "Pass OBV": "Possession",
+            "xG": "Attacking",
+            "Shots": "Attacking",
+            "xG/Shot": "Attacking",
+            "Pressure Regains": "Off The Ball",
+            "Aggressive Actions": "Off The Ball"
         }
     },
 
-    # ================== WINGER (Touchline Winger) ==================
+    # ================== WINGER (built from FB/Wide profiles + your winger use) ==================
     "Winger": {
         "metrics": [
-            "Non-penalty goals per 90", "xG per 90", "Assists per 90", "xA per 90",
-            "Crosses per 90", "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
-            "Fouls suffered per 90", "Shot assists per 90",
-            "Passes to penalty area per 90", "Accurate passes to penalty area, %"
+            "Non-penalty Goals", "xG", "Shots", "xG/Shot",
+            "xG Assisted", "Key Passes",
+            "Crosses", "Successful Crosses", "Successful Box Cross%",
+            "Dribbles", "Successful Dribbles",
+            "Fouls Won",
+            "OP Passes Into Box", "Deep Completions"
         ],
         "groups": {
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Crosses per 90": "Possession",
-            "Accurate crosses, %": "Possession",
-            "Dribbles per 90": "Possession",
-            "Successful dribbles, %": "Possession",
-            "Fouls suffered per 90": "Possession",
-            "Shot assists per 90": "Possession",
-            "Passes to penalty area per 90": "Possession",
-            "Accurate passes to penalty area, %": "Possession"
+            "Non-penalty Goals": "Attacking",
+            "xG": "Attacking",
+            "Shots": "Attacking",
+            "xG/Shot": "Attacking",
+            "xG Assisted": "Attacking",
+            "Key Passes": "Attacking",
+            "Crosses": "Possession",
+            "Successful Crosses": "Possession",
+            "Successful Box Cross%": "Possession",
+            "Dribbles": "Possession",
+            "Successful Dribbles": "Possession",
+            "Fouls Won": "Possession",
+            "OP Passes Into Box": "Possession",
+            "Deep Completions": "Possession"
         }
     },
 
-    # ================== STRIKER (All-Round CF) ==================
+    # ================== STRIKER (from “ST Livingston FC” radar) ==================
     "Striker": {
         "metrics": [
-            "Successful defensive actions per 90", "Aerial duels per 90", "Aerial duels won, %",
-            "Non-penalty goals per 90", "xG per 90", "Shots per 90", "Shots on target, %",
-            "Goal conversion, %", "Assists per 90", "xA per 90", "Shot assists per 90",
-            "Offensive duels per 90", "Offensive duels won, %"
+            "Pressure Regains",
+            "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
+            "Shot Touch%", "Touches In Box",
+            "xG Assisted",
+            "Aerial Wins", "Aerial Wins%",
+            "Fouls Won"
         ],
         "groups": {
-            "Successful defensive actions per 90": "Off The Ball",
-            "Aerial duels per 90": "Off The Ball",
-            "Aerial duels won, %": "Off The Ball",
-            "Non-penalty goals per 90": "Attacking",
-            "xG per 90": "Attacking",
-            "Shots per 90": "Attacking",
-            "Shots on target, %": "Attacking",
-            "Goal conversion, %": "Attacking",
-            "Assists per 90": "Attacking",
-            "xA per 90": "Attacking",
-            "Shot assists per 90": "Attacking",
-            "Offensive duels per 90": "Possession",
-            "Offensive duels won, %": "Possession"
+            "Pressure Regains": "Off The Ball",
+            "All Goals": "Attacking",
+            "Penalty Goals": "Attacking",
+            "xG": "Attacking",
+            "Shots": "Attacking",
+            "xG/Shot": "Attacking",
+            "Shot Touch%": "Attacking",
+            "Touches In Box": "Attacking",
+            "xG Assisted": "Attacking",
+            "Aerial Wins": "Off The Ball",
+            "Aerial Wins%": "Off The Ball",
+            "Fouls Won": "Possession"
         }
     }
 }
