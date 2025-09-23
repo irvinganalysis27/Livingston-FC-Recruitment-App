@@ -902,10 +902,10 @@ if st.session_state.selected_player:
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Weighted Z-Score")
 
-# Slimmer, re-ordered columns (no 'Team within selected timeframe', no 'Multiplier')
+# Slimmer, re-ordered columns (removed 'Team within selected timeframe', 'Multiplier', and 'Avg Z Score')
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",  # will be renamed to 'League'
-    "Avg Z Score", "Weighted Z Score",
+    "Weighted Z Score",
     "Age", "Team", "Minutes played", "Rank"
 ]
 for c in cols_for_table:
