@@ -164,11 +164,11 @@ position_metrics = {
     "Centre Back": {
         "metrics": [
             "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
-            "Defensive Actions", "Ball Recoveries",
+            "Defensive Actions", "Aggressive Actions",
             "Aerial Win%", "Aerial Wins",
-            "Passing%", "Pass OBV",
+            "Passing%", "OBV",
             "UPr. Long Balls",
-            "Pressures", "PAdj Pressures"
+            "Fouls", "xG"
         ],
         "groups": {
             "PAdj Interceptions": "Defensive",
@@ -176,13 +176,13 @@ position_metrics = {
             "Tack/DP%": "Defensive",
             "Defensive Actions": "Defensive",
             "Ball Recoveries": "Defensive",
-            "Aerial Win%": "Defensive",
             "Aerial Wins": "Defensive",
+            "Aerial Win%": "Defensive",
+            "Aggressive Actions": "Defensive",
             "Passing%": "Possession",
-            "Pass OBV": "Possession",
+            "OBV": "Possession",
             "UPr. Long Balls": "Possession",
-            "Pressures": "Off The Ball",
-            "PAdj Pressures": "Off The Ball",
+            "xG": "Attacking",
         }
     },
 
