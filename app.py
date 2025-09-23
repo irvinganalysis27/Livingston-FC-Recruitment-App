@@ -862,7 +862,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
                 fontsize=20, fontweight="bold",
                 color=group_colors.get(group, "grey"))
 
-    # ---------- Title (updated) ----------
+        # ---------- Title (weighted Z in title) ----------
     age     = row["Age"].values[0] if "Age" in row else np.nan
     height  = row["Height"].values[0] if "Height" in row else np.nan
     team    = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
@@ -870,7 +870,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     role    = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
     rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
 
-    # Prefer normalised league name if present; fall back gracefully
+    # League name (prefer normalised)
     if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
         comp = row["Competition_norm"].values[0]
     elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
@@ -878,17 +878,17 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     else:
         comp = ""
 
-        # --- Weighted Z Score ---
+    # Weighted Z
     z_scores = (percentiles - 50) / 15
     avg_z = float(np.mean(z_scores))
-    
-    mult = row["Multiplier"].values[0] if "Multiplier" in row.columns else 1.0
-    if pd.isnull(mult):
-        mult = 1.0
-    
-    weighted_z = avg_z * float(mult)
-    
-    # Rating by weighted z
+    mult = (
+        float(row["Multiplier"].values[0])
+        if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0])
+        else 1.0
+    )
+    weighted_z = avg_z * mult
+
+    # Rating from weighted Z
     if weighted_z >= 1.0:
         rating, badge_color = "Excellent", "#228B22"
     elif weighted_z >= 0.3:
@@ -897,59 +897,34 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         rating, badge_color = "Average", "#DAA520"
     else:
         rating, badge_color = "Below Average", "#DC143C"
-    
-    # Title strings
-    age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
-    height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
-    parts = [player_name]
-    if age_str: parts.append(age_str)
-    if height_str: parts.append(height_str)
-    line1 = " | ".join(parts)
-    
+
+    # Build title (ONE time)
+    age_str    = f"{int(age)} years old" if not pd.isnull(age) else ""
+    height_str = f"{int(height)} cm"     if not pd.isnull(height) else ""
+    line1_parts = [player_name]
+    if age_str:    line1_parts.append(age_str)
+    if height_str: line1_parts.append(height_str)
+    line1 = " | ".join(line1_parts)
+
     team_str = f"{team}" if team else ""
     comp_str = f"{comp}" if comp else ""
     mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
     rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
-    z_str = f"Z {weighted_z:.2f} ({rating})"
-    
-    line2 = " | ".join([p for p in [role, team_str, comp_str, mins_str, rank_str, z_str] if p])
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+    z_str    = f"Z {weighted_z:.2f} ({rating})"
 
-    # Line 1: Player | age | height
-    age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
-    height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
-    parts = [player_name]
-    if age_str: parts.append(age_str)
-    if height_str: parts.append(height_str)
-    line1 = " | ".join(parts)
-
-    # Line 2: Role | Team | League | mins | Rank | Z + rating
-    team_str = f"{team}" if team else ""
-    comp_str = f"{comp}" if comp else ""
-    mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
-    rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
-    z_str = f"Z {avg_z:.2f} ({rating})"
     line2 = " | ".join([p for p in [role, team_str, comp_str, mins_str, rank_str, z_str] if p])
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-        # ---------- Club badge in the centre ----------
-    # (requires: from matplotlib.offsetbox import OffsetImage, AnnotationBbox)
+    # ---------- Club badge in the centre (no extra text over it) ----------
     try:
         if logo is not None:
             img = np.array(logo)
-            imagebox = OffsetImage(img, zoom=0.18)   # tweak zoom to taste
+            imagebox = OffsetImage(img, zoom=0.18)
             ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
             ax.add_artist(ab)
-    except Exception as _e:
-        # fail silently; chart still renders
+    except Exception:
         pass
-
-    st.pyplot(fig, use_container_width=True)
-
-# Plot
-if st.session_state.selected_player:
-    plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Weighted Z-Score")
 
