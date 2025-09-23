@@ -62,44 +62,47 @@ SIX_GROUPS = [
     "Striker"
 ]
 
-# ========== Token → group mapping ==========
+# ========== Token → group mapping (new provider positions only) ==========
 RAW_TO_SIX = {
     # Goalkeeper
-    "GK": "Goalkeeper", "GKP": "Goalkeeper", "GOALKEEPER": "Goalkeeper",
+    "GOALKEEPER": "Goalkeeper",
 
-    # Full Back (RB/LB/RWB/LWB all funnel to unified Full Back profile)
-    "RB": "Full Back", "LB": "Full Back",
-    "RWB": "Full Back", "LWB": "Full Back", "RFB": "Full Back", "LFB": "Full Back",
+    # Full Back (RB/LB/RWB/LWB → Full Back)
+    "RIGHTBACK": "Full Back",
+    "LEFTBACK": "Full Back",
+    "RIGHTWINGBACK": "Full Back",
+    "LEFTWINGBACK": "Full Back",
 
     # Centre Back
-    "CB": "Centre Back", "RCB": "Centre Back", "LCB": "Centre Back",
-    "CBR": "Centre Back", "CBL": "Centre Back", "SW": "Centre Back",
+    "RIGHTCENTREBACK": "Centre Back",
+    "LEFTCENTREBACK": "Centre Back",
 
-    # Centre Midfield — split:
-    # Generic CM → keep as placeholder "Centre Midfield" (we duplicate these to 6 & 8 after mapping)
-    "CMF": "Centre Midfield", "CM": "Centre Midfield",
-    "RCMF": "Centre Midfield", "RCM": "Centre Midfield",
-    "LCMF": "Centre Midfield", "LCM": "Centre Midfield",
+    # Centre Midfield (generic CM placeholder — can be duplicated into both 6 & 8 later)
+    "CENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield",
+    "LEFTCENTREMIDFIELDER": "Centre Midfield",
 
-    # Defensive mids → Number 6
-    "DMF": "Number 6", "DM": "Number 6", "CDM": "Number 6",
-    "RDMF": "Number 6", "RDM": "Number 6",
-    "LDMF": "Number 6", "LDM": "Number 6",
+    # Number 6 (defensive mids)
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
+    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "DEFENSIVEMIDFIELDER": "Number 6",
 
-    # Attacking mids → Number 8
-    "AMF": "Number 8", "AM": "Number 8", "CAM": "Number 8",
-    "SS": "Number 8", "10": "Number 8",
+    # Number 8 (attacking mids / 10)
+    "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "ATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8",   # if provider ever uses this synonym
+    "10": "Number 8",
 
-    # Winger
-    "LWF": "Winger", "RWF": "Winger",
-    "RW": "Winger", "LW": "Winger",
-    "LAMF": "Winger", "RAMF": "Winger",
-    "RM": "Winger", "LM": "Winger",
-    "WF": "Winger", "RWG": "Winger", "LWG": "Winger", "W": "Winger",
+    # Winger (wide mids & wings)
+    "RIGHTWING": "Winger",
+    "LEFTWING": "Winger",
+    "RIGHTMIDFIELDER": "Winger",
+    "LEFTMIDFIELDER": "Winger",
 
-    # Striker
-    "CF": "Striker", "ST": "Striker", "9": "Striker",
-    "FW": "Striker", "STK": "Striker", "CFW": "Striker"
+    # Striker (centre forwards)
+    "CENTREFORWARD": "Striker",
+    "RIGHTCENTREFORWARD": "Striker",
+    "LEFTCENTREFORWARD": "Striker"
 }
 
 def _clean_pos_token(tok: str) -> str:
@@ -345,18 +348,16 @@ else:
 
 df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group) if "Position" in df.columns else np.nan
 
-# Duplicate generic centre mids into both Number 6 and Number 8
-mask_cm_generic = df["Six-Group Position"] == "Centre Midfield"
-if mask_cm_generic.any():
-    cm_rows = df[mask_cm_generic].copy()
-
-    cm_as_6 = cm_rows.copy()
-    cm_as_6["Six-Group Position"] = "Number 6"
-
-    cm_as_8 = cm_rows.copy()
-    cm_as_8["Six-Group Position"] = "Number 8"
-
-    df = pd.concat([df[~mask_cm_generic], cm_as_6, cm_as_8], ignore_index=True)
+# Duplicate generic "Centre Midfield" rows into both Number 6 and Number 8
+if "Six-Group Position" in df.columns:
+    cm_rows = df[df["Six-Group Position"] == "Centre Midfield"].copy()
+    if not cm_rows.empty:
+        cm6 = cm_rows.copy()
+        cm6["Six-Group Position"] = "Number 6"
+        cm8 = cm_rows.copy()
+        cm8["Six-Group Position"] = "Number 8"
+        # Append back to dataframe
+        df = pd.concat([df, cm6, cm8], ignore_index=True)
 
 # Add a combined label to disambiguate duplicates in UI and tables
 df["Player (Role)"] = df["Player"].astype(str) + " — " + df["Six-Group Position"].astype(str)
