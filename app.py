@@ -135,9 +135,8 @@ DEFAULT_TEMPLATE = {
     "Striker": "Striker"
 }
 
-# ========== Radar metric sets (NEW PROVIDER METRICS) ==========
+# ========== Radar metric sets ==========
 position_metrics = {
-    # ---------------- GOALKEEPER ----------------
     "Goalkeeper": {
         "metrics": [
             "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
@@ -157,11 +156,11 @@ position_metrics = {
             "Pass into Danger%": "Possession",
             "Pass into Pressure%": "Possession",
             "Positive Outcome%": "Goalkeeping",
-            "Goalkeeper OBV": "Goalkeeping"
+            "Goalkeeper OBV": "Goalkeeping",
         }
     },
 
-    # ---------------- CENTRE BACK ----------------
+    # ---------- Centre Back ----------
     "Centre Back": {
         "metrics": [
             "PAdj Interceptions",
@@ -183,7 +182,7 @@ position_metrics = {
             "PAdj Tackles": "Defensive",
             "Tack/Dribbled Past%": "Defensive",
             "Defensive Actions": "Defensive",
-            "Aggressive Actions": "Off The Ball",
+            "Aggressive Actions": "Defensive",
             "Fouls": "Defensive",
             "Aerial Wins": "Defensive",
             "Aerial Win%": "Defensive",
@@ -191,11 +190,11 @@ position_metrics = {
             "Pressured Long Balls": "Possession",
             "Unpressured Long Balls": "Possession",
             "OBV": "Possession",
-            "xG": "Attacking"
+            "xG": "Attacking",
         }
     },
 
-    # ---------------- FULL BACK ----------------
+    # ---------- Full Back ----------
     "Full Back": {
         "metrics": [
             "Passing%",
@@ -221,15 +220,15 @@ position_metrics = {
             "Turnovers": "Possession",
             "Defensive Actions": "Defensive",
             "Aerial Win%": "Defensive",
-            "PAdj Pressures": "Off The Ball",
+            "PAdj Pressures": "Defensive",
             "PAdj Tackles & Interceptions": "Defensive",
             "Tack/Dribbles Past%": "Defensive",
             "OBV": "Possession",
-            "Pass OBV": "Possession"
+            "Pass OBV": "Possession",
         }
     },
 
-    # ---------------- NUMBER 6 ----------------
+    # ---------- Number 6 ----------
     "Number 6": {
         "metrics": [
             "Passing%",
@@ -252,16 +251,16 @@ position_metrics = {
             "PAdj Interceptions": "Defensive",
             "PAdj Tackles": "Defensive",
             "Tack/Dribbled Past%": "Defensive",
-            "Aggressive Actions": "Off The Ball",
+            "Aggressive Actions": "Defensive",
             "Aerial Win%": "Defensive",
             "Turnovers": "Possession",
             "OBV": "Possession",
             "Pass OBV": "Possession",
-            "xG Assisted": "Attacking"
+            "xG Assisted": "Attacking",
         }
     },
 
-    # ---------------- NUMBER 8 ----------------
+    # ---------- Number 8 ----------
     "Number 8": {
         "metrics": [
             "Passing %",
@@ -287,15 +286,15 @@ position_metrics = {
             "Pass OBV": "Possession",
             "Shots": "Attacking",
             "xG": "Attacking",
-            "Pressure Regains": "Off The Ball",
-            "PAdj Pressures": "Off The Ball",
-            "Opposition Half Ball Recoveries": "Off The Ball",
-            "Aggressive Actions": "Off The Ball",
-            "OBV": "Possession"
+            "Pressure Regains": "Defensive",
+            "PAdj Pressures": "Defensive",
+            "Opposition Half Ball Recoveries": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "OBV": "Possession",
         }
     },
 
-    # ---------------- WINGER ----------------
+    # ---------- Winger ----------
     "Winger": {
         "metrics": [
             "xG",
@@ -321,13 +320,13 @@ position_metrics = {
             "Open Play xG Assisted": "Attacking",
             "Successful Dribbles": "Possession",
             "Turnovers": "Possession",
-            "Pressure Regains": "Off The Ball",
+            "Pressure Regains": "Defensive",
             "OBV": "Possession",
-            "Dribble & Carry OBV": "Possession"
+            "Dribble & Carry OBV": "Possession",
         }
     },
 
-    # ---------------- STRIKER ----------------
+    # ---------- Striker ----------
     "Striker": {
         "metrics": [
             "All Goals",
@@ -352,20 +351,19 @@ position_metrics = {
             "Shot Touch%": "Attacking",
             "Touches In Box": "Attacking",
             "xG Assisted": "Attacking",
-            "Aerial Win%": "Off The Ball",
-            "Aerial Wins": "Off The Ball",
+            "Aerial Win%": "Defensive",
+            "Aerial Wins": "Defensive",
             "Fouls Won": "Possession",
-            "Pressure Regains": "Off The Ball"
+            "Pressure Regains": "Defensive",
         }
-    }
+    },
 }
 
 # Colors
 group_colors = {
-    "Off The Ball": "crimson",
-    "Attacking": "royalblue",
+    "Attacking": "crimson",
     "Possession": "seagreen",
-    "Defensive": "darkorange",
+    "Defensive": "royalblue",
     "Goalkeeping": "purple"
 }
 
