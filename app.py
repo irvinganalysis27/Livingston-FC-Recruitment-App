@@ -800,11 +800,11 @@ plot_data["Rank"] = (
     plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
 )
 
-# ---------- Chart ----------
+# ---------- Chart (original look, new title, badge in middle) ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
-    row = plot_data[plot_data["Player"] == player_name]
+    row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
-        st.error(f"No entry for '{player_name}' found.")
+        st.error(f"No player named '{player_name}' found.")
         return
 
     sel_metrics_loc = list(metric_groups.keys())
@@ -814,91 +814,63 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     colors = [group_colors.get(g, "grey") for g in groups]
 
     num_bars = len(sel_metrics_loc)
-    angles = np.linspace(0, 2 * np.pi, num_bars, endpoint=False)
+    angles = np.linspace(0, 2*np.pi, num_bars, endpoint=False)
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
-    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
-    ax.set_ylim(0, 130)  # headroom for labels
-    ax.set_yticklabels([])
-    ax.set_xticks([])
+    ax.set_ylim(0, 100)                 # keep your original scale
+    ax.set_yticklabels([])              # clean rings
+    ax.set_xticks([])                   # no tick spokes
     ax.spines["polar"].set_visible(False)
 
-    # Bars
+    # Bars (keep the same style/colors)
     ax.bar(
-        angles,
-        percentiles,
-        width=2 * np.pi / num_bars * 0.9,
-        color=colors,
-        edgecolor=colors,
-        alpha=0.75,
+        angles, percentiles,
+        width=2*np.pi/num_bars*0.9,
+        color=colors, edgecolor=colors, alpha=0.75
     )
 
-    # Raw numbers on rings
+    # Raw value labels on the ring
     for angle, raw_val in zip(angles, raw):
         try:
-            ax.text(
-                angle,
-                50,
-                f"{float(raw_val):.2f}",
-                ha="center",
-                va="center",
-                color="black",
-                fontsize=10,
-                fontweight="bold",
-            )
+            ax.text(angle, 50, f"{float(raw_val):.2f}",
+                    ha="center", va="center",
+                    color="black", fontsize=10, fontweight="bold")
         except Exception:
-            ax.text(
-                angle,
-                50,
-                "-",
-                ha="center",
-                va="center",
-                color="black",
-                fontsize=10,
-                fontweight="bold",
-            )
+            ax.text(angle, 50, "-",
+                    ha="center", va="center",
+                    color="black", fontsize=10, fontweight="bold")
 
-    # Metric labels outside
+    # Metric labels outside the ring
     for i, angle in enumerate(angles):
-        ax.text(
-            angle,
-            108,
-            sel_metrics_loc[i],
-            ha="center",
-            va="center",
-            color="black",
-            fontsize=10,
-            fontweight="bold",
-        )
+        label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
+        ax.text(angle, 108, label,
+                ha="center", va="center",
+                color="black", fontsize=10, fontweight="bold")
 
-    # Group labels
+    # Group labels (same positions/colors)
     group_positions = {}
     for g, a in zip(groups, angles):
         group_positions.setdefault(g, []).append(a)
     for group, group_angles in group_positions.items():
         mean_angle = np.mean(group_angles)
-        ax.text(
-            mean_angle,
-            125,
-            group,
-            ha="center",
-            va="center",
-            fontsize=20,
-            fontweight="bold",
-            color=group_colors.get(group, "grey"),
-        )
+        ax.text(mean_angle, 125, group,
+                ha="center", va="center",
+                fontsize=20, fontweight="bold",
+                color=group_colors.get(group, "grey"))
 
-    # ---- Title (with Z + rating in title line) ----
-    age = row["Age"].values[0]
-    height = row["Height"].values[0]
-    team = row["Team within selected timeframe"].values[0]
-    mins = row["Minutes played"].values[0]
-    rank_val = int(row["Rank"].values[0]) if pd.notnull(row["Rank"].values[0]) else None
+    # ---------- Title (updated) ----------
+    age     = row["Age"].values[0] if "Age" in row else np.nan
+    height  = row["Height"].values[0] if "Height" in row else np.nan
+    team    = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
+    mins    = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
+    role    = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
+    rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
 
-    # Competition display (use normalized if present)
+    # Prefer normalised league name if present; fall back gracefully
     if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
         comp = row["Competition_norm"].values[0]
     elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
@@ -906,68 +878,49 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     else:
         comp = ""
 
-    # Z + rating (weighted if multiplier present)
-    avg_z = float(row["Avg Z Score"].values[0])
-    mult = float(row["Multiplier"].values[0]) if pd.notnull(row["Multiplier"].values[0]) else 1.0
-    weighted_z = avg_z * mult
+    # Z-score & rating (unweighted here; if you have a Multiplier column you can multiply it)
+    z_scores = (percentiles - 50) / 15
+    avg_z = float(np.mean(z_scores))
 
-    if weighted_z >= 1.0:
+    if avg_z >= 1.0:
         rating, badge_color = "Excellent", "#228B22"
-    elif weighted_z >= 0.3:
+    elif avg_z >= 0.3:
         rating, badge_color = "Good", "#1E90FF"
-    elif weighted_z >= -0.3:
+    elif avg_z >= -0.3:
         rating, badge_color = "Average", "#DAA520"
     else:
         rating, badge_color = "Below Average", "#DC143C"
 
+    # Line 1: Player | age | height
     age_str = f"{int(age)} years old" if not pd.isnull(age) else ""
     height_str = f"{int(height)} cm" if not pd.isnull(height) else ""
-    parts = [row["Player"].values[0]]
-    if age_str:
-        parts.append(age_str)
-    if height_str:
-        parts.append(height_str)
+    parts = [player_name]
+    if age_str: parts.append(age_str)
+    if height_str: parts.append(height_str)
     line1 = " | ".join(parts)
 
+    # Line 2: Role | Team | League | mins | Rank | Z + rating
+    team_str = f"{team}" if team else ""
     comp_str = f"{comp}" if comp else ""
     mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
     rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
-    role_str = (
-        row["Six-Group Position"].values[0]
-        if "Six-Group Position" in row.columns and pd.notnull(row["Six-Group Position"].values[0])
-        else ""
-    )
-    z_str = f"Z {weighted_z:.2f} ({rating})"
+    z_str = f"Z {avg_z:.2f} ({rating})"
+    line2 = " | ".join([p for p in [role, team_str, comp_str, mins_str, rank_str, z_str] if p])
 
-    line2 = " | ".join([p for p in [role_str, team, comp_str, mins_str, rank_str, z_str] if p])
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-    # ---- Also put Z + rating inside radar (optional; keep or remove) ----
-    ax.text(0, 18, f"Z: {weighted_z:.2f}", ha="center", va="center", fontsize=16, fontweight="bold", color="black")
-    ax.text(
-        0,
-        10,
-        rating,
-        ha="center",
-        va="center",
-        fontsize=13,
-        fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.35", facecolor=badge_color, edgecolor="none"),
-    )
-
-    # Club logo in centre
-    if logo is not None:
-        try:
-            img = np.array(logo)
-            imagebox = OffsetImage(img, zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-        except Exception as e:
-            st.error(f"Could not add logo to chart: {e}")
+    # ---------- Badge inside the radar ----------
+    ax.text(0, 18, f"Z: {avg_z:.2f}",
+            ha="center", va="center",
+            fontsize=16, fontweight="bold", color="black")
+    ax.text(0, 10, rating,
+            ha="center", va="center",
+            fontsize=13, fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor=badge_color, edgecolor="none"))
 
     st.pyplot(fig, use_container_width=True)
 
-# Plot when a player is selected
+# Plot
 if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 # ---------- Ranking table ----------
