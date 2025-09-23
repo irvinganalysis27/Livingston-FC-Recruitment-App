@@ -909,11 +909,29 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-    # ---------- Badge inside the radar ----------
-    ax.text(0, 18, f"Z: {avg_z:.2f}",
+        # ---------- Club badge in the centre ----------
+    # (requires: from matplotlib.offsetbox import OffsetImage, AnnotationBbox)
+    try:
+        if logo is not None:
+            img = np.array(logo)
+            imagebox = OffsetImage(img, zoom=0.18)   # tweak zoom to taste
+            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
+            ax.add_artist(ab)
+    except Exception as _e:
+        # fail silently; chart still renders
+        pass
+
+    # ---------- Z score + rating (offset so they don't cover the badge) ----------
+    # Put Z just above the badge and the rating a touch below it.
+    # Angle=0 points right; we’ll keep angle=0 and change radius to place the text.
+    r_z = 22     # distance from centre for the Z text
+    r_badge = 12 # distance for the colored rating pill
+
+    ax.text(0, r_z, f"Z: {avg_z:.2f}",
             ha="center", va="center",
             fontsize=16, fontweight="bold", color="black")
-    ax.text(0, 10, rating,
+
+    ax.text(0, r_badge, rating,
             ha="center", va="center",
             fontsize=13, fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.35", facecolor=badge_color, edgecolor="none"))
