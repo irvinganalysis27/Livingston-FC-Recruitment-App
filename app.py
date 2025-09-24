@@ -972,6 +972,15 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
             ax.add_artist(ab)
     except Exception:
         pass
+
+# ---------- Plot ----------
+if st.session_state.selected_player:
+    plot_radial_bar_grouped(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups,
+        group_colors
+    )
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Weighted Z-Score")
 
