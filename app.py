@@ -763,26 +763,26 @@ plot_data["Rank"] = (
     plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
 )
 
-# ---------- Chart (original look, new title, badge in middle) ----------
+# ---------- Chart (original look, position on top row, weighted Z in title) ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
         st.error(f"No player named '{player_name}' found.")
         return
 
-    sel_metrics_loc = list(metric_groups.keys())
-    raw = row[sel_metrics_loc].values.flatten()
-    percentiles = row[[m + " (percentile)" for m in sel_metrics_loc]].values.flatten()
-    groups = [metric_groups[m] for m in sel_metrics_loc]
+    sel_metrics = list(metric_groups.keys())
+    raw_vals = row[sel_metrics].values.flatten()
+    pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
+    groups = [metric_groups[m] for m in sel_metrics]
     colors = [group_colors.get(g, "grey") for g in groups]
 
-    num_bars = len(sel_metrics_loc)
-    angles = np.linspace(0, 2*np.pi, num_bars, endpoint=False)
+    n = len(sel_metrics)
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
-    ax.set_theta_offset(np.pi/2)
+    ax.set_theta_offset(np.pi / 2)
     ax.set_theta_direction(-1)
     ax.set_ylim(0, 100)
     ax.set_yticklabels([])
@@ -790,43 +790,55 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     ax.spines["polar"].set_visible(False)
 
     # Bars
-    ax.bar(angles, percentiles, width=2*np.pi/num_bars*0.9,
-           color=colors, edgecolor=colors, alpha=0.75)
+    ax.bar(
+        angles,
+        pct_vals,
+        width=2 * np.pi / n * 0.9,
+        color=colors,
+        edgecolor=colors,
+        alpha=0.75,
+    )
 
     # Raw numbers on ring
-    for angle, raw_val in zip(angles, raw):
+    for ang, raw_val in zip(angles, raw_vals):
         try:
-            ax.text(angle, 50, f"{float(raw_val):.2f}",
-                    ha="center", va="center", color="black",
-                    fontsize=10, fontweight="bold")
+            txt = f"{float(raw_val):.2f}"
         except Exception:
-            ax.text(angle, 50, "-", ha="center", va="center",
-                    color="black", fontsize=10, fontweight="bold")
+            txt = "-"
+        ax.text(ang, 50, txt, ha="center", va="center",
+                color="black", fontsize=10, fontweight="bold")
 
-    # Metric labels
-    for i, angle in enumerate(angles):
-        label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
-        ax.text(angle, 108, label, ha="center", va="center",
+    # Metric labels (outside)
+    for i, ang in enumerate(angles):
+        label = sel_metrics[i].replace(" per 90", "").replace(", %", " (%)")
+        ax.text(ang, 108, label, ha="center", va="center",
                 color="black", fontsize=10, fontweight="bold")
 
     # Group labels
     group_positions = {}
     for g, a in zip(groups, angles):
         group_positions.setdefault(g, []).append(a)
-    for group, group_angles in group_positions.items():
-        mean_angle = np.mean(group_angles)
-        ax.text(mean_angle, 125, group, ha="center", va="center",
-                fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
+    for g, a_list in group_positions.items():
+        ax.text(np.mean(a_list), 125, g, ha="center", va="center",
+                fontsize=20, fontweight="bold", color=group_colors.get(g, "grey"))
 
-        # ---------- Title (WEIGHTED Z) ----------
-    age     = row["Age"].values[0] if "Age" in row else np.nan
-    height  = row["Height"].values[0] if "Height" in row else np.nan
-    team    = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
-    mins    = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
-    role    = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
+    # ---------- Title (Position on top row, Weighted Z only) ----------
+    # Safer to read precomputed weighted Z if present; else fall back to recompute
+    if "Weighted Z Score" in row.columns:
+        weighted_z = float(row["Weighted Z Score"].values[0])
+    else:
+        z_scores = (pct_vals - 50) / 15
+        avg_z = float(np.mean(z_scores))
+        mult = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
+        weighted_z = avg_z * mult
+
+    age      = row["Age"].values[0] if "Age" in row else np.nan
+    height   = row["Height"].values[0] if "Height" in row else np.nan
+    team     = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
+    mins     = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
+    role     = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
     rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
 
-    # League label
     if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
         comp = row["Competition_norm"].values[0]
     elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
@@ -834,11 +846,23 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     else:
         comp = ""
 
-    # Weighted Z
-    z_scores = (percentiles - 50) / 15
-    avg_z = float(np.mean(z_scores))
-    multiplier = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
-    weighted_z = avg_z * multiplier
+    # Top row: Player | Role | Age | Height
+    top_parts = [player_name]
+    if role: top_parts.append(role)
+    if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
+    if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
+    line1 = " | ".join(top_parts)
+
+    # Bottom row: Team | League | Mins | Rank | Z
+    bottom_parts = []
+    if team:               bottom_parts.append(team)
+    if comp:               bottom_parts.append(comp)
+    if pd.notnull(mins):   bottom_parts.append(f"{int(mins)} mins")
+    if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
+    bottom_parts.append(f"Z {weighted_z:.2f}")
+    line2 = " | ".join(bottom_parts)
+
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
     # Badge in the middle (optional; safe if logo is None)
     try:
@@ -851,15 +875,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
 
     st.pyplot(fig, use_container_width=True)
 
-    # ---------- Club badge in the centre (no extra text over it) ----------
-    try:
-        if logo is not None:
-            img = np.array(logo)
-            imagebox = OffsetImage(img, zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-    except Exception:
-        pass
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
@@ -869,14 +884,13 @@ if st.session_state.selected_player:
         metric_groups,
         group_colors
     )
+
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Weighted Z-Score")
 
-# Slimmer, re-ordered columns (removed 'Team within selected timeframe', 'Multiplier', and 'Avg Z Score')
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",  # will be renamed to 'League'
-    "Weighted Z Score",
-    "Age", "Team", "Minutes played", "Rank"
+    "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
 ]
 for c in cols_for_table:
     if c not in plot_data.columns:
@@ -887,16 +901,11 @@ z_ranking = (
     .sort_values(by="Weighted Z Score", ascending=False)
     .reset_index(drop=True)
 )
-
-# Rename league column for display
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
-
-# Light cleanup/formatting
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-# Pretty index
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
