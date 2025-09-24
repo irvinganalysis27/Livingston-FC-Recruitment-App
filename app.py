@@ -198,10 +198,9 @@ position_metrics = {
         ],
         "groups": {
             "Passing%": "Possession", "OP Passes Into Box": "Possession", "Deep Progressions": "Possession",
-            "xGBuildup": "Attacking", "Successful Dribbles": "Possession", "Turnovers": "Possession",
-            "Defensive Actions": "Defensive", "Aerial Win%": "Defensive",
-            "PAdj Pressures": "Defensive", "PAdj Tackles & Interceptions": "Defensive",
-            "Tack/Dribbles Past%": "Defensive", "OBV": "Possession", "Pass OBV": "Possession",
+            "OBV": "Possession", "Pass OBV": "Possession", "xGBuildup": "Attacking", "Successful Dribbles": "Possession", "Turnovers": "Possession",
+            "Defensive Actions": "Defensive", "Aerial Win%": "Defensive", "PAdj Pressures": "Defensive", "PAdj Tackles & Interceptions": "Defensive",
+            "Tack/Dribbles Past%": "Defensive", "xGBuildup": "Attacking"
         }
     },
     "Number 6": {
@@ -584,7 +583,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         st.error(f"No player named '{player_name}' found.")
         return
 
-    sel_metrics = list(metric_groups.keys())
+    # For GK chart, keep Goalkeeping block together, then Possession
+    group_order = ["Goalkeeping", "Possession", "Defensive", "Attacking", "Off The Ball"]
+    sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
     raw_vals = row[sel_metrics].values.flatten()
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
