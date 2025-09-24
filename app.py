@@ -877,26 +877,30 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     multiplier = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
     weighted_z = avg_z * multiplier
 
-    # Build line1 (player + age + height)
-    line1_parts = [player_name]
-    if not pd.isnull(age):
-        line1_parts.append(f"{int(age)} years old")
-    if not pd.isnull(height):
-        line1_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(line1_parts)
+    # ---------- Title (Weighted Z, role moved to top row) ----------
 
-    # Build line2 (role, team, comp, mins, rank, weighted Z)
-    line2_parts = []
-    if role: line2_parts.append(role)
-    if team: line2_parts.append(team)
-    if comp: line2_parts.append(comp)
-    if pd.notnull(mins): line2_parts.append(f"{int(mins)} mins")
-    if rank_val is not None: line2_parts.append(f"Rank #{rank_val}")
-    line2_parts.append(f"Z {weighted_z:.2f}")  # weighted Z only
+# Build line1 (player + age + height + role)
+line1_parts = [player_name]
+if role: 
+    line1_parts.append(role)  # put position here
+if not pd.isnull(age):
+    line1_parts.append(f"{int(age)} years old")
+if not pd.isnull(height):
+    line1_parts.append(f"{int(height)} cm")
+line1 = " | ".join(line1_parts)
 
-    line2 = " | ".join(line2_parts)
+# Build line2 (team, comp, mins, rank, weighted Z)
+line2_parts = []
+if team: line2_parts.append(team)
+if comp: line2_parts.append(comp)
+if pd.notnull(mins): line2_parts.append(f"{int(mins)} mins")
+if rank_val is not None: line2_parts.append(f"Rank #{rank_val}")
+line2_parts.append(f"Z {weighted_z:.2f}")  # weighted Z only
 
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+line2 = " | ".join(line2_parts)
+
+# Set the title
+ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
     # Badge in the middle (optional; safe if logo is None)
     try:
