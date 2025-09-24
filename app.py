@@ -515,29 +515,6 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# If the player changed, re-enable auto (so it snaps to that player's role)
-if st.session_state.last_player_for_auto != st.session_state.selected_player:
-    st.session_state.manual_override = False
-    st.session_state.last_player_for_auto = st.session_state.selected_player
-
-# ---------- Auto-snap (no visible control) ----------
-if not st.session_state.manual_override:
-    desired_tpl = None
-    # Prefer single 6-group if the user narrowed to one
-    if current_single_group:
-        desired_tpl = DEFAULT_TEMPLATE.get(current_single_group)
-    # Else use the selected player's most common role
-    if desired_tpl is None and st.session_state.selected_player:
-        _rows = df.loc[df["Player"] == st.session_state.selected_player]
-        if not _rows.empty and "Six-Group Position" in _rows.columns:
-            player_role = _rows["Six-Group Position"].mode().iloc[0]
-            desired_tpl = DEFAULT_TEMPLATE.get(player_role)
-
-    if desired_tpl and desired_tpl != st.session_state.template_select:
-        st.session_state.template_select = desired_tpl
-        st.session_state.auto_just_applied = True
-        st.rerun()
-
 # ---------- Template select (manual override supported, but no checkbox) ----------
 template_names = list(position_metrics.keys())
 idx = template_names.index(st.session_state.template_select) if st.session_state.template_select in template_names else 0
