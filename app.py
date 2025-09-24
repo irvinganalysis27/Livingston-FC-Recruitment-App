@@ -718,6 +718,14 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
+# ---------- Auto-switch template to match player's position ----------
+if st.session_state.selected_player:
+    row = df.loc[df["Player"] == st.session_state.selected_player]
+    if not row.empty and "Six-Group Position" in row.columns:
+        player_role = row["Six-Group Position"].values[0]
+        if player_role in DEFAULT_TEMPLATE:
+            st.session_state.selected_template = DEFAULT_TEMPLATE[player_role]
+
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
 tpl_index = (
