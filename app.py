@@ -617,13 +617,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         label = sel_metrics[i].replace(" per 90", "").replace(", %", " (%)")
         ax.text(ang, 108, label, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
-    group_positions = {}
-    for g, a in zip(groups, angles):
-        group_positions.setdefault(g, []).append(a)
-    for g, a_list in group_positions.items():
-        ax.text(np.mean(a_list), 125, g, ha="center", va="center", fontsize=20, fontweight="bold",
-                color=group_colors.get(g, "grey"))
-
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
