@@ -174,45 +174,82 @@ position_metrics = {
         }
     },
     "Centre Back": {
-        "metrics": [
-            "xG", "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
-            "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
-            "Defensive Actions", "Aggressive Actions", "Fouls",
-            "Aerial Wins", "Aerial Win%",
-        ],
-        "groups": {
-            "PAdj Interceptions": "Defensive", "PAdj Tackles": "Defensive",
-            "Tack/Dribbled Past%": "Defensive", "Defensive Actions": "Defensive",
-            "Aggressive Actions": "Defensive", "Fouls": "Defensive",
-            "Aerial Wins": "Defensive", "Aerial Win%": "Defensive",
-            "Passing%": "Possession", "Pressured Long Balls": "Possession",
-            "Unpressured Long Balls": "Possession", "OBV": "Possession", "xG": "Attacking",
+    "metrics": [
+        # Attacking
+        "xG",
+        # Possession
+        "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
+        # Defensive
+        "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+        "Defensive Actions", "Aggressive Actions", "Fouls",
+        "Aerial Wins", "Aerial Win%",
+    ],
+    "groups": {
+        "PAdj Interceptions": "Defensive",
+        "PAdj Tackles": "Defensive",
+        "Tack/DP%": "Defensive",
+        "Defensive Actions": "Defensive",
+        "Aggressive Actions": "Defensive",
+        "Fouls": "Defensive",
+        "Aerial Wins": "Defensive",
+        "Aerial Win%": "Defensive",
+        "Passing%": "Possession",
+        "Pressured Long Balls": "Possession",
+        "Unpressured Long Balls": "Possession",
+        "OBV": "Possession",
+        "xG": "Attacking",
         }
     },
     "Full Back": {
-        "metrics": [
-            "xGBuildup", "Passing%", "OP Passes Into Box", "Deep Progressions",
-            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-            "PAdj Tackles & Interceptions", "Tack/Dribbles Past%",
-        ],
-        "groups": {
-            "Passing%": "Possession", "OP Passes Into Box": "Possession", "Deep Progressions": "Possession",
-            "OBV": "Possession", "Pass OBV": "Possession", "xGBuildup": "Attacking", "Successful Dribbles": "Possession", "Turnovers": "Possession",
-            "Defensive Actions": "Defensive", "Aerial Win%": "Defensive", "PAdj Pressures": "Defensive", "PAdj Tackles & Interceptions": "Defensive",
-            "Tack/Dribbles Past%": "Defensive", "xGBuildup": "Attacking"
+    "metrics": [
+        # Attacking
+        "xGBuildup",
+        # Possession
+        "Passing%", "OP Passes Into Box", "Deep Progressions",
+        "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+        # Defensive
+        "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+        "PAdj Tack&Int", "Tack/DP%",
+    ],
+    "groups": {
+        "Passing%": "Possession",
+        "OP Passes Into Box": "Possession",
+        "Deep Progressions": "Possession",
+        "xGBuildup": "Attacking",
+        "Successful Dribbles": "Possession",
+        "Turnovers": "Possession",
+        "Defensive Actions": "Defensive",
+        "Aerial Win%": "Defensive",
+        "PAdj Pressures": "Defensive",
+        "PAdj Tack&Int": "Defensive",
+        "Tack/DP%": "Defensive",
+        "OBV": "Possession",
+        "Pass OBV": "Possession",
         }
     },
     "Number 6": {
-        "metrics": [
-            "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
-            "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "Aggressive Actions", "Aerial Win%",
-        ],
-        "groups": {
-            "Passing%": "Possession", "Deep Progressions": "Possession", "xGBuildup": "Attacking",
-            "PAdj Interceptions": "Defensive", "PAdj Tackles": "Defensive", "Tack/Dribbled Past%": "Defensive",
-            "Aggressive Actions": "Defensive", "Aerial Win%": "Defensive",
-            "Turnovers": "Possession", "OBV": "Possession", "Pass OBV": "Possession", "xG Assisted": "Attacking",
+    "metrics": [
+        # Attacking
+        "xGBuildup", "xG Assisted",
+        # Possession
+        "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
+        # Defensive
+        "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+        "Aggressive Actions", "Aerial Win%",
+    ],
+    "groups": {
+        "Passing%": "Possession",
+        "Deep Progressions": "Possession",
+        "xGBuildup": "Attacking",
+        "PAdj Interceptions": "Defensive",
+        "PAdj Tackles": "Defensive",
+        "Tack/DP%": "Defensive",
+        "Aggressive Actions": "Defensive",
+        "Aerial Win%": "Defensive",
+        "Turnovers": "Possession",
+        "OBV": "Possession",
+        "Pass OBV": "Possession",
+        "xG Assisted": "Attacking",
         }
     },
     "Number 8": {
