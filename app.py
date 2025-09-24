@@ -51,6 +51,15 @@ if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
+
+# ---------- Fixed group colours ----------
+group_colors = {
+    "Attacking":   "crimson",
+    "Possession":  "seagreen",
+    "Defensive":   "royalblue",
+    "Goalkeeping": "purple",
+}
+
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     # Australia
