@@ -855,7 +855,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         ax.text(mean_angle, 125, group, ha="center", va="center",
                 fontsize=20, fontweight="bold", color=group_colors.get(group, "grey"))
 
-    # ---------- Title (WEIGHTED Z) ----------
+        # ---------- Title (WEIGHTED Z) ----------
     age     = row["Age"].values[0] if "Age" in row else np.nan
     height  = row["Height"].values[0] if "Height" in row else np.nan
     team    = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
@@ -863,6 +863,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     role    = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
     rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
 
+    # League label
     if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
         comp = row["Competition_norm"].values[0]
     elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
@@ -876,19 +877,25 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     multiplier = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
     weighted_z = avg_z * multiplier
 
-    line1 = " | ".join([
-        player_name,
-        *(f"{int(age)} years old",) if not pd.isnull(age) else (),
-        *(f"{int(height)} cm",)    if not pd.isnull(height) else (),
-    ])
-    line2 = " | ".join([
-        *(role,) if role else (),
-        *(team,) if team else (),
-        *(comp,) if comp else (),
-        *(f"{int(mins)} mins",) if pd.notnull(mins) else (),
-        *(f"Rank #{rank_val}",) if rank_val is not None else (),
-        f"Z {weighted_z:.2f}",
-    ])
+    # Build line1 (player + age + height)
+    line1_parts = [player_name]
+    if not pd.isnull(age):
+        line1_parts.append(f"{int(age)} years old")
+    if not pd.isnull(height):
+        line1_parts.append(f"{int(height)} cm")
+    line1 = " | ".join(line1_parts)
+
+    # Build line2 (role, team, comp, mins, rank, weighted Z)
+    line2_parts = []
+    if role: line2_parts.append(role)
+    if team: line2_parts.append(team)
+    if comp: line2_parts.append(comp)
+    if pd.notnull(mins): line2_parts.append(f"{int(mins)} mins")
+    if rank_val is not None: line2_parts.append(f"Rank #{rank_val}")
+    line2_parts.append(f"Z {weighted_z:.2f}")  # weighted Z only
+
+    line2 = " | ".join(line2_parts)
+
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
     # Badge in the middle (optional; safe if logo is None)
