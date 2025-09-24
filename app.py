@@ -763,8 +763,19 @@ plot_data["Rank"] = (
     plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
 )
 
-# ---------- Chart (original look, position on top row, weighted Z in title) ----------
-def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
+# ---------- Chart (colours by group, position on top row, weighted Z in title) ----------
+def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
+    import matplotlib.patches as mpatches
+
+    # Fallback palette if a dict wasn't provided
+    if not isinstance(group_colors, dict) or len(group_colors) == 0:
+        group_colors = {
+            "Attacking":   "crimson",
+            "Possession":  "seagreen",
+            "Defensive":   "royalblue",
+            "Goalkeeping": "purple",
+        }
+
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
         st.error(f"No player named '{player_name}' found.")
@@ -774,7 +785,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     raw_vals = row[sel_metrics].values.flatten()
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
-    colors = [group_colors.get(g, "grey") for g in groups]
+
+    # Colours for bars by group
+    bar_colors = [group_colors.get(g, "grey") for g in groups]
 
     n = len(sel_metrics)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
@@ -789,14 +802,14 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # Bars
+    # Bars (coloured)
     ax.bar(
         angles,
         pct_vals,
         width=2 * np.pi / n * 0.9,
-        color=colors,
-        edgecolor=colors,
-        alpha=0.75,
+        color=bar_colors,
+        edgecolor=bar_colors,
+        alpha=0.78,
     )
 
     # Raw numbers on ring
@@ -814,16 +827,30 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         ax.text(ang, 108, label, ha="center", va="center",
                 color="black", fontsize=10, fontweight="bold")
 
-    # Group labels
+    # Group labels (in their colours)
     group_positions = {}
     for g, a in zip(groups, angles):
         group_positions.setdefault(g, []).append(a)
     for g, a_list in group_positions.items():
         ax.text(np.mean(a_list), 125, g, ha="center", va="center",
-                fontsize=20, fontweight="bold", color=group_colors.get(g, "grey"))
+                fontsize=20, fontweight="bold",
+                color=group_colors.get(g, "grey"))
+
+    # Small legend (only groups that appear)
+    present_groups = list(dict.fromkeys(groups))  # keep order
+    patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
+    if patches:
+        # Make some space below for legend and above for title
+        fig.subplots_adjust(top=0.86, bottom=0.08)
+        ax.legend(
+            handles=patches,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.06),
+            ncol=min(len(patches), 4),
+            frameon=False,
+        )
 
     # ---------- Title (Position on top row, Weighted Z only) ----------
-    # Safer to read precomputed weighted Z if present; else fall back to recompute
     if "Weighted Z Score" in row.columns:
         weighted_z = float(row["Weighted Z Score"].values[0])
     else:
@@ -853,16 +880,16 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
     line1 = " | ".join(top_parts)
 
-    # Bottom row: Team | League | Mins | Rank | Z
+    # Bottom row: Team | League | Mins | Rank | Z (weighted)
     bottom_parts = []
-    if team:               bottom_parts.append(team)
-    if comp:               bottom_parts.append(comp)
-    if pd.notnull(mins):   bottom_parts.append(f"{int(mins)} mins")
+    if team:                 bottom_parts.append(team)
+    if comp:                 bottom_parts.append(comp)
+    if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
     bottom_parts.append(f"Z {weighted_z:.2f}")
     line2 = " | ".join(bottom_parts)
 
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
     # Badge in the middle (optional; safe if logo is None)
     try:
@@ -874,7 +901,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
         pass
 
     st.pyplot(fig, use_container_width=True)
-
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
