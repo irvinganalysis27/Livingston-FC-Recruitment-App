@@ -51,7 +51,6 @@ if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
-
 # ---------- Fixed group colours ----------
 group_colors = {
     "Attacking":   "crimson",
@@ -62,122 +61,51 @@ group_colors = {
 
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
-    # Australia
     "A-League": "Australia A-League Men",
-
-    # Austria
     "2. Liga": "Austria 2. Liga",
-
-    # Belgium
     "Challenger Pro League": "Belgium Challenger Pro League",
-
-    # Bulgaria
     "First League": "Bulgaria First League",
-
-    # Croatia
     "1. HNL": "Croatia 1. HNL",
     "HNL": "Croatia 1. HNL",
-
-    # Czech Republic
     "Czech Liga": "Czech First Tier",
-
-    # Denmark
     "1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
-
-    # England
     "League One": "England League One",
     "League Two": "England League Two",
     "National League": "England National League",
     "National League N / S": "England National League N/S",
-
-    # Estonia
     "Premium Liiga": "Estonia Premium Liiga",
-
-    # Finland
     "Veikkausliiga": "Finland Veikkausliiga",
-
-    # France
     "Championnat National": "France National 1",
-
-    # Germany
     "3. Liga": "Germany 3. Liga",
-
-    # Greece
     "Super League": "Greece Super League 1",
-
-    # Hungary
     "NB I": "Hungary NB I",
-
-    # Iceland
     "Besta deild karla": "Iceland Besta Deild",
-
-    # Italy
     "Serie C": "Italy Serie C",
-
-    # Japan
     "J2 League": "Japan J2 League",
-
-    # Latvia
     "Virsliga": "Latvia Virsliga",
-
-    # Lithuania
     "A Lyga": "Lithuania A Lyga",
-
-    # Morocco
     "Botola Pro": "Morocco Botola Pro",
-
-    # Netherlands
     "Eerste Divisie": "Netherlands Eerste Divisie",
-
-    # Northern Ireland
     "Premiership": "Northern Ireland Premiership",
-
-    # Norway
     "1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
-
-    # Poland
     "I Liga": "Poland 1 Liga",
     "Ekstraklasa": "Poland Ekstraklasa",
-
-    # Portugal
     "Segunda Liga": "Portugal Segunda Liga",
     "Liga Pro": "Portugal Segunda Liga",
-
-    # Republic of Ireland
     "Premier Division": "Republic of Ireland Premier Division",
-
-    # Romania
     "Liga 1": "Romania Liga 1",
-
-    # Scotland
     "Championship": "Scotland Championship",
     "Scottish Premiership": "Scotland Premiership",
-
-    # Serbia
     "Super Liga": "Serbia Super Liga",
-
-    # Slovakia
     "1. Liga": "Slovakia 1. Liga",
-
-    # Slovenia
     "1. Liga (SVN)": "Slovenia 1. Liga",
-
-    # South Africa
     "PSL": "South Africa Premier Division",
-
-    # Sweden
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
-
-    # Switzerland
     "Challenge League": "Switzerland Challenge League",
-
-    # Tunisia
     "Ligue 1": "Tunisia Ligue 1",
-
-    # USA
     "USL Championship": "USA USL Championship",
 }
 
@@ -202,43 +130,28 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
-    # GK
     "GOALKEEPER": "Goalkeeper",
-
-    # Full backs & wing backs
     "RIGHTBACK": "Full Back",
     "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back",
     "LEFTWINGBACK": "Full Back",
-
-    # Centre backs
     "RIGHTCENTREBACK": "Centre Back",
     "LEFTCENTREBACK": "Centre Back",
     "CENTREBACK": "Centre Back",
-
-    # Centre mid (generic) → we’ll duplicate into 6 & 8 later
     "CENTREMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield",
     "LEFTCENTREMIDFIELDER": "Centre Midfield",
-
-    # Defensive mids → 6
     "DEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
     "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-
-    # Attacking mids / 10 → 8
     "CENTREATTACKINGMIDFIELDER": "Number 8",
     "ATTACKINGMIDFIELDER": "Number 8",
     "SECONDSTRIKER": "Number 8",
     "10": "Number 8",
-
-    # Wingers / wide mids
     "RIGHTWING": "Winger",
     "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger",
     "LEFTMIDFIELDER": "Winger",
-
-    # Strikers
     "CENTREFORWARD": "Striker",
     "RIGHTCENTREFORWARD": "Striker",
     "LEFTCENTREFORWARD": "Striker",
@@ -251,7 +164,7 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, "Winger")  # safe default
+    return RAW_TO_SIX.get(tok, "Winger")  # safe default if unknown
 
 # ========== Default template mapping ==========
 DEFAULT_TEMPLATE = {
@@ -266,12 +179,9 @@ DEFAULT_TEMPLATE = {
 
 # ========== Radar metric sets (grouped ordering) ==========
 position_metrics = {
-    # ---------- Goalkeeper ----------
     "Goalkeeper": {
         "metrics": [
-            # Possession
             "Pass into Danger%", "Pass into Pressure%",
-            # Goalkeeping
             "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
             "Shots Faced", "Shots Faced OT%", "Positive Outcome%", "Goalkeeper OBV",
         ],
@@ -290,15 +200,10 @@ position_metrics = {
             "Goalkeeper OBV": "Goalkeeping",
         }
     },
-
-    # ---------- Centre Back ----------
     "Centre Back": {
         "metrics": [
-            # Attacking
             "xG",
-            # Possession
             "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
             "Defensive Actions", "Aggressive Actions", "Fouls",
             "Aerial Wins", "Aerial Win%",
@@ -319,16 +224,11 @@ position_metrics = {
             "xG": "Attacking",
         }
     },
-
-    # ---------- Full Back ----------
     "Full Back": {
         "metrics": [
-            # Attacking
             "xGBuildup",
-            # Possession
             "Passing%", "OP Passes Into Box", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-            # Defensive
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
             "PAdj Tackles & Interceptions", "Tack/Dribbles Past%",
         ],
@@ -348,15 +248,10 @@ position_metrics = {
             "Pass OBV": "Possession",
         }
     },
-
-    # ---------- Number 6 ----------
     "Number 6": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted",
-            # Possession
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
             "Aggressive Actions", "Aerial Win%",
         ],
@@ -375,15 +270,10 @@ position_metrics = {
             "xG Assisted": "Attacking",
         }
     },
-
-    # ---------- Number 8 ----------
     "Number 8": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted", "Shots", "xG",
-            # Possession
             "Passing %", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
-            # Defensive
             "Pressure Regains", "PAdj Pressures", "Opposition Half Ball Recoveries",
             "Aggressive Actions",
         ],
@@ -403,16 +293,11 @@ position_metrics = {
             "OBV": "Possession",
         }
     },
-
-    # ---------- Winger ----------
     "Winger": {
         "metrics": [
-            # Attacking
             "xG", "xG/Shot", "Touches In Box", "Open Play xG Assisted",
-            # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "Dribble & Carry OBV",
-            # Defensive
             "Pressure Regains",
         ],
         "groups": {
@@ -430,16 +315,11 @@ position_metrics = {
             "Dribble & Carry OBV": "Possession",
         }
     },
-
-    # ---------- Striker ----------
     "Striker": {
         "metrics": [
-            # Attacking
             "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
             "Shot Touch%", "Touches In Box", "xG Assisted",
-            # Possession
             "Fouls Won",
-            # Defensive
             "Aerial Win%", "Aerial Wins", "Pressure Regains",
         ],
         "groups": {
@@ -572,31 +452,23 @@ if selected_groups:
 
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
-# ---------- Session state ----------
+# ---------- Session state (single source of truth for template) ----------
 if "selected_player" not in st.session_state:
     st.session_state.selected_player = None
-if "selected_template" not in st.session_state:
-    st.session_state.selected_template = None
-if "last_auto_group" not in st.session_state:
-    st.session_state.last_auto_group = None
 if "ec_rows" not in st.session_state:
     st.session_state.ec_rows = 1
+if "template_select" not in st.session_state:
+    st.session_state.template_select = list(position_metrics.keys())[0]
 
-# Initialise template (prefer single-group default)
-if st.session_state.selected_template is None:
-    if current_single_group:
-        st.session_state.selected_template = DEFAULT_TEMPLATE.get(current_single_group, list(position_metrics.keys())[0])
-        st.session_state.last_auto_group = current_single_group
-    else:
-        st.session_state.selected_template = list(position_metrics.keys())[0]
-
-# Snap to group default if user narrows to exactly one group
-if current_single_group is not None and current_single_group != st.session_state.last_auto_group:
-    st.session_state.selected_template = DEFAULT_TEMPLATE.get(current_single_group, st.session_state.selected_template)
-    st.session_state.last_auto_group = current_single_group
+# ---- Auto-pick template from single 6-group filter (if exactly one selected) ----
+if current_single_group:
+    desired_tpl = DEFAULT_TEMPLATE.get(current_single_group, st.session_state.template_select)
+    if st.session_state.template_select != desired_tpl:
+        st.session_state.template_select = desired_tpl
+        st.rerun()
 
 # ---------- Build metric pool for Essential Criteria ----------
-current_template_name = st.session_state.selected_template or list(position_metrics.keys())[0]
+current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
 current_metrics = position_metrics[current_template_name]["metrics"]
 
 for m in current_metrics:
@@ -697,7 +569,7 @@ with st.expander("Essential Criteria", expanded=False):
         summary = " AND ".join([f"{m} {o} {t}{'%' if md=='Percentile' else ''}" for m, md, o, t in criteria])
         st.caption(f"Essential Criteria applied: {summary}. Kept {kept}, removed {dropped} players.")
 
-# ---------- Player list (names only; no role suffix) ----------
+# ---------- Player list (names only) ----------
 if "Player" not in df.columns:
     st.error("Expected a 'Name' column in the upload (renamed to 'Player').")
     st.stop()
@@ -718,37 +590,26 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# ---------- Auto-switch template to the player's position ----------
+# ---- Auto-pick template from the selected player's 6-group role ----
 if st.session_state.selected_player:
-    # Find the player's rows (there can be duplicates if you duplicated CMs)
     _rows = df.loc[df["Player"] == st.session_state.selected_player]
-
     if not _rows.empty and "Six-Group Position" in _rows.columns:
-        # If there are multiple rows for the same player, use the most common role
         player_role = _rows["Six-Group Position"].mode().iloc[0]
-
-        # Map role -> template name (uses your DEFAULT_TEMPLATE)
-        auto_template = DEFAULT_TEMPLATE.get(player_role)
-
-        # Only update (and rerun) if it actually changed to avoid loops
-        if auto_template and st.session_state.selected_template != auto_template:
-            st.session_state.selected_template = auto_template
+        desired_tpl = DEFAULT_TEMPLATE.get(player_role, st.session_state.template_select)
+        if st.session_state.template_select != desired_tpl:
+            st.session_state.template_select = desired_tpl
             st.rerun()
 
-# ---------- Template select ----------
+# ---------- Template select (single source of truth) ----------
 template_names = list(position_metrics.keys())
-tpl_index = (
-    template_names.index(st.session_state.selected_template)
-    if st.session_state.get("selected_template") in template_names
-    else 0
-)
-selected_position_template = st.selectbox(
+idx = template_names.index(st.session_state.template_select) if st.session_state.template_select in template_names else 0
+st.selectbox(
     "Choose a position template for the chart",
     template_names,
-    index=tpl_index,
+    index=idx,
     key="template_select",
 )
-st.session_state.selected_template = selected_position_template
+selected_position_template = st.session_state.template_select
 
 # ---------- Metrics + percentiles ----------
 metrics = position_metrics[selected_position_template]["metrics"]
@@ -790,17 +651,8 @@ plot_data["Rank"] = (
 )
 
 # ---------- Chart (colours by group, position on top row, weighted Z in title) ----------
-def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
+def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
     import matplotlib.patches as mpatches
-
-    # Fallback palette if a dict wasn't provided
-    if not isinstance(group_colors, dict) or len(group_colors) == 0:
-        group_colors = {
-            "Attacking":   "crimson",
-            "Possession":  "seagreen",
-            "Defensive":   "royalblue",
-            "Goalkeeping": "purple",
-        }
 
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
@@ -866,7 +718,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     present_groups = list(dict.fromkeys(groups))  # keep order
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
-        # Make some space below for legend and above for title
         fig.subplots_adjust(top=0.86, bottom=0.08)
         ax.legend(
             handles=patches,
@@ -917,7 +768,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
-    # Badge in the middle (optional; safe if logo is None)
+    # Badge in the middle (optional)
     try:
         if logo is not None:
             imagebox = OffsetImage(np.array(logo), zoom=0.18)
@@ -941,7 +792,7 @@ if st.session_state.selected_player:
 st.markdown("### Players Ranked by Weighted Z-Score")
 
 cols_for_table = [
-    "Player", "Positions played", "Competition_norm",  # will be renamed to 'League'
+    "Player", "Positions played", "Competition_norm",
     "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
 ]
 for c in cols_for_table:
