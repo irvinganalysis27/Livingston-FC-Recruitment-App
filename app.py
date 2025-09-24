@@ -255,217 +255,16 @@ DEFAULT_TEMPLATE = {
     "Striker": "Striker"
 }
 
-# ========== Radar metric sets (your new-provider metric names) ==========
-position_metrics = {
-    "Goalkeeper": {
-        "metrics": [
-            "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
-            "Shots Faced", "Shots Faced OT%",
-            "Pass into Danger%", "Pass into Pressure%",
-            "Positive Outcome%", "Goalkeeper OBV"
-        ],
-        "groups": {
-            "Goals Conceded": "Goalkeeping",
-            "PSxG Faced": "Goalkeeping",
-            "GSAA": "Goalkeeping",
-            "Save%": "Goalkeeping",
-            "xSv%": "Goalkeeping",
-            "Shot Stopping%": "Goalkeeping",
-            "Shots Faced": "Goalkeeping",
-            "Shots Faced OT%": "Goalkeeping",
-            "Pass into Danger%": "Possession",
-            "Pass into Pressure%": "Possession",
-            "Positive Outcome%": "Goalkeeping",
-            "Goalkeeper OBV": "Goalkeeping",
-        }
-    },
-
-    # ---------- Centre Back ----------
-    "Centre Back": {
-        "metrics": [
-            "PAdj Interceptions",
-            "PAdj Tackles",
-            "Tack/Dribbled Past%",
-            "Defensive Actions",
-            "Aggressive Actions",
-            "Fouls",
-            "Aerial Wins",
-            "Aerial Win%",
-            "Passing%",
-            "Pressured Long Balls",
-            "Unpressured Long Balls",
-            "OBV",
-            "xG"
-        ],
-        "groups": {
-            "PAdj Interceptions": "Defensive",
-            "PAdj Tackles": "Defensive",
-            "Tack/Dribbled Past%": "Defensive",
-            "Defensive Actions": "Defensive",
-            "Aggressive Actions": "Defensive",
-            "Fouls": "Defensive",
-            "Aerial Wins": "Defensive",
-            "Aerial Win%": "Defensive",
-            "Passing%": "Possession",
-            "Pressured Long Balls": "Possession",
-            "Unpressured Long Balls": "Possession",
-            "OBV": "Possession",
-            "xG": "Attacking",
-        }
-    },
-
-    # ---------- Full Back ----------
-    "Full Back": {
-        "metrics": [
-            "Passing%",
-            "OP Passes Into Box",
-            "Deep Progressions",
-            "xGBuildup",
-            "Successful Dribbles",
-            "Turnovers",
-            "Defensive Actions",
-            "Aerial Win%",
-            "PAdj Pressures",
-            "PAdj Tackles & Interceptions",
-            "Tack/Dribbles Past%",
-            "OBV",
-            "Pass OBV"
-        ],
-        "groups": {
-            "Passing%": "Possession",
-            "OP Passes Into Box": "Possession",
-            "Deep Progressions": "Possession",
-            "xGBuildup": "Attacking",
-            "Successful Dribbles": "Possession",
-            "Turnovers": "Possession",
-            "Defensive Actions": "Defensive",
-            "Aerial Win%": "Defensive",
-            "PAdj Pressures": "Defensive",
-            "PAdj Tackles & Interceptions": "Defensive",
-            "Tack/Dribbles Past%": "Defensive",
-            "OBV": "Possession",
-            "Pass OBV": "Possession",
-        }
-    },
-
-    # ---------- Number 6 ----------
-    "Number 6": {
-        "metrics": [
-            "Passing%",
-            "Deep Progressions",
-            "xGBuildup",
-            "PAdj Interceptions",
-            "PAdj Tackles",
-            "Tack/Dribbled Past%",
-            "Aggressive Actions",
-            "Aerial Win%",
-            "Turnovers",
-            "OBV",
-            "Pass OBV",
-            "xG Assisted"
-        ],
-        "groups": {
-            "Passing%": "Possession",
-            "Deep Progressions": "Possession",
-            "xGBuildup": "Attacking",
-            "PAdj Interceptions": "Defensive",
-            "PAdj Tackles": "Defensive",
-            "Tack/Dribbled Past%": "Defensive",
-            "Aggressive Actions": "Defensive",
-            "Aerial Win%": "Defensive",
-            "Turnovers": "Possession",
-            "OBV": "Possession",
-            "Pass OBV": "Possession",
-            "xG Assisted": "Attacking",
-        }
-    },
-
-    # ---------- Number 8 ----------
-    "Number 8": {
-        "metrics": [
-            "Passing %",
-            "Deep Progressions",
-            "xGBuildup",
-            "xG Assisted",
-            "OP Passes Into Box",
-            "Pass OBV",
-            "Shots",
-            "xG",
-            "Pressure Regains",
-            "PAdj Pressures",
-            "Opposition Half Ball Recoveries",
-            "Aggressive Actions",
-            "OBV"
-        ],
-        "groups": {
-            "Passing %": "Possession",
-            "Deep Progressions": "Possession",
-            "xGBuildup": "Attacking",
-            "xG Assisted": "Attacking",
-            "OP Passes Into Box": "Possession",
-            "Pass OBV": "Possession",
-            "Shots": "Attacking",
-            "xG": "Attacking",
-            "Pressure Regains": "Defensive",
-            "PAdj Pressures": "Defensive",
-            "Opposition Half Ball Recoveries": "Defensive",
-            "Aggressive Actions": "Defensive",
-            "OBV": "Possession",
-        }
-    },
-
-    # ---------- Winger ----------
-    "Winger": {
-        "metrics": [
-            "xG",
-            "xG/Shot",
-            "Touches In Box",
-            "OP Passes Into Box",
-            "Successful Box Cross%",
-            "Passing%",
-            "Open Play xG Assisted",
-            "Successful Dribbles",
-            "Turnovers",
-            "Pressure Regains",
-            "OBV",
-            "Dribble & Carry OBV"
-        ],
-        "groups": {
-            "xG": "Attacking",
-            "xG/Shot": "Attacking",
-            "Touches In Box": "Attacking",
-            "OP Passes Into Box": "Possession",
-            "Successful Box Cross%": "Possession",
-            "Passing%": "Possession",
-            "Open Play xG Assisted": "Attacking",
-            "Successful Dribbles": "Possession",
-            "Turnovers": "Possession",
-            "Pressure Regains": "Defensive",
-            "OBV": "Possession",
-            "Dribble & Carry OBV": "Possession",
-        }
-    },
-
-    # ========== Radar metric sets (grouped ordering) ==========
+# ========== Radar metric sets (grouped ordering) ==========
 position_metrics = {
     # ---------- Goalkeeper ----------
     "Goalkeeper": {
         "metrics": [
-            # Possession (together)
-            "Pass into Danger%",
-            "Pass into Pressure%",
-
-            # Goalkeeping (together)
-            "Goals Conceded",
-            "PSxG Faced",
-            "GSAA",
-            "Save%",
-            "xSv%",
-            "Shot Stopping%",
-            "Shots Faced",
-            "Shots Faced OT%",
-            "Positive Outcome%",
-            "Goalkeeper OBV",
+            # Possession
+            "Pass into Danger%", "Pass into Pressure%",
+            # Goalkeeping
+            "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
+            "Shots Faced", "Shots Faced OT%", "Positive Outcome%", "Goalkeeper OBV",
         ],
         "groups": {
             "Goals Conceded": "Goalkeeping",
@@ -488,22 +287,12 @@ position_metrics = {
         "metrics": [
             # Attacking
             "xG",
-
             # Possession
-            "Passing%",
-            "Pressured Long Balls",
-            "Unpressured Long Balls",
-            "OBV",
-
+            "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
             # Defensive
-            "PAdj Interceptions",
-            "PAdj Tackles",
-            "Tack/Dribbled Past%",
-            "Defensive Actions",
-            "Aggressive Actions",
-            "Fouls",
-            "Aerial Wins",
-            "Aerial Win%",
+            "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
+            "Defensive Actions", "Aggressive Actions", "Fouls",
+            "Aerial Wins", "Aerial Win%",
         ],
         "groups": {
             "PAdj Interceptions": "Defensive",
@@ -527,22 +316,12 @@ position_metrics = {
         "metrics": [
             # Attacking
             "xGBuildup",
-
             # Possession
-            "Passing%",
-            "OP Passes Into Box",
-            "Deep Progressions",
-            "Successful Dribbles",
-            "Turnovers",
-            "OBV",
-            "Pass OBV",
-
+            "Passing%", "OP Passes Into Box", "Deep Progressions",
+            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
             # Defensive
-            "Defensive Actions",
-            "Aerial Win%",
-            "PAdj Pressures",
-            "PAdj Tackles & Interceptions",
-            "Tack/Dribbles Past%",
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tackles & Interceptions", "Tack/Dribbles Past%",
         ],
         "groups": {
             "Passing%": "Possession",
@@ -565,22 +344,12 @@ position_metrics = {
     "Number 6": {
         "metrics": [
             # Attacking
-            "xGBuildup",
-            "xG Assisted",
-
+            "xGBuildup", "xG Assisted",
             # Possession
-            "Passing%",
-            "Deep Progressions",
-            "Turnovers",
-            "OBV",
-            "Pass OBV",
-
+            "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
             # Defensive
-            "PAdj Interceptions",
-            "PAdj Tackles",
-            "Tack/Dribbled Past%",
-            "Aggressive Actions",
-            "Aerial Win%",
+            "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%",
+            "Aggressive Actions", "Aerial Win%",
         ],
         "groups": {
             "Passing%": "Possession",
@@ -602,22 +371,11 @@ position_metrics = {
     "Number 8": {
         "metrics": [
             # Attacking
-            "xGBuildup",
-            "xG Assisted",
-            "Shots",
-            "xG",
-
+            "xGBuildup", "xG Assisted", "Shots", "xG",
             # Possession
-            "Passing %",
-            "Deep Progressions",
-            "OP Passes Into Box",
-            "Pass OBV",
-            "OBV",
-
+            "Passing %", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
             # Defensive
-            "Pressure Regains",
-            "PAdj Pressures",
-            "Opposition Half Ball Recoveries",
+            "Pressure Regains", "PAdj Pressures", "Opposition Half Ball Recoveries",
             "Aggressive Actions",
         ],
         "groups": {
@@ -641,20 +399,10 @@ position_metrics = {
     "Winger": {
         "metrics": [
             # Attacking
-            "xG",
-            "xG/Shot",
-            "Touches In Box",
-            "Open Play xG Assisted",
-
+            "xG", "xG/Shot", "Touches In Box", "Open Play xG Assisted",
             # Possession
-            "OP Passes Into Box",
-            "Successful Box Cross%",
-            "Passing%",
-            "Successful Dribbles",
-            "Turnovers",
-            "OBV",
-            "Dribble & Carry OBV",
-
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
+            "Successful Dribbles", "Turnovers", "OBV", "Dribble & Carry OBV",
             # Defensive
             "Pressure Regains",
         ],
@@ -678,22 +426,12 @@ position_metrics = {
     "Striker": {
         "metrics": [
             # Attacking
-            "All Goals",
-            "Penalty Goals",
-            "xG",
-            "Shots",
-            "xG/Shot",
-            "Shot Touch%",
-            "Touches In Box",
-            "xG Assisted",
-
+            "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
+            "Shot Touch%", "Touches In Box", "xG Assisted",
             # Possession
             "Fouls Won",
-
             # Defensive
-            "Aerial Win%",
-            "Aerial Wins",
-            "Pressure Regains",
+            "Aerial Win%", "Aerial Wins", "Pressure Regains",
         ],
         "groups": {
             "All Goals": "Attacking",
@@ -704,20 +442,12 @@ position_metrics = {
             "Shot Touch%": "Attacking",
             "Touches In Box": "Attacking",
             "xG Assisted": "Attacking",
+            "Fouls Won": "Possession",
             "Aerial Win%": "Defensive",
             "Aerial Wins": "Defensive",
-            "Fouls Won": "Possession",
             "Pressure Regains": "Defensive",
         }
     },
-}
-
-# Colors
-group_colors = {
-    "Attacking": "crimson",
-    "Possession": "seagreen",
-    "Defensive": "royalblue",
-    "Goalkeeping": "purple"
 }
 
 # ---------- File upload ----------
@@ -1109,31 +839,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors)
     avg_z = float(np.mean(z_scores))
     multiplier = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
     weighted_z = avg_z * multiplier
-
-    # ---------- Title (Weighted Z, role moved to top row) ----------
-
-    # Build line1 (player + age + height + role)
-    line1_parts = [player_name]
-    if role: 
-        line1_parts.append(role)  # put position here
-    if not pd.isnull(age):
-        line1_parts.append(f"{int(age)} years old")
-    if not pd.isnull(height):
-        line1_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(line1_parts)
-    
-    # Build line2 (team, comp, mins, rank, weighted Z)
-    line2_parts = []
-    if team: line2_parts.append(team)
-    if comp: line2_parts.append(comp)
-    if pd.notnull(mins): line2_parts.append(f"{int(mins)} mins")
-    if rank_val is not None: line2_parts.append(f"Rank #{rank_val}")
-    line2_parts.append(f"Z {weighted_z:.2f}")  # weighted Z only
-    
-    line2 = " | ".join(line2_parts)
-    
-    # Set the title
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
     # Badge in the middle (optional; safe if logo is None)
     try:
