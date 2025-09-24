@@ -718,13 +718,22 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# ---------- Auto-switch template to match player's position ----------
+# ---------- Auto-switch template to the player's position ----------
 if st.session_state.selected_player:
-    row = df.loc[df["Player"] == st.session_state.selected_player]
-    if not row.empty and "Six-Group Position" in row.columns:
-        player_role = row["Six-Group Position"].values[0]
-        if player_role in DEFAULT_TEMPLATE:
-            st.session_state.selected_template = DEFAULT_TEMPLATE[player_role]
+    # Find the player's rows (there can be duplicates if you duplicated CMs)
+    _rows = df.loc[df["Player"] == st.session_state.selected_player]
+
+    if not _rows.empty and "Six-Group Position" in _rows.columns:
+        # If there are multiple rows for the same player, use the most common role
+        player_role = _rows["Six-Group Position"].mode().iloc[0]
+
+        # Map role -> template name (uses your DEFAULT_TEMPLATE)
+        auto_template = DEFAULT_TEMPLATE.get(player_role)
+
+        # Only update (and rerun) if it actually changed to avoid loops
+        if auto_template and st.session_state.selected_template != auto_template:
+            st.session_state.selected_template = auto_template
+            st.rerun()
 
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
