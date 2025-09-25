@@ -353,11 +353,15 @@ position_metrics = {
 }
 
 # ---------- File upload ----------
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload your data file", type=["xlsx", "csv"])
 if not uploaded_file:
     st.stop()
 
-df = pd.read_excel(uploaded_file)
+# Load depending on extension
+if uploaded_file.name.endswith(".csv"):
+    df = pd.read_csv(uploaded_file)
+else:
+    df = pd.read_excel(uploaded_file)
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
