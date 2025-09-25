@@ -745,7 +745,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if role: top_parts.append(role)
     if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
     if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(top_parts)
+    line1 = " | ".join(str(x) for x in top_parts if pd.notnull(x) and x != "")
 
     bottom_parts = []
     if team:                 bottom_parts.append(team)
@@ -753,7 +753,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
     bottom_parts.append(f"Z {weighted_z:.2f}")
-    line2 = " | ".join(bottom_parts)
+    line2 = " | ".join(str(x) for x in bottom_parts if pd.notnull(x) and x != "")
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
