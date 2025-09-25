@@ -353,32 +353,11 @@ position_metrics = {
 }
 
 # ---------- File upload ----------
-uploaded_file = st.file_uploader("Upload your data file", type=["xlsx", "csv"])
+uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 if not uploaded_file:
     st.stop()
 
-# Load depending on extension
-if uploaded_file.name.endswith(".csv"):
-    df = pd.read_csv(uploaded_file)
-else:
-    df = pd.read_excel(uploaded_file)
-
-# Normalise column headers
-df.columns = df.columns.str.strip().str.lower()
-
-# Rename consistently
-rename_map = {}
-if "name" in df.columns: rename_map["name"] = "Player"
-if "primary position" in df.columns: rename_map["primary position"] = "Position"
-if "position" in df.columns: rename_map["position"] = "Position"  # catch CSVs with just "Position"
-if "minutes" in df.columns: rename_map["minutes"] = "Minutes played"
-if "minutes played" in df.columns: rename_map["minutes played"] = "Minutes played"
-if "age" in df.columns: rename_map["age"] = "Age"
-if "height" in df.columns: rename_map["height"] = "Height"
-if "competition" in df.columns: rename_map["competition"] = "Competition"
-if "secondary position" in df.columns: rename_map["secondary position"] = "Secondary Position"
-
-df.rename(columns=rename_map, inplace=True)
+df = pd.read_excel(uploaded_file)
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
@@ -762,7 +741,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if role: top_parts.append(role)
     if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
     if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(str(x) for x in top_parts if pd.notnull(x) and x != "")
+    line1 = " | ".join(top_parts)
 
     bottom_parts = []
     if team:                 bottom_parts.append(team)
@@ -770,7 +749,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
     bottom_parts.append(f"Z {weighted_z:.2f}")
-    line2 = " | ".join(str(x) for x in bottom_parts if pd.notnull(x) and x != "")
+    line2 = " | ".join(bottom_parts)
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
