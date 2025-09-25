@@ -363,6 +363,23 @@ if uploaded_file.name.endswith(".csv"):
 else:
     df = pd.read_excel(uploaded_file)
 
+# Normalise column headers
+df.columns = df.columns.str.strip().str.lower()
+
+# Rename consistently
+rename_map = {}
+if "name" in df.columns: rename_map["name"] = "Player"
+if "primary position" in df.columns: rename_map["primary position"] = "Position"
+if "position" in df.columns: rename_map["position"] = "Position"  # catch CSVs with just "Position"
+if "minutes" in df.columns: rename_map["minutes"] = "Minutes played"
+if "minutes played" in df.columns: rename_map["minutes played"] = "Minutes played"
+if "age" in df.columns: rename_map["age"] = "Age"
+if "height" in df.columns: rename_map["height"] = "Height"
+if "competition" in df.columns: rename_map["competition"] = "Competition"
+if "secondary position" in df.columns: rename_map["secondary position"] = "Secondary Position"
+
+df.rename(columns=rename_map, inplace=True)
+
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
     df["Competition_norm"] = (
