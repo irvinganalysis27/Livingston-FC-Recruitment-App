@@ -1053,6 +1053,20 @@ plot_data = pd.concat(
 
 # ---------- Z + 0–100 score (min–max by position, anchors require minutes) ----------
 
+# --- Compute Z-scores & avg_z for the min–max scaling ---
+# metrics used for the score are the keys from the selected position template
+sel_metrics = list(metric_groups.keys())
+
+# Defensive: ensure every metric exists in the percentiles frame
+for m in sel_metrics:
+    if m not in percentile_df_globalpos.columns:
+        percentile_df_globalpos[m] = 0.0
+
+# Z-score-like transform from percentiles (50 -> 0, ~15 pts ~ 1 SD)
+pct_for_score   = percentile_df_globalpos[sel_metrics]
+z_scores_all    = (pct_for_score - 50.0) / 15.0
+avg_z           = z_scores_all.mean(axis=1)
+
 # We already have:
 # - sel_metrics, percentile_df_globalpos, z_scores_all, avg_z
 # - plot_data with "Avg Z Score" and "Multiplier" columns
