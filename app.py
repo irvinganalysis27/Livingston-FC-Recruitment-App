@@ -522,7 +522,7 @@ position_metrics = {
 from pathlib import Path
 
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbombdata")  # file or folder
+DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # file or folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
     ext = p.suffix.lower()
