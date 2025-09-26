@@ -522,31 +522,28 @@ position_metrics = {
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    # Show what we are trying
-    st.caption(f"Trying to load file at: {p.resolve()}")
+    # Debugging to terminal, not Streamlit
+    print(f"[DEBUG] Trying to load file at: {p.resolve()}")
 
-    # Try Excel first if extension suggests it, otherwise still attempt Excel then fallback to CSV
     def try_excel() -> pd.DataFrame | None:
         try:
-            import openpyxl  # ensure engine is present
-            return pd.read_excel(p, engine="openpyxl")  # first sheet by default
-        except ImportError as e:
-            st.info("openpyxl is not available on this environment, trying CSV reader next.")
+            import openpyxl
+            return pd.read_excel(p, engine="openpyxl")
+        except ImportError:
+            print("[DEBUG] openpyxl not available, trying CSV reader next.")
             return None
         except ValueError as e:
-            # Pandas throws ValueError for invalid file format, bad ZIP, etc
-            st.info(f"Excel parse failed, trying CSV next. Reason, {e}")
+            print(f"[DEBUG] Excel parse failed: {e}. Trying CSV.")
             return None
         except Exception as e:
-            st.info(f"Excel read raised {type(e).__name__}, trying CSV next.")
+            print(f"[DEBUG] Excel read raised {type(e).__name__}, trying CSV. {e}")
             return None
 
     def try_csv() -> pd.DataFrame | None:
-        # Try liberal CSV sniff, then a plain UTF-8, then latin-1
         for kwargs in [
-            dict(sep=None, engine="python"),     # sniff delimiter
-            dict(),                              # default, comma UTF-8
-            dict(encoding="latin1"),             # tolerant encoding
+            dict(sep=None, engine="python"),
+            dict(),
+            dict(encoding="latin1"),
         ]:
             try:
                 return pd.read_csv(p, **kwargs)
@@ -555,62 +552,55 @@ def load_one_file(p: Path) -> pd.DataFrame:
         return None
 
     df = None
-    # If it looks like Excel, try Excel first
     if p.suffix.lower() in {".xlsx", ".xls"}:
         df = try_excel()
         if df is None:
             df = try_csv()
     else:
-        # If no extension or not Excel, try CSV first, then Excel
         df = try_csv()
         if df is None:
             df = try_excel()
 
     if df is None:
-        # Last resort, show small peek to help debug
         try:
             with open(p, "rb") as fh:
                 head = fh.read(256)
-            st.error("Could not read the file as Excel or CSV. Here is a short raw preview below.")
-            st.code(head[:256])
+            print(f"[ERROR] Could not read {p.name}. File preview: {head[:256]}")
         except Exception:
             pass
         raise ValueError(f"Unsupported or unreadable file, {p.name}")
 
-    st.caption(f"Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
+    print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
     return df
 
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
-    st.caption(f"Data path configured as: {path}")
+    print(f"[DEBUG] Data path configured as: {path}")
     if not path.exists():
-        st.error(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
-        st.stop()
+        raise FileNotFoundError(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
 
     if path.is_file():
         return load_one_file(path)
 
-    # Directory, merge files inside
     files = sorted(
         f for f in path.iterdir()
         if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
     )
     if not files:
-        st.error(f"No data files found inside {path.name}. Add CSV or XLSX.")
-        st.stop()
+        raise FileNotFoundError(f"No data files found inside {path.name}. Add CSV or XLSX.")
 
     frames = []
     for f in files:
         try:
             frames.append(load_one_file(f))
         except Exception as e:
-            st.warning(f"Skipping {f.name} ({e})")
+            print(f"[WARNING] Skipping {f.name} ({e})")
+
     if not frames:
-        st.error("No readable files found in statsbombdata")
-        st.stop()
+        raise ValueError("No readable files found in statsbombdata")
 
     df = pd.concat(frames, ignore_index=True, sort=False)
-    st.caption(f"Merged {len(files)} files from {path.name}, total rows {len(df)}")
+    print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
     return df
 
 # Use local data, no uploader
