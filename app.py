@@ -518,14 +518,6 @@ position_metrics = {
     },
 }
 
-# ---------- Metrics where lower values are better ----------
-INVERT_METRICS = {
-    "Turnovers",
-    "Fouls",
-    "Pressured Long Balls",
-    "Unpressured Long Balls",
-}
-
 # ---------- Data source: local repo ----------
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
 
@@ -941,39 +933,45 @@ else:
         st.session_state.manual_override = True
         st.session_state.last_template_choice = st.session_state.template_select
 
-# ---------- Metrics + percentiles ----------
+# ---------- Metrics + percentiles (direction-aware; raw unchanged) ----------
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
+# ensure all selected metrics exist
 for m in metrics:
     if m not in df.columns:
-        df[m] = 0
-df[metrics] = df[metrics].fillna(0)
+        df[m] = np.nan
 
-# Copy only selected metrics
-metrics_df = df[metrics].copy()
+# raw numbers for labels (DO NOT CHANGE THESE)
+metrics_df_raw = df[metrics].apply(pd.to_numeric, errors="coerce").copy()
 
-# Invert the "lower is better" metrics
-for m in metrics_df.columns:
-    if m in INVERT_METRICS:
-        # Handle zeros and negatives safely: higher becomes worse
-        max_val = metrics_df[m].max(skipna=True)
-        metrics_df[m] = max_val - metrics_df[m]
+# which metrics are "lower is better" (bars should invert)
+LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pressured Long Balls", "Unpressured Long Balls"}
 
+# league-aware percentile option
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
 
-if compute_within_league and league_col in df.columns:
-    # rank within each league separately
-    percentile_df = (
-        df.groupby(league_col)[metrics]
-          .rank(pct=True) * 100
-    ).round(1)
-else:
-    # pooled across all selected leagues
-    percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
+# compute percentiles with correct direction per metric
+percentile_df = pd.DataFrame(index=df.index, columns=metrics, dtype="float")
 
-# Keep base columns
+if compute_within_league and league_col in df.columns:
+    tmp = metrics_df_raw.copy()
+    tmp[league_col] = df[league_col].values
+    for col in metrics:
+        asc = (col not in LOWER_IS_BETTER)   # higher better -> ascending True
+        percentile_df[col] = (
+            tmp.groupby(league_col)[col]
+               .rank(pct=True, ascending=asc) * 100
+        ).round(1)
+else:
+    for col in metrics:
+        asc = (col not in LOWER_IS_BETTER)
+        percentile_df[col] = (
+            metrics_df_raw[col].rank(pct=True, ascending=asc) * 100
+        ).round(1)
+
+# assemble data for plotting: RAW values + PERCENTILES
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
     "Positions played", "Minutes played", "Six-Group Position",
@@ -984,14 +982,14 @@ for c in keep_cols:
         df[c] = np.nan
 
 plot_data = pd.concat(
-    [df[keep_cols], metrics_df, percentile_df.add_suffix(" (percentile)")], axis=1
+    [df[keep_cols], metrics_df_raw, percentile_df.add_suffix(" (percentile)")],
+    axis=1
 )
 
-# Compute Zs
+# Z-scores & ranking from the percentiles (unchanged)
 sel_metrics = list(metric_groups.keys())
 percentiles_all = plot_data[[m + " (percentile)" for m in sel_metrics]]
 z_scores_all = (percentiles_all - 50) / 15
-
 plot_data["Avg Z Score"] = z_scores_all.mean(axis=1)
 plot_data["Multiplier"] = plot_data["Multiplier"].fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
