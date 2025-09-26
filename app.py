@@ -65,11 +65,15 @@ LEAGUE_SYNONYMS = {
     "2. Liga": "Austria 2. Liga",
     "Challenger Pro League": "Belgium Challenger Pro League",
     "First League": "Bulgaria First League",
-    "1. HNL": "Croatia 1. HNL", "HNL": "Croatia 1. HNL",
+    "1. HNL": "Croatia 1. HNL", 
+    "HNL": "Croatia 1. HNL",
     "Czech Liga": "Czech First Tier",
-    "1st Division": "Denmark 1st Division", "Superliga": "Denmark Superliga",
-    "League One": "England League One", "League Two": "England League Two",
-    "National League": "England National League", "National League N / S": "England National League N/S",
+    "1st Division": "Denmark 1st Division",
+    "Superliga": "Denmark Superliga",   # Denmark
+    "League One": "England League One", 
+    "League Two": "England League Two",
+    "National League": "England National League", 
+    "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
     "Championnat National": "France National 1",
@@ -83,17 +87,23 @@ LEAGUE_SYNONYMS = {
     "A Lyga": "Lithuania A Lyga",
     "Botola Pro": "Morocco Botola Pro",
     "Eerste Divisie": "Netherlands Eerste Divisie",
-    "1. Division": "Norway 1. Division", "Eliteserien": "Norway Eliteserien",
-    "I Liga": "Poland 1 Liga", "Ekstraklasa": "Poland Ekstraklasa",
-    "Segunda Liga": "Portugal Segunda Liga", "Liga Pro": "Portugal Segunda Liga",
+    "1. Division": "Norway 1. Division", 
+    "Eliteserien": "Norway Eliteserien",
+    "I Liga": "Poland 1 Liga", 
+    "Ekstraklasa": "Poland Ekstraklasa",
+    "Segunda Liga": "Portugal Segunda Liga", 
+    "Liga Pro": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
-    "Championship": "Scotland Championship", "Premiership": "Scotland Premiership",
-    "Super Liga": "Serbia Super Liga",
-    "1. Liga": "Slovakia 1. Liga",
+    "Championship": "Scotland Championship", 
+    "Premiership": "Scotland Premiership",
+    "Super Liga": "Serbia Super Liga",        # Serbia
+    "Slovakia Super Liga": "Slovakia 1. Liga",# Slovakia StatsBomb export
+    "1. Liga": "Slovakia 1. Liga",            # Slovakia
     "1. Liga (SVN)": "Slovenia 1. Liga",
     "PSL": "South Africa Premier Division",
-    "Allsvenskan": "Sweden Allsvenskan", "Superettan": "Sweden Superettan",
+    "Allsvenskan": "Sweden Allsvenskan", 
+    "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
     "Ligue 1": "Tunisia Ligue 1",
     "USL Championship": "USA USL Championship",
@@ -632,15 +642,24 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # Merge league multipliers (fallback 1.0)
+        # Merge league multipliers (fallback 1.0)
     try:
         multipliers_df = pd.read_excel("league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(multipliers_df.columns):
             df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+            
+            # Debug: show leagues that failed to match multipliers
+            missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
+            if missing_mult:
+                print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
+                st.warning(f"Some leagues did not match multipliers: {missing_mult}")
+            
+            df["Multiplier"] = df["Multiplier"].fillna(1.0)  # fallback
         else:
             st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
             df["Multiplier"] = 1.0
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] Failed to load multipliers: {e}")
         df["Multiplier"] = 1.0
 
     # Rename new-provider identifiers
