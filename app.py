@@ -949,13 +949,15 @@ LOWER_IS_BETTER = {
 }
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
-    # We want higher percentile = better
+    # pandas: rank(pct=True, ascending=True) -> smallest ≈ 0, largest = 1.0
+    r = series.rank(pct=True, ascending=True)
+
     if lower_is_better:
-        r = series.rank(pct=True, ascending=True)   # small -> small
-        return (1.0 - r) * 100.0
+        p = 1.0 - r          # smaller raw -> larger percentile
     else:
-        r = series.rank(pct=True, ascending=False)  # big -> big
-        return r * 100.0
+        p = r                # larger raw -> larger percentile
+
+    return (p * 100.0).round(1)
 
 # --- A) Percentiles for RADAR BARS (within selected leagues vs pooled) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
