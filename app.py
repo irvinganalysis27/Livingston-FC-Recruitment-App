@@ -920,7 +920,19 @@ for m in metrics:
 df[metrics] = df[metrics].fillna(0)
 
 metrics_df = df[metrics].copy()
-percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
+
+league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
+compute_within_league = st.checkbox("Percentiles within each league", value=True)
+
+if compute_within_league and league_col in df.columns:
+    # rank within each league separately
+    percentile_df = (
+        df.groupby(league_col)[metrics]
+          .rank(pct=True) * 100
+    ).round(1)
+else:
+    # pooled across all selected leagues
+    percentile_df = (metrics_df.rank(pct=True) * 100).round(1)
 
 # Keep base columns
 keep_cols = [
