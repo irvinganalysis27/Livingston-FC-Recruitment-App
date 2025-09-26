@@ -1246,7 +1246,7 @@ st.markdown("### Players Ranked by Score (0–100)")
 # Include Score (0–100) so we can sort by it and display it
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",
-    "Score (0–100)", "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
+    "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
 ]
 
 # Ensure the columns exist (defensive)
