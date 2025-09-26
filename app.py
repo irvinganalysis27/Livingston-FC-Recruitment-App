@@ -422,6 +422,7 @@ position_metrics = {
         ],
         "groups": {
             "xG": "Attacking",
+            "Shots": "Attacking:,
             "xG/Shot": "Attacking",
             "Touches In Box": "Attacking",
             "OP xG Assisted": "Attacking",
@@ -449,6 +450,7 @@ position_metrics = {
         ],
         "groups": {
             "xG": "Attacking",
+            "Shots": "Attacking:,
             "xG/Shot": "Attacking",
             "Touches In Box": "Attacking",
             "OP xG Assisted": "Attacking",
