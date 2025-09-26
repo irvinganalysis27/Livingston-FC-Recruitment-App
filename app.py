@@ -677,6 +677,36 @@ if "Six-Group Position" in df.columns:
         cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
         df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
+# ---------- League filter ----------
+# Place this block right before the "Minutes filter" section
+
+# choose which column to use for league
+league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
+
+# normalise to strings for safety
+if league_col not in df.columns:
+    df[league_col] = np.nan
+df[league_col] = df[league_col].astype(str).str.strip()
+
+all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
+
+st.markdown("### Choose league, multiple allowed")
+selected_leagues = st.multiselect(
+    "Leagues to include",
+    options=all_leagues,
+    default=all_leagues,  # start with everything selected
+)
+
+if selected_leagues:
+    df = df[df[league_col].isin(selected_leagues)].copy()
+    st.caption(f"Leagues selected, {len(selected_leagues)}. Players remaining, {len(df)}")
+    if df.empty:
+        st.warning("No players match the selected leagues. Clear or change the league filter.")
+        st.stop()
+else:
+    st.info("No leagues selected. Showing no players until you pick at least one.")
+    st.stop()
+
 # ---------- Minutes filter ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
