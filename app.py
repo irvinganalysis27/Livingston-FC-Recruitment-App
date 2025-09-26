@@ -184,8 +184,8 @@ position_metrics = {
         }
     },
 
-    # ---------- Centre Back ----------
-    "Centre Back": {
+    # ---------- Centre Back Old ----------
+    "Centre Back Old": {
         "metrics": [
             # Attacking
             "xG",
@@ -213,8 +213,37 @@ position_metrics = {
         }
     },
 
-    # ---------- Full Back ----------
-    "Full Back": {
+    # ---------- Centre Back New ----------
+    "Centre Back New": {
+        "metrics": [
+            # Attacking
+            "xG",
+            # Possession
+            "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
+            # Defensive
+            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+            "Defensive Actions", "Aggressive Actions", "Fouls",
+            "Aerial Wins", "Aerial Win%",
+        ],
+        "groups": {
+            "PAdj Interceptions": "Defensive",
+            "PAdj Tackles": "Defensive",
+            "Tack/DP%": "Defensive",
+            "Defensive Actions": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "Fouls": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Aerial Win%": "Defensive",
+            "Passing%": "Possession",
+            "Pressured Long Balls": "Possession",
+            "Unpressured Long Balls": "Possession",
+            "OBV": "Possession",
+            "xG": "Attacking",
+        }
+    },
+
+    # ---------- Full Back Old ----------
+    "Full Back Old": {
         "metrics": [
             # Attacking
             "xGBuildup",
@@ -242,8 +271,37 @@ position_metrics = {
         }
     },
 
-    # ---------- Number 6 ----------
-    "Number 6": {
+    # ---------- Full Back New ----------
+    "Full Back New": {
+        "metrics": [
+            # Attacking
+            "xGBuildup",
+            # Possession
+            "Passing%", "OP Passes Into Box", "Deep Progressions",
+            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+            # Defensive
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tack&Int", "Tack/DP%",
+        ],
+        "groups": {
+            "Passing%": "Possession",
+            "OP Passes Into Box": "Possession",
+            "Deep Progressions": "Possession",
+            "xGBuildup": "Attacking",
+            "Successful Dribbles": "Possession",
+            "Turnovers": "Possession",
+            "Defensive Actions": "Defensive",
+            "Aerial Win%": "Defensive",
+            "PAdj Pressures": "Defensive",
+            "PAdj Tack&Int": "Defensive",
+            "Tack/DP%": "Defensive",
+            "OBV": "Possession",
+            "Pass OBV": "Possession",
+        }
+    },
+
+    # ---------- Number 6 Old ----------
+    "Number 6 Old": {
         "metrics": [
             # Attacking
             "xGBuildup", "xG Assisted",
@@ -269,8 +327,35 @@ position_metrics = {
         }
     },
 
-    # ---------- Number 8 ----------
-    "Number 8": {
+    # ---------- Number 6 New ----------
+    "Number 6 New": {
+        "metrics": [
+            # Attacking
+            "xGBuildup", "xG Assisted",
+            # Possession
+            "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
+            # Defensive
+            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+            "Aggressive Actions", "Aerial Win%",
+        ],
+        "groups": {
+            "Passing%": "Possession",
+            "Deep Progressions": "Possession",
+            "xGBuildup": "Attacking",
+            "PAdj Interceptions": "Defensive",
+            "PAdj Tackles": "Defensive",
+            "Tack/DP%": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "Aerial Win%": "Defensive",
+            "Turnovers": "Possession",
+            "OBV": "Possession",
+            "Pass OBV": "Possession",
+            "xG Assisted": "Attacking",
+        }
+    },
+
+    # ---------- Number 8 Old ----------
+    "Number 8 Old": {
         "metrics": [
             # Attacking
             "xGBuildup", "xG Assisted", "Shots", "xG",
@@ -297,8 +382,36 @@ position_metrics = {
         }
     },
 
-    # ---------- Winger ----------
-    "Winger": {
+    # ---------- Number 8 New ----------
+    "Number 8 New": {
+        "metrics": [
+            # Attacking
+            "xGBuildup", "xG Assisted", "Shots", "xG",
+            # Possession
+            "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
+            # Defensive
+            "Pressure Regains", "PAdj Pressures", "Opposition Half Ball Recoveries",
+            "Aggressive Actions",
+        ],
+        "groups": {
+            "Passing%": "Possession",
+            "Deep Progressions": "Possession",
+            "xGBuildup": "Attacking",
+            "xG Assisted": "Attacking",
+            "OP Passes Into Box": "Possession",
+            "Pass OBV": "Possession",
+            "Shots": "Attacking",
+            "xG": "Attacking",
+            "Pressure Regains": "Defensive",
+            "PAdj Pressures": "Defensive",
+            "Opposition Half Ball Recoveries": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "OBV": "Possession",
+        }
+    },
+
+    # ---------- Winger Old ----------
+    "Winger Old": {
         "metrics": [
             # Attacking
             "xG", "xG/Shot", "Touches In Box", "OP xG Assisted",
@@ -324,8 +437,62 @@ position_metrics = {
         }
     },
 
-    # ---------- Striker ----------
-    "Striker": {
+    # ---------- Winger New ----------
+    "Winger New": {
+        "metrics": [
+            # Attacking
+            "xG", "xG/Shot", "Touches In Box", "OP xG Assisted",
+            # Possession
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
+            "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
+            # Defensive
+            "Pressure Regains",
+        ],
+        "groups": {
+            "xG": "Attacking",
+            "xG/Shot": "Attacking",
+            "Touches In Box": "Attacking",
+            "OP xG Assisted": "Attacking",
+            "OP Passes Into Box": "Possession",
+            "Successful Box Cross%": "Possession",
+            "Passing%": "Possession",
+            "Successful Dribbles": "Possession",
+            "Turnovers": "Possession",
+            "Pressure Regains": "Defensive",
+            "OBV": "Possession",
+            "D&C OBV": "Possession",
+        }
+    },
+
+    # ---------- Striker Old ----------
+    "Striker Old": {
+        "metrics": [
+            # Attacking
+            "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
+            "Shot Touch%", "Touches In Box", "xG Assisted",
+            # Possession
+            "Fouls Won",
+            # Defensive
+            "Aerial Win%", "Aerial Wins", "Pressure Regains",
+        ],
+        "groups": {
+            "All Goals": "Attacking",
+            "Penalty Goals": "Attacking",
+            "xG": "Attacking",
+            "Shots": "Attacking",
+            "xG/Shot": "Attacking",
+            "Shot Touch%": "Attacking",
+            "Touches In Box": "Attacking",
+            "xG Assisted": "Attacking",
+            "Fouls Won": "Possession",
+            "Aerial Win%": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Pressure Regains": "Defensive",
+        }
+    },
+
+    # ---------- Striker New ----------
+    "Striker New": {
         "metrics": [
             # Attacking
             "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
@@ -351,23 +518,6 @@ position_metrics = {
         }
     },
 }
-from copy import deepcopy
-
-def duplicate_positions_old_new(src: dict) -> dict:
-    out = {}
-    for name, payload in src.items():
-        if name.lower() == "goalkeeper":
-            out[name] = deepcopy(payload)
-            continue
-        # make Old and New with identical content
-        old_name = f"{name} Old"
-        new_name = f"{name} New"
-        out[old_name] = deepcopy(payload)
-        out[new_name] = deepcopy(payload)
-    return out
-
-# Build the duplicated dictionary
-position_metrics = duplicate_positions_old_new(position_metrics)
 
 # ---------- File upload ----------
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
