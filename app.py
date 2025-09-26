@@ -522,7 +522,6 @@ position_metrics = {
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    # Debugging to terminal, not Streamlit
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
 
     def try_excel() -> pd.DataFrame | None:
@@ -573,8 +572,6 @@ def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
     return df
 
-
-# --- helper: build a cache signature from file mtimes/sizes (no extra imports needed) ---
 def _data_signature(path: Path):
     path = Path(path)
     if path.is_file():
@@ -593,9 +590,6 @@ def _data_signature(path: Path):
 
 @st.cache_data(show_spinner=False)
 def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
-    """
-    Cached loader. `_sig` forces cache refresh when the file/folder contents change.
-    """
     print(f"[DEBUG] Data path configured as: {path}")
     if not path.exists():
         raise FileNotFoundError(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
@@ -624,31 +618,7 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
     return df
 
-# Use local data, no uploader
-df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
-df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (filtered by UI)
-
-# Normalise Competition name and merge league multipliers
-if "Competition" in df.columns:
-    df["Competition_norm"] = (
-        df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
-    )
-else:
-    df["Competition_norm"] = np.nan
-
-try:
-    multipliers_df = pd.read_excel("league_multipliers.xlsx")
-    if {"League", "Multiplier"}.issubset(multipliers_df.columns):
-        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-    else:
-        st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
-        df["Multiplier"] = 1.0
-except Exception:
-    st.info("No league_multipliers.xlsx found. Using 1.0 for all leagues.")
-    df["Multiplier"] = 1.0
-
-# ---------- Preprocess DataFrame ----------
+# ---------- Preprocess DataFrame (define BEFORE it’s used) ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
 
@@ -703,7 +673,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-    # Duplicate generic CMs into both 6 & 8 (do this once, at baseline)
+    # Duplicate generic CMs into both 6 & 8 (baseline only)
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"] == "Centre Midfield"
         if cm_mask.any():
@@ -713,6 +683,11 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
+
+# ---------- Load & preprocess ----------
+df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
+df = df_all.copy()                   # working copy (filtered by UI)
 
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
@@ -724,11 +699,9 @@ all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
 st.markdown("### Choose league (multiple allowed)")
 
-# keep selection in session_state so buttons can update it
 if "league_selection" not in st.session_state:
     st.session_state.league_selection = all_leagues.copy()
 
-# buttons
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all"):
@@ -737,7 +710,6 @@ with b2:
     if st.button("Clear all"):
         st.session_state.league_selection = []
 
-# the multiselect reflects session_state (and can change it)
 selected_leagues = st.multiselect(
     "Leagues to include",
     options=all_leagues,
@@ -745,7 +717,6 @@ selected_leagues = st.multiselect(
     key="league_selection",
 )
 
-# filter
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
@@ -794,7 +765,7 @@ if selected_groups:
 
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
-# ---------- Session state (auto without visible toggle) ----------
+# ---------- Session state ----------
 if "selected_player" not in st.session_state:
     st.session_state.selected_player = None
 if "ec_rows" not in st.session_state:
@@ -804,21 +775,20 @@ if "template_select" not in st.session_state:
 if "last_template_choice" not in st.session_state:
     st.session_state.last_template_choice = st.session_state.template_select
 if "manual_override" not in st.session_state:
-    st.session_state.manual_override = False           # becomes True when user changes dropdown
+    st.session_state.manual_override = False
 if "auto_just_applied" not in st.session_state:
-    st.session_state.auto_just_applied = False         # guard to not mark manual after auto change
+    st.session_state.auto_just_applied = False
 if "last_player_for_auto" not in st.session_state:
     st.session_state.last_player_for_auto = None
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# If the group filter changed and is now a single group, re-enable auto
 if tuple(selected_groups) != st.session_state.last_groups_tuple:
     if len(selected_groups) == 1:
         st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# ---------- Build metric pool for Essential Criteria (uses current template) ----------
+# ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
 current_metrics = position_metrics[current_template_name]["metrics"]
 
@@ -920,7 +890,7 @@ with st.expander("Essential Criteria", expanded=False):
         summary = " AND ".join([f"{m} {o} {t}{'%' if md=='Percentile' else ''}" for m, md, o, t in criteria])
         st.caption(f"Essential Criteria applied: {summary}. Kept {kept}, removed {dropped} players.")
 
-# ---------- Player list (names only; no role suffix) ----------
+# ---------- Player list ----------
 if "Player" not in df.columns:
     st.error("Expected a 'Name' column in the upload (renamed to 'Player').")
     st.stop()
@@ -941,7 +911,7 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# ---------- Template select (manual override supported, but no checkbox) ----------
+# ---------- Template select ----------
 template_names = list(position_metrics.keys())
 idx = template_names.index(st.session_state.template_select) if st.session_state.template_select in template_names else 0
 selected_position_template = st.selectbox(
@@ -951,7 +921,6 @@ selected_position_template = st.selectbox(
     key="template_select",
 )
 
-# Detect manual change, but don't flag when it was just changed by auto
 if st.session_state.auto_just_applied:
     st.session_state.last_template_choice = st.session_state.template_select
     st.session_state.auto_just_applied = False
@@ -964,14 +933,14 @@ else:
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
-# ensure columns exist
+# ensure columns exist in both df_all and df
 for m in metrics:
     if m not in df_all.columns: df_all[m] = 0
     if m not in df.columns:     df[m] = 0
 df_all[metrics] = df_all[metrics].fillna(0)
 df[metrics]     = df[metrics].fillna(0)
 
-# Metrics where lower values are better (do NOT change raw values; only affects percentiles)
+# Metrics where lower values are better (raw values unchanged; only percentiles invert)
 LOWER_IS_BETTER = {
     "Turnovers",
     "Fouls",
@@ -988,12 +957,11 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
         r = series.rank(pct=True, ascending=False)  # big -> big
         return r * 100.0
 
-# --- A) Percentiles used for the RADAR BARS (unchanged behaviour) ---
+# --- A) Percentiles for RADAR BARS (within selected leagues vs pooled) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
 
 if compute_within_league and league_col in df.columns:
-    # within each selected league
     percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
     for m in metrics:
         percentile_df_chart[m] = (
@@ -1001,14 +969,13 @@ if compute_within_league and league_col in df.columns:
               .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
         )
 else:
-    # pooled across the selected rows
     percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
     for m in metrics:
         percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
 
 percentile_df_chart = percentile_df_chart.round(1)
 
-# --- B) Percentiles for the 0–100 SCORE (baseline = WHOLE DATASET by position) ---
+# --- B) Percentiles for 0–100 SCORE (baseline = WHOLE DATASET by position) ---
 pos_col = "Six-Group Position"
 if pos_col not in df_all.columns: df_all[pos_col] = np.nan
 if pos_col not in df.columns:     df[pos_col]     = np.nan
@@ -1039,10 +1006,8 @@ plot_data = pd.concat(
 
 # ---------- Z + 0–100 score (based on WHOLE DATASET by position) ----------
 sel_metrics = list(metric_groups.keys())
-
-# use the global-by-position percentiles for z/score
 pct_for_score = percentile_df_globalpos[sel_metrics]
-z_scores_all  = (pct_for_score - 50.0) / 15.0         # 50 -> 0, each 15 pct points = 1 SD
+z_scores_all  = (pct_for_score - 50.0) / 15.0         # 50 -> 0, ~15 pct points = 1 SD
 avg_z         = z_scores_all.mean(axis=1)
 
 plot_data["Avg Z Score"]      = avg_z.values
@@ -1107,7 +1072,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.06),
                   ncol=min(len(patches), 4), frameon=False)
 
-        # Keep weighted_z as a fallback
     if "Weighted Z Score" in row.columns:
         weighted_z = float(row["Weighted Z Score"].values[0])
     else:
@@ -1116,7 +1080,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         mult = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
         weighted_z = avg_z * mult
 
-    # Optional new score out of 100 (computed elsewhere)
     score_100 = None
     if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
         score_100 = float(row["Score (0–100)"].values[0])
@@ -1147,7 +1110,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
 
-    # Prefer Score (0–100) if present; otherwise show Z
     if score_100 is not None:
         bottom_parts.append(f"Score {score_100:.0f}")
     else:
