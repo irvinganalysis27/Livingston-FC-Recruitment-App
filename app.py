@@ -1125,9 +1125,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
 
     if score_100 is not None:
-    bottom_parts.append(f"{score_100:.0f}/100")
-else:
-    bottom_parts.append(f"Z {weighted_z:.2f}")
+        bottom_parts.append(f"{score_100:.0f}/100")
+    else:
+        bottom_parts.append(f"Z {weighted_z:.2f}")
 
     line2 = " | ".join(bottom_parts)
 
