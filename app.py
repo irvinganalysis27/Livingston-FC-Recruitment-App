@@ -574,7 +574,28 @@ def load_one_file(p: Path) -> pd.DataFrame:
     return df
 
 
-def load_statsbomb(path: Path) -> pd.DataFrame:
+# --- helper: build a cache signature from file mtimes/sizes (no extra imports needed) ---
+def _data_signature(path: Path):
+    path = Path(path)
+    if path.is_file():
+        s = path.stat()
+        return ("file", str(path.resolve()), s.st_size, int(s.st_mtime))
+    else:
+        sigs = []
+        for p in sorted(path.iterdir()):
+            if p.is_file() and (p.suffix.lower() in {".csv", ".xlsx", ".xls"} or p.suffix == ""):
+                try:
+                    s = p.stat()
+                    sigs.append((str(p.resolve()), s.st_size, int(s.st_mtime)))
+                except FileNotFoundError:
+                    continue
+        return ("dir", str(path.resolve()), tuple(sigs))
+
+@st.cache_data(show_spinner=False)
+def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
+    """
+    Cached loader. `_sig` forces cache refresh when the file/folder contents change.
+    """
     print(f"[DEBUG] Data path configured as: {path}")
     if not path.exists():
         raise FileNotFoundError(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
@@ -604,7 +625,7 @@ def load_statsbomb(path: Path) -> pd.DataFrame:
     return df
 
 # Use local data, no uploader
-df = load_statsbomb(DATA_PATH)
+df = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
