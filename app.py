@@ -413,7 +413,7 @@ position_metrics = {
     "Winger Old": {
         "metrics": [
             # Attacking
-            "xG", "xG/Shot", "Touches In Box", "OP xG Assisted",
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted",
             # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
@@ -440,7 +440,7 @@ position_metrics = {
     "Winger New": {
         "metrics": [
             # Attacking
-            "xG", "xG/Shot", "Touches In Box", "OP xG Assisted",
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted",
             # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
