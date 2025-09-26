@@ -667,33 +667,45 @@ if "Six-Group Position" in df.columns:
         df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
 # ---------- League filter ----------
-# Place this block right before the "Minutes filter" section
-
-# choose which column to use for league
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-
-# normalise to strings for safety
 if league_col not in df.columns:
     df[league_col] = np.nan
-df[league_col] = df[league_col].astype(str).str.strip()
 
+df[league_col] = df[league_col].astype(str).str.strip()
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
-st.markdown("### Choose league, multiple allowed")
+st.markdown("### Choose league (multiple allowed)")
+
+# keep selection in session_state so buttons can update it
+if "league_selection" not in st.session_state:
+    st.session_state.league_selection = all_leagues.copy()
+
+# buttons
+b1, b2, _ = st.columns([1, 1, 6])
+with b1:
+    if st.button("Select all"):
+        st.session_state.league_selection = all_leagues.copy()
+with b2:
+    if st.button("Clear all"):
+        st.session_state.league_selection = []
+
+# the multiselect reflects session_state (and can change it)
 selected_leagues = st.multiselect(
     "Leagues to include",
     options=all_leagues,
-    default=all_leagues,  # start with everything selected
+    default=st.session_state.league_selection,
+    key="league_selection",
 )
 
+# filter
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
-    st.caption(f"Leagues selected, {len(selected_leagues)}. Players remaining, {len(df)}")
+    st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
     if df.empty:
         st.warning("No players match the selected leagues. Clear or change the league filter.")
         st.stop()
 else:
-    st.info("No leagues selected. Showing no players until you pick at least one.")
+    st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
 
 # ---------- Minutes filter ----------
