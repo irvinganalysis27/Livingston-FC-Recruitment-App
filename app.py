@@ -1140,10 +1140,14 @@ if st.session_state.selected_player:
 
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Score (0–100)")
+
+# Include Score (0–100) so we can sort by it and display it
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",
-    "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
+    "Score (0–100)", "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
 ]
+
+# Ensure the columns exist (defensive)
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
@@ -1153,11 +1157,15 @@ z_ranking = (
     .sort_values(by="Score (0–100)", ascending=False)
     .reset_index(drop=True)
 )
+
+# Nice display tweaks
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
+# 1-based row index
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
+
 st.dataframe(z_ranking, use_container_width=True)
