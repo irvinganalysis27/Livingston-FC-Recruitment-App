@@ -625,7 +625,9 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     return df
 
 # Use local data, no uploader
-df = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
+df = df_all.copy()                   # working copy (to be filtered by UI)
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
@@ -678,14 +680,70 @@ if "Position" in df.columns:
 else:
     df["Six-Group Position"] = np.nan
 
-# Duplicate generic CMs into both 6 & 8
-if "Six-Group Position" in df.columns:
+def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
+    df = df_in.copy()
+
+    # Normalise Competition name
+    if "Competition" in df.columns:
+        df["Competition_norm"] = (
+            df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+        )
+    else:
+        df["Competition_norm"] = np.nan
+
+    # Merge league multipliers (fallback 1.0)
+    try:
+        multipliers_df = pd.read_excel("league_multipliers.xlsx")
+        if {"League", "Multiplier"}.issubset(multipliers_df.columns):
+            df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+        else:
+            st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
+            df["Multiplier"] = 1.0
+    except Exception:
+        # keep this quiet; we already know it’s optional
+        df["Multiplier"] = 1.0
+
+    # Rename new-provider identifiers
+    rename_map = {}
+    if "Name" in df.columns: rename_map["Name"] = "Player"
+    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
+    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+    df.rename(columns=rename_map, inplace=True)
+
+    # Build "Positions played"
+    if "Position" in df.columns:
+        if "Secondary Position" in df.columns:
+            df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
+                df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
+                ", " + df["Secondary Position"].astype(str),
+                ""
+            )
+        else:
+            df["Positions played"] = df["Position"].astype(str)
+    else:
+        df["Positions played"] = np.nan
+
+    # Fallbacks
+    if "Team within selected timeframe" not in df.columns:
+        df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
+    if "Height" not in df.columns:
+        df["Height"] = np.nan
+
+    # Six-Group mapping (from PRIMARY position only)
+    if "Position" in df.columns:
+        df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+    else:
+        df["Six-Group Position"] = np.nan
+
+    # Duplicate generic CMs into both 6 & 8 (do this once, at baseline)
     cm_mask = df["Six-Group Position"] == "Centre Midfield"
-    if cm_mask.any():
+    if "Six-Group Position" in df.columns and cm_mask.any():
         cm_rows = df.loc[cm_mask].copy()
         cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
         cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
         df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
+    return df
 
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
@@ -933,69 +991,98 @@ else:
         st.session_state.manual_override = True
         st.session_state.last_template_choice = st.session_state.template_select
 
-# ---------- Metrics + percentiles (direction-aware; raw unchanged) ----------
+# ---------- Metrics + percentiles ----------
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
-# ensure all selected metrics exist
+# ensure columns exist
 for m in metrics:
-    if m not in df.columns:
-        df[m] = np.nan
+    if m not in df_all.columns: df_all[m] = 0
+    if m not in df.columns:     df[m] = 0
+df_all[metrics] = df_all[metrics].fillna(0)
+df[metrics]     = df[metrics].fillna(0)
 
-# raw numbers for labels (DO NOT CHANGE THESE)
-metrics_df_raw = df[metrics].apply(pd.to_numeric, errors="coerce").copy()
+# Metrics where lower values are better (do NOT change raw values; only affects percentiles)
+LOWER_IS_BETTER = {
+    "Turnovers",
+    "Fouls",
+    "Pressured Long Balls",
+    "Unpressured Long Balls",
+}
 
-# which metrics are "lower is better" (bars should invert)
-LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pressured Long Balls", "Unpressured Long Balls"}
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    # We want higher percentile = better
+    if lower_is_better:
+        r = series.rank(pct=True, ascending=True)   # small -> small
+        return (1.0 - r) * 100.0
+    else:
+        r = series.rank(pct=True, ascending=False)  # big -> big
+        return r * 100.0
 
-# league-aware percentile option
+# --- A) Percentiles used for the RADAR BARS (unchanged behaviour) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
 
-# compute percentiles with correct direction per metric
-percentile_df = pd.DataFrame(index=df.index, columns=metrics, dtype="float")
-
 if compute_within_league and league_col in df.columns:
-    tmp = metrics_df_raw.copy()
-    tmp[league_col] = df[league_col].values
-    for col in metrics:
-        asc = (col not in LOWER_IS_BETTER)   # higher better -> ascending True
-        percentile_df[col] = (
-            tmp.groupby(league_col)[col]
-               .rank(pct=True, ascending=asc) * 100
-        ).round(1)
+    # within each selected league
+    percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
+    for m in metrics:
+        percentile_df_chart[m] = (
+            df.groupby(league_col, group_keys=False)[m]
+              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+        )
 else:
-    for col in metrics:
-        asc = (col not in LOWER_IS_BETTER)
-        percentile_df[col] = (
-            metrics_df_raw[col].rank(pct=True, ascending=asc) * 100
-        ).round(1)
+    # pooled across the selected rows
+    percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
+    for m in metrics:
+        percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
 
-# assemble data for plotting: RAW values + PERCENTILES
+percentile_df_chart = percentile_df_chart.round(1)
+
+# --- B) Percentiles for the 0–100 SCORE (baseline = WHOLE DATASET by position) ---
+pos_col = "Six-Group Position"
+if pos_col not in df_all.columns: df_all[pos_col] = np.nan
+if pos_col not in df.columns:     df[pos_col]     = np.nan
+
+percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=metrics, dtype=float)
+for m in metrics:
+    percentile_df_globalpos_all[m] = (
+        df_all.groupby(pos_col, group_keys=False)[m]
+              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+    )
+percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].round(1)
+
+# --- Assemble plot_data (radar uses the CHART percentiles) ---
+metrics_df = df[metrics].copy()
+
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
     "Positions played", "Minutes played", "Six-Group Position",
     "Competition", "Competition_norm", "Multiplier"
 ]
 for c in keep_cols:
-    if c not in df.columns:
-        df[c] = np.nan
+    if c not in df.columns: df[c] = np.nan
 
 plot_data = pd.concat(
-    [df[keep_cols], metrics_df_raw, percentile_df.add_suffix(" (percentile)")],
+    [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
     axis=1
 )
 
-# Z-scores & ranking from the percentiles (unchanged)
+# ---------- Z + 0–100 score (based on WHOLE DATASET by position) ----------
 sel_metrics = list(metric_groups.keys())
-percentiles_all = plot_data[[m + " (percentile)" for m in sel_metrics]]
-z_scores_all = (percentiles_all - 50) / 15
-plot_data["Avg Z Score"] = z_scores_all.mean(axis=1)
-plot_data["Multiplier"] = plot_data["Multiplier"].fillna(1.0)
-plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
-plot_data["Rank"] = (
-    plot_data["Weighted Z Score"].rank(ascending=False, method="min").astype(int)
-)
+
+# use the global-by-position percentiles for z/score
+pct_for_score = percentile_df_globalpos[sel_metrics]
+z_scores_all  = (pct_for_score - 50.0) / 15.0         # 50 -> 0, each 15 pct points = 1 SD
+avg_z         = z_scores_all.mean(axis=1)
+
+plot_data["Avg Z Score"]      = avg_z.values
+plot_data["Multiplier"]        = plot_data["Multiplier"].fillna(1.0)
+plot_data["Weighted Z Score"]  = plot_data["Avg Z Score"] * plot_data["Multiplier"]
+plot_data["Score (0–100)"]     = (50.0 + 15.0 * plot_data["Weighted Z Score"]).clip(0, 100).round(1)
+
+# Rank by the 0–100 score
+plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
@@ -1051,6 +1138,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.06),
                   ncol=min(len(patches), 4), frameon=False)
 
+        # Keep weighted_z as a fallback
     if "Weighted Z Score" in row.columns:
         weighted_z = float(row["Weighted Z Score"].values[0])
     else:
@@ -1058,6 +1146,11 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         avg_z = float(np.mean(z_scores))
         mult = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
         weighted_z = avg_z * mult
+
+    # Optional new score out of 100 (computed elsewhere)
+    score_100 = None
+    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
+        score_100 = float(row["Score (0–100)"].values[0])
 
     age      = row["Age"].values[0] if "Age" in row else np.nan
     height   = row["Height"].values[0] if "Height" in row else np.nan
@@ -1084,7 +1177,13 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if comp:                 bottom_parts.append(comp)
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
-    bottom_parts.append(f"Z {weighted_z:.2f}")
+
+    # Prefer Score (0–100) if present; otherwise show Z
+    if score_100 is not None:
+        bottom_parts.append(f"Score {score_100:.0f}")
+    else:
+        bottom_parts.append(f"Z {weighted_z:.2f}")
+
     line2 = " | ".join(bottom_parts)
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
@@ -1109,7 +1208,7 @@ if st.session_state.selected_player:
     )
 
 # ---------- Ranking table ----------
-st.markdown("### Players Ranked by Weighted Z-Score")
+st.markdown("### Players Ranked by Score (0–100)")
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",
     "Weighted Z Score", "Age", "Team", "Minutes played", "Rank"
@@ -1120,7 +1219,7 @@ for c in cols_for_table:
 
 z_ranking = (
     plot_data[cols_for_table]
-    .sort_values(by="Weighted Z Score", ascending=False)
+    .sort_values(by="Score (0–100)", ascending=False)
     .reset_index(drop=True)
 )
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
