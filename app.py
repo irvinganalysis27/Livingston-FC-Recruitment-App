@@ -618,6 +618,13 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
     return df
 
+# Clean column headers once after load
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.strip()
+    .str.replace(u"\xa0", " ", regex=False)
+)
+
 # ---------- Preprocess DataFrame (define BEFORE it’s used) ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
