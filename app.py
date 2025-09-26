@@ -627,7 +627,7 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
 # Use local data, no uploader
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (to be filtered by UI)
+df = df_all.copy()                   # working copy (filtered by UI)
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
@@ -648,38 +648,7 @@ except Exception:
     st.info("No league_multipliers.xlsx found. Using 1.0 for all leagues.")
     df["Multiplier"] = 1.0
 
-# ---------- NORMALISE new-provider identifiers ----------
-rename_map = {}
-if "Name" in df.columns: rename_map["Name"] = "Player"
-if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
-df.rename(columns=rename_map, inplace=True)
-
-# Build "Positions played"
-if "Position" in df.columns:
-    if "Secondary Position" in df.columns:
-        df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
-            df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
-            ", " + df["Secondary Position"].astype(str),
-            ""
-        )
-    else:
-        df["Positions played"] = df["Position"].astype(str)
-else:
-    df["Positions played"] = np.nan
-
-# Fallbacks
-if "Team within selected timeframe" not in df.columns:
-    df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
-if "Height" not in df.columns:
-    df["Height"] = np.nan
-
-# Six-Group mapping from PRIMARY position only
-if "Position" in df.columns:
-    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-else:
-    df["Six-Group Position"] = np.nan
-
+# ---------- Preprocess DataFrame ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
 
@@ -700,7 +669,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
             df["Multiplier"] = 1.0
     except Exception:
-        # keep this quiet; we already know it’s optional
         df["Multiplier"] = 1.0
 
     # Rename new-provider identifiers
@@ -736,12 +704,13 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Six-Group Position"] = np.nan
 
     # Duplicate generic CMs into both 6 & 8 (do this once, at baseline)
-    cm_mask = df["Six-Group Position"] == "Centre Midfield"
-    if "Six-Group Position" in df.columns and cm_mask.any():
-        cm_rows = df.loc[cm_mask].copy()
-        cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
-        cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
-        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+    if "Six-Group Position" in df.columns:
+        cm_mask = df["Six-Group Position"] == "Centre Midfield"
+        if cm_mask.any():
+            cm_rows = df.loc[cm_mask].copy()
+            cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
+            cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
+            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
 
