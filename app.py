@@ -1053,11 +1053,10 @@ plot_data = pd.concat(
 
 # ---------- Z + 0–100 score (min–max by position, anchors require minutes) ----------
 
-# Compute the position-based Z on the CURRENT VIEW (no UI change here)
-sel_metrics = list(metric_groups.keys())
+# ---------- Z + 0–100 score (min–max by position, anchors require minutes) ----------
 
-# Use the global-by-position percentiles we already built for the WHOLE dataset,
-# but select the rows currently in view (df index) and the metrics we score on.
+# 1) Build Z for the CURRENT VIEW using global-by-position percentiles (so view size doesn’t affect Z)
+sel_metrics = list(metric_groups.keys())
 pct_for_score_view = percentile_df_globalpos[sel_metrics]
 z_scores_view      = (pct_for_score_view - 50.0) / 15.0
 avg_z_view         = z_scores_view.mean(axis=1)
@@ -1067,41 +1066,35 @@ plot_data["Avg Z Score"]      = avg_z_view.values
 plot_data["Multiplier"]       = plot_data["Multiplier"].fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
-# We min–max scale WITHIN POSITION, using anchors defined by players who meet a minutes floor,
-# taken from the FULL dataset (df_all). This keeps 100 = best *reliable* sample.
+# 2) ALWAYS recompute the WHOLE-DATASET anchors with the *current* metric set
 pos_col = "Six-Group Position"
 if pos_col not in plot_data.columns:
     plot_data[pos_col] = np.nan
+if pos_col not in df_all.columns:
+    df_all[pos_col] = np.nan
 
-# Hidden scaling setting: use at least 600, or the current minutes filter, whichever is higher.
-scale_minutes = max(600, int(min_minutes))
+# Use the global-by-position percentiles for the WHOLE dataset and recompute every run
+_pct_for_score_all = percentile_df_globalpos_all[sel_metrics]
+_z_scores_all      = (_pct_for_score_all - 50.0) / 15.0
+_avg_z_all         = _z_scores_all.mean(axis=1)
 
-# Ensure df_all has Weighted Z Score computed the SAME way, so anchors are consistent.
-if "Weighted Z Score" not in df_all.columns:
-    # Build Z for the WHOLE dataset by position using the same sel_metrics
-    _pct_for_score_all = percentile_df_globalpos_all[sel_metrics]
-    _z_scores_all      = (_pct_for_score_all - 50.0) / 15.0
-    _avg_z_all         = _z_scores_all.mean(axis=1)
+df_all["Avg Z Score"]      = _avg_z_all.values
+df_all["Multiplier"]       = df_all.get("Multiplier", 1.0).fillna(1.0)
+df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-    df_all["Avg Z Score"]      = _avg_z_all.values
-    df_all["Multiplier"]       = df_all.get("Multiplier", 1.0).fillna(1.0)
-    df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
-
-# Build the eligible pool (full dataset, minutes >= scale_minutes)
+# 3) Define anchors (per position) using a minutes floor from the FULL dataset
+scale_minutes = max(600, int(min_minutes))  # 100 = best among players with at least this many minutes
 _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
 eligible  = df_all[_mins_all >= scale_minutes].copy()
-
-# Fallback: if nothing meets the minutes floor (unlikely), use everyone to avoid NaNs
 if eligible.empty:
-    eligible = df_all.copy()
+    eligible = df_all.copy()  # fallback to avoid NaNs if no one hits the threshold
 
-# Per-position min/max anchors on Weighted Z Score
 anchor_minmax = (
     eligible.groupby(pos_col)["Weighted Z Score"]
             .agg(_scale_min="min", _scale_max="max")
 )
 
-# Merge anchors onto the rows we’re scoring now
+# 4) Merge anchors to current view and compute the 0–100 score
 plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
 def _minmax_score(val, lo, hi):
@@ -1111,15 +1104,22 @@ def _minmax_score(val, lo, hi):
         return 50.0
     return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
 
-# Final 0–100 score and rank
 plot_data["Score (0–100)"] = [
     _minmax_score(v, lo, hi)
     for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
 ]
 plot_data["Score (0–100)"] = plot_data["Score (0–100)"].round(1)
+
+# 5) Rank on the new 0–100 scale
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-# (No UI controls or expanders shown; scaling is quietly based on minutes >= scale_minutes.)
+# (Optional tiny debug so you can verify anchors once)
+print("[DEBUG] minutes floor for anchors =", scale_minutes)
+print("[DEBUG] sample anchor ranges:",
+      anchor_minmax.reset_index()
+                   .rename(columns={pos_col:"Pos"})
+                   .head(6)
+                   .to_dict(orient="records"))
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
