@@ -518,6 +518,14 @@ position_metrics = {
     },
 }
 
+# ---------- Metrics where lower values are better ----------
+INVERT_METRICS = {
+    "Turnovers",
+    "Fouls",
+    "Pressured Long Balls",
+    "Unpressured Long Balls",
+}
+
 # ---------- Data source: local repo ----------
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
 
@@ -942,7 +950,15 @@ for m in metrics:
         df[m] = 0
 df[metrics] = df[metrics].fillna(0)
 
+# Copy only selected metrics
 metrics_df = df[metrics].copy()
+
+# Invert the "lower is better" metrics
+for m in metrics_df.columns:
+    if m in INVERT_METRICS:
+        # Handle zeros and negatives safely: higher becomes worse
+        max_val = metrics_df[m].max(skipna=True)
+        metrics_df[m] = max_val - metrics_df[m]
 
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
