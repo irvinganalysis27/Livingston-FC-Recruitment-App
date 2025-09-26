@@ -1051,72 +1051,86 @@ plot_data = pd.concat(
     axis=1
 )
 
-# ---------- Z + 0–100 score (WHOLE DATASET by position) with min-max to 0–100 ----------
+# ---------- Z + 0–100 score (min–max by position, anchors require minutes) ----------
 
-# 1) Compute Weighted Z for the WHOLE DATASET (df_all) by position, so we can find
-#    the min & max per position over the entire database.
-sel_metrics = list(metric_groups.keys())
+# We already have:
+# - sel_metrics, percentile_df_globalpos, z_scores_all, avg_z
+# - plot_data with "Avg Z Score" and "Multiplier" columns
 
-# Percentiles for the whole dataset by position were already built above as
-# `percentile_df_globalpos_all`. Use only the metrics in this template:
-pct_for_score_all = percentile_df_globalpos_all[sel_metrics]
-
-# Convert percentiles to z, average across metrics, then apply league multiplier
-z_scores_all_db = (pct_for_score_all - 50.0) / 15.0
-avg_z_all_db     = z_scores_all_db.mean(axis=1)
-
-# Ensure Multiplier exists on df_all
-if "Multiplier" not in df_all.columns:
-    df_all["Multiplier"] = 1.0
-
-weighted_z_all_db = (avg_z_all_db * df_all["Multiplier"].fillna(1.0))
-
-# 2) Get min & max Weighted Z per position across the whole database
-pos_col = "Six-Group Position"
-if pos_col not in df_all.columns:
-    df_all[pos_col] = np.nan
-
-min_max_by_pos = (
-    pd.DataFrame({
-        "pos": df_all[pos_col],
-        "wz":  weighted_z_all_db
-    })
-    .groupby("pos")["wz"]
-    .agg(wz_min="min", wz_max="max")
-    .reset_index()
-)
-
-# 3) Compute current players' Weighted Z (same as before, but for the filtered df)
-pct_for_score_current = percentile_df_globalpos[sel_metrics]
-z_scores_current      = (pct_for_score_current - 50.0) / 15.0
-avg_z_current         = z_scores_current.mean(axis=1)
-
-plot_data["Avg Z Score"]      = avg_z_current.values
+plot_data["Avg Z Score"]      = avg_z.values
 plot_data["Multiplier"]        = plot_data["Multiplier"].fillna(1.0)
 plot_data["Weighted Z Score"]  = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
-# 4) Join min/max for each player's position, then min-max scale to 0–100
-plot_data = plot_data.merge(
-    min_max_by_pos,
-    left_on=pos_col,
-    right_on="pos",
-    how="left"
+pos_col = "Six-Group Position"
+if pos_col not in plot_data.columns:
+    plot_data[pos_col] = np.nan
+
+# Choose the minutes threshold for defining the 0 and 100 anchors
+# (Use the UI minimum by default, but let the user set a stricter one if they want.)
+scale_minutes = st.number_input(
+    "Minutes threshold used to set 0–100 scale",
+    min_value=0, value=max(600, int(min_minutes)), step=50,
+    help="Only players with at least this many minutes define the 0 and 100 endpoints per position. "
+         "Everyone is still scored within that scale."
 )
 
-# Handle cases where min == max (avoid divide-by-zero)
-denom = (plot_data["wz_max"] - plot_data["wz_min"])
-denom = denom.replace(0, np.nan)
+# Build per-position min/max from the FULL dataset (df_all), but only players meeting the threshold
+_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
+eligible = df_all[_mins_all >= scale_minutes].copy()
 
-plot_data["Score (0–100)"] = (
-    ((plot_data["Weighted Z Score"] - plot_data["wz_min"]) / denom) * 100.0
-).clip(0, 100).fillna(50).round(1)
+# If Weighted Z Score doesn't exist in df_all yet, compute it there too so min/max are consistent
+if "Weighted Z Score" not in df_all.columns:
+    # Recompute using the same logic as for plot_data
+    _pct_for_score_all = percentile_df_globalpos_all[sel_metrics]
+    _z_scores_all_all = ( _pct_for_score_all - 50.0 ) / 15.0
+    _avg_z_all = _z_scores_all_all.mean(axis=1)
+    df_all["Avg Z Score"] = _avg_z_all.values
+    df_all["Multiplier"]  = df_all.get("Multiplier", 1.0).fillna(1.0)
+    df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
+    _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
+    eligible = df_all[_mins_all >= scale_minutes].copy()
 
-# 5) Rank by the new 0–100 score (higher is better)
+# Safeguard: if eligible is empty for some reason, fall back to using all rows for anchors
+if eligible.empty:
+    eligible = df_all.copy()
+
+# Per-position anchors
+anchor_minmax = (
+    eligible.groupby(pos_col)["Weighted Z Score"]
+            .agg(_scale_min="min", _scale_max="max")
+)
+
+# Merge anchors onto the rows we’re scoring
+plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
+
+def _minmax_score(val, lo, hi):
+    if pd.isna(val) or pd.isna(lo) or pd.isna(hi):
+        return np.nan
+    if hi <= lo:
+        # Degenerate case: no spread; put everyone at 50
+        return 50.0
+    return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+
+plot_data["Score (0–100)"] = [
+    _minmax_score(v, lo, hi)
+    for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
+]
+plot_data["Score (0–100)"] = plot_data["Score (0–100)"].round(1)
+
+# Rank by the new 0–100 score
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-# (Optional) clean up helper columns if you don't want them visible later
-# plot_data.drop(columns=["pos", "wz_min", "wz_max"], inplace=True, errors="ignore")
-
+# Small readout so you know how many players defined each position’s anchors
+with st.expander("Scaling anchors (per position)", expanded=False):
+    if not anchor_minmax.empty:
+        st.write(
+            anchor_minmax.assign(
+                _count=eligible.groupby(pos_col)["Weighted Z Score"].count()
+            )[["_scale_min", "_scale_max", "_count"]]
+            .rename(columns={"_scale_min": "Anchor Min (Z·w)", "_scale_max": "Anchor Max (Z·w)", "_count": f"Players ≥ {scale_minutes}m"})
+        )
+    else:
+        st.info("No eligible players found for anchors; using fallback.")
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
