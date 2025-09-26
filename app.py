@@ -618,13 +618,6 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
     return df
 
-# Clean column headers once after load
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()
-    .str.replace(u"\xa0", " ", regex=False)
-)
-
 # ---------- Preprocess DataFrame (define BEFORE it’s used) ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
@@ -693,6 +686,18 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+# ---------- Clean raw column headers (do this immediately after loading) ----------
+# Removes stray spaces and non-breaking spaces so column lookups match
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.strip()                              # trim leading/trailing spaces
+    .str.replace(u"\xa0", " ", regex=False)   # replace non-breaking spaces with normal spaces
+    .str.replace(r"\s+", " ", regex=True)     # collapse multiple spaces to a single space
+)
+
+# (Optional) quick debug to verify key columns are present exactly as expected
+print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
+print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
 df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
 df = df_all.copy()                   # working copy (filtered by UI)
 
