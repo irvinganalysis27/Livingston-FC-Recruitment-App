@@ -519,12 +519,52 @@ position_metrics = {
     },
 }
 
-# ---------- File upload ----------
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
-if not uploaded_file:
-    st.stop()
+from pathlib import Path
 
-df = pd.read_excel(uploaded_file)
+# ---------- Data source: local repo ----------
+DATA_PATH = (APP_DIR / "statsbombdata")  # file or folder
+
+def load_one_file(p: Path) -> pd.DataFrame:
+    ext = p.suffix.lower()
+    if ext in [".csv"]:
+        return pd.read_csv(p)
+    if ext in [".xlsx", ".xls"]:
+        # first sheet by default
+        return pd.read_excel(p)
+    raise ValueError(f"Unsupported file type, {p.name}")
+
+def load_statsbomb(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        st.error(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
+        st.stop()
+
+    if path.is_file():
+        df = load_one_file(path)
+        st.caption(f"Loaded {path.name}, {len(df)} rows")
+        return df
+
+    # folder, gather files
+    files = sorted([p for p in path.iterdir() if p.suffix.lower() in {".csv", ".xlsx", ".xls"}])
+    if not files:
+        st.error(f"No CSV or Excel files inside {path}")
+        st.stop()
+
+    frames = []
+    for f in files:
+        try:
+            frames.append(load_one_file(f))
+        except Exception as e:
+            st.warning(f"Skipping {f.name}, {e}")
+    if not frames:
+        st.error("No readable files found in statsbombdata")
+        st.stop()
+
+    df = pd.concat(frames, ignore_index=True, sort=False)
+    st.caption(f"Merged {len(files)} files from {path.name}, total rows {len(df)}")
+    return df
+
+# Use local data, no uploader
+df = load_statsbomb(DATA_PATH)
 
 # Normalise Competition name and merge league multipliers
 if "Competition" in df.columns:
