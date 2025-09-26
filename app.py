@@ -1051,19 +1051,71 @@ plot_data = pd.concat(
     axis=1
 )
 
-# ---------- Z + 0–100 score (based on WHOLE DATASET by position) ----------
-sel_metrics = list(metric_groups.keys())
-pct_for_score = percentile_df_globalpos[sel_metrics]
-z_scores_all  = (pct_for_score - 50.0) / 15.0         # 50 -> 0, ~15 pct points = 1 SD
-avg_z         = z_scores_all.mean(axis=1)
+# ---------- Z + 0–100 score (WHOLE DATASET by position) with min-max to 0–100 ----------
 
-plot_data["Avg Z Score"]      = avg_z.values
+# 1) Compute Weighted Z for the WHOLE DATASET (df_all) by position, so we can find
+#    the min & max per position over the entire database.
+sel_metrics = list(metric_groups.keys())
+
+# Percentiles for the whole dataset by position were already built above as
+# `percentile_df_globalpos_all`. Use only the metrics in this template:
+pct_for_score_all = percentile_df_globalpos_all[sel_metrics]
+
+# Convert percentiles to z, average across metrics, then apply league multiplier
+z_scores_all_db = (pct_for_score_all - 50.0) / 15.0
+avg_z_all_db     = z_scores_all_db.mean(axis=1)
+
+# Ensure Multiplier exists on df_all
+if "Multiplier" not in df_all.columns:
+    df_all["Multiplier"] = 1.0
+
+weighted_z_all_db = (avg_z_all_db * df_all["Multiplier"].fillna(1.0))
+
+# 2) Get min & max Weighted Z per position across the whole database
+pos_col = "Six-Group Position"
+if pos_col not in df_all.columns:
+    df_all[pos_col] = np.nan
+
+min_max_by_pos = (
+    pd.DataFrame({
+        "pos": df_all[pos_col],
+        "wz":  weighted_z_all_db
+    })
+    .groupby("pos")["wz"]
+    .agg(wz_min="min", wz_max="max")
+    .reset_index()
+)
+
+# 3) Compute current players' Weighted Z (same as before, but for the filtered df)
+pct_for_score_current = percentile_df_globalpos[sel_metrics]
+z_scores_current      = (pct_for_score_current - 50.0) / 15.0
+avg_z_current         = z_scores_current.mean(axis=1)
+
+plot_data["Avg Z Score"]      = avg_z_current.values
 plot_data["Multiplier"]        = plot_data["Multiplier"].fillna(1.0)
 plot_data["Weighted Z Score"]  = plot_data["Avg Z Score"] * plot_data["Multiplier"]
-plot_data["Score (0–100)"]     = (50.0 + 15.0 * plot_data["Weighted Z Score"]).clip(0, 100).round(1)
 
-# Rank by the 0–100 score
+# 4) Join min/max for each player's position, then min-max scale to 0–100
+plot_data = plot_data.merge(
+    min_max_by_pos,
+    left_on=pos_col,
+    right_on="pos",
+    how="left"
+)
+
+# Handle cases where min == max (avoid divide-by-zero)
+denom = (plot_data["wz_max"] - plot_data["wz_min"])
+denom = denom.replace(0, np.nan)
+
+plot_data["Score (0–100)"] = (
+    ((plot_data["Weighted Z Score"] - plot_data["wz_min"]) / denom) * 100.0
+).clip(0, 100).fillna(50).round(1)
+
+# 5) Rank by the new 0–100 score (higher is better)
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+# (Optional) clean up helper columns if you don't want them visible later
+# plot_data.drop(columns=["pos", "wz_min", "wz_max"], inplace=True, errors="ignore")
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
