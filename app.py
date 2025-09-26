@@ -107,6 +107,18 @@ LEAGUE_SYNONYMS = {
     "Challenge League": "Switzerland Challenge League",
     "Ligue 1": "Tunisia Ligue 1",
     "USL Championship": "USA USL Championship",
+    # Belgium top flight
+    "Jupiler Pro League": "Jupiler Pro League",   # identity (keeps exact SB name)
+    "Belgium Pro League": "Jupiler Pro League",
+    "Belgian Pro League": "Jupiler Pro League",
+
+    # France second tier
+    "Ligue 2": "Ligue 2",                         # identity
+    "France Ligue 2": "Ligue 2",
+
+    # Germany second tier
+    "2. Bundesliga": "2. Bundesliga",             # identity
+    "Germany 2. Bundesliga": "2. Bundesliga",
 }
 
 # ========== Role groups shown in filters ==========
