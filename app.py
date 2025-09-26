@@ -519,34 +519,85 @@ position_metrics = {
     },
 }
 
-from pathlib import Path
-
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # file or folder
+DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    ext = p.suffix.lower()
-    if ext in [".csv"]:
-        return pd.read_csv(p)
-    if ext in [".xlsx", ".xls"]:
-        # first sheet by default
-        return pd.read_excel(p)
-    raise ValueError(f"Unsupported file type, {p.name}")
+    # Show what we are trying
+    st.caption(f"Trying to load file at: {p.resolve()}")
+
+    # Try Excel first if extension suggests it, otherwise still attempt Excel then fallback to CSV
+    def try_excel() -> pd.DataFrame | None:
+        try:
+            import openpyxl  # ensure engine is present
+            return pd.read_excel(p, engine="openpyxl")  # first sheet by default
+        except ImportError as e:
+            st.info("openpyxl is not available on this environment, trying CSV reader next.")
+            return None
+        except ValueError as e:
+            # Pandas throws ValueError for invalid file format, bad ZIP, etc
+            st.info(f"Excel parse failed, trying CSV next. Reason, {e}")
+            return None
+        except Exception as e:
+            st.info(f"Excel read raised {type(e).__name__}, trying CSV next.")
+            return None
+
+    def try_csv() -> pd.DataFrame | None:
+        # Try liberal CSV sniff, then a plain UTF-8, then latin-1
+        for kwargs in [
+            dict(sep=None, engine="python"),     # sniff delimiter
+            dict(),                              # default, comma UTF-8
+            dict(encoding="latin1"),             # tolerant encoding
+        ]:
+            try:
+                return pd.read_csv(p, **kwargs)
+            except Exception:
+                continue
+        return None
+
+    df = None
+    # If it looks like Excel, try Excel first
+    if p.suffix.lower() in {".xlsx", ".xls"}:
+        df = try_excel()
+        if df is None:
+            df = try_csv()
+    else:
+        # If no extension or not Excel, try CSV first, then Excel
+        df = try_csv()
+        if df is None:
+            df = try_excel()
+
+    if df is None:
+        # Last resort, show small peek to help debug
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(256)
+            st.error("Could not read the file as Excel or CSV. Here is a short raw preview below.")
+            st.code(head[:256])
+        except Exception:
+            pass
+        raise ValueError(f"Unsupported or unreadable file, {p.name}")
+
+    st.caption(f"Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
+    return df
+
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
+    st.caption(f"Data path configured as: {path}")
     if not path.exists():
         st.error(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
         st.stop()
 
     if path.is_file():
-        df = load_one_file(path)
-        st.caption(f"Loaded {path.name}, {len(df)} rows")
-        return df
+        return load_one_file(path)
 
-    # folder, gather files
-    files = sorted([p for p in path.iterdir() if p.suffix.lower() in {".csv", ".xlsx", ".xls"}])
+    # Directory, merge files inside
+    files = sorted(
+        f for f in path.iterdir()
+        if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
+    )
     if not files:
-        st.error(f"No CSV or Excel files inside {path}")
+        st.error(f"No data files found inside {path.name}. Add CSV or XLSX.")
         st.stop()
 
     frames = []
@@ -554,7 +605,7 @@ def load_statsbomb(path: Path) -> pd.DataFrame:
         try:
             frames.append(load_one_file(f))
         except Exception as e:
-            st.warning(f"Skipping {f.name}, {e}")
+            st.warning(f"Skipping {f.name} ({e})")
     if not frames:
         st.error("No readable files found in statsbombdata")
         st.stop()
