@@ -351,6 +351,23 @@ position_metrics = {
         }
     },
 }
+from copy import deepcopy
+
+def duplicate_positions_old_new(src: dict) -> dict:
+    out = {}
+    for name, payload in src.items():
+        if name.lower() == "goalkeeper":
+            out[name] = deepcopy(payload)
+            continue
+        # make Old and New with identical content
+        old_name = f"{name} Old"
+        new_name = f"{name} New"
+        out[old_name] = deepcopy(payload)
+        out[new_name] = deepcopy(payload)
+    return out
+
+# Build the duplicated dictionary
+position_metrics = duplicate_positions_old_new(position_metrics)
 
 # ---------- File upload ----------
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
