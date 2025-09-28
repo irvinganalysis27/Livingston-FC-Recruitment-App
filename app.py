@@ -550,7 +550,7 @@ position_metrics = {
             "OP Key Passes": "Possession",
             "Aerial Win%": "Defensive",
             "Aerial Wins": "Defensive",
-            "Pressures F2": "Defensive:,
+            "Pressures F2": "Defensive",
         }
     },
 }
