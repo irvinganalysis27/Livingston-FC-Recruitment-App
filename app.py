@@ -1225,12 +1225,19 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         return
     raw_vals = row[available_metrics].values.flatten()
     pct_cols = [m + " (percentile)" for m in available_metrics]
-    missing_pct_cols = [c for c in pct_cols if c not in row.columns]
-    if missing_pct_cols:
-        st.warning(f"Missing percentile columns for {player_name}: {missing_pct_cols}. Using neutral percentiles (50) for missing.")
-    pct_data = row[pct_cols].fillna(50.0)  # Use 50.0 for missing percentiles
-    pct_vals = pd.to_numeric(pct_data.values.flatten(), errors="coerce").fillna(50.0)
+    # Check for missing percentile columns and prepare pct_data
+    pct_data = pd.DataFrame(index=row.index, columns=pct_cols, data=50.0)  # Default to 50.0
+    for col in pct_cols:
+        if col in row.columns:
+            pct_data[col] = row[col]
+    try:
+        pct_vals = pd.to_numeric(pct_data.values.flatten(), errors="coerce").fillna(50.0)
+    except Exception as e:
+        print(f"[DEBUG] Failed to convert percentiles for {player_name}: {e}")
+        st.warning(f"Invalid percentile data for {player_name}. Using neutral percentiles (50).")
+        pct_vals = np.full(len(available_metrics), 50.0)
     if len(pct_vals) != len(available_metrics):
+        print(f"[DEBUG] Mismatch: Expected {len(available_metrics)} metrics, got {len(pct_vals)} for {player_name}")
         st.warning(f"Percentile data mismatch for {player_name}. Using neutral percentiles (50).")
         pct_vals = np.full(len(available_metrics), 50.0)
     groups = [metric_groups[m] for m in available_metrics]
@@ -1294,7 +1301,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if comp: bottom_parts.append(comp)
     if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
-    if score_100 is not null:
+    if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
