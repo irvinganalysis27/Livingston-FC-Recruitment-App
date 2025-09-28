@@ -952,11 +952,11 @@ plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier
 
 # Ensure eligible is based on plot_data to inherit Weighted Z Score
 _mins_all = pd.to_numeric(plot_data.get("Minutes played", np.nan), errors="coerce")
-eligible = plot_data[_mins_all >= user_min_minutes].copy()
+eligible = plot_data[_mins_all >= min_minutes].copy()
 if main_position:
     eligible = eligible[eligible[pos_col] == main_position].copy()
 if eligible.empty:
-    st.warning(f"No players with >= {user_min_minutes} mins for {main_position if main_position else 'all positions'}. Falling back to full dataset.")
+    st.warning(f"No players with >= {min_minutes} mins for {main_position if main_position else 'all positions'}. Falling back to full dataset.")
     eligible = plot_data.copy()
 
 # Anchors from eligible (>=600 mins) on weighted Z
