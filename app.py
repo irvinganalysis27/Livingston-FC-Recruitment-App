@@ -1333,3 +1333,147 @@ z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
 st.dataframe(z_ranking, use_container_width=True)
+
+# ---------- Sidebar for Page Navigation ----------
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Player Analysis", "Team Formation"])
+
+if page == "Player Analysis":
+    # [Keep all existing code for Player Analysis here, unchanged]
+    # ... (your existing code from line 1 to ~1292) ...
+    if st.session_state.selected_player:
+        plot_radial_bar_grouped(
+            st.session_state.selected_player,
+            plot_data,
+            metric_groups,
+            group_colors
+        )
+    st.markdown("### Players Ranked by Score (0–100)")
+    cols_for_table = [
+        "Player", "Positions played", "Competition_norm",
+        "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
+    ]
+    for c in cols_for_table:
+        if c not in plot_data.columns:
+            plot_data[c] = np.nan
+    z_ranking = (
+        plot_data[cols_for_table]
+        .sort_values(by="Score (0–100)", ascending=False)
+        .reset_index(drop=True)
+    )
+    z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
+    z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+    if "Age" in z_ranking.columns:
+        z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
+    z_ranking.index = np.arange(1, len(z_ranking) + 1)
+    z_ranking.index.name = "Row"
+    st.dataframe(z_ranking, use_container_width=True)
+
+elif page == "Team Formation":
+    st.title("Team Formation - 4-3-3")
+    
+    # Team selection dropdown
+    team_col = "Team within selected timeframe" if "Team within selected timeframe" in plot_data.columns else "Team"
+    if team_col not in plot_data.columns:
+        plot_data[team_col] = np.nan
+    all_teams = sorted(plot_data[team_col].dropna().unique().tolist())
+    selected_team = st.selectbox("Choose a team", all_teams, index=0 if all_teams else None)
+    
+    if selected_team:
+        # Filter data for the selected team
+        team_data = plot_data[plot_data[team_col] == selected_team].copy()
+        if team_data.empty:
+            st.warning(f"No players found for {selected_team}. Check the data or filters.")
+        else:
+            # Minimum minutes filter (consistent with player analysis)
+            min_minutes = 600  # Match the anchor_minutes_floor
+            team_data["_mins_numeric"] = pd.to_numeric(team_data["Minutes played"], errors="coerce")
+            team_data = team_data[team_data["_mins_numeric"] >= min_minutes].copy()
+            
+            # Define 4-3-3 positions and their mapping to Six-Group Position
+            formation_positions = {
+                "Goalkeeper": 1,
+                "Right Back": 1,
+                "Left Back": 1,
+                "Center Back": 2,  # Two center backs
+                "Right Midfielder": 1,
+                "Central Midfielder": 2,  # Two central midfielders
+                "Left Midfielder": 1,
+                "Right Winger": 1,
+                "Left Winger": 1,
+                "Striker": 1
+            }
+            pos_mapping = {
+                "Goalkeeper": "Goalkeeper",
+                "Full Back": ["Right Back", "Left Back"],
+                "Centre Back": "Center Back",
+                "Number 6": "Central Midfielder",
+                "Number 8": "Central Midfielder",
+                "Winger": ["Right Winger", "Left Winger"],
+                "Striker": "Striker"
+            }
+            
+            # Assign players to positions based on Six-Group Position and highest score
+            formation = {}
+            for six_group, target_pos in pos_mapping.items():
+                if isinstance(target_pos, list):  # Handle multiple positions (e.g., Full Back, Winger)
+                    available_positions = target_pos
+                else:
+                    available_positions = [target_pos]
+                
+                group_data = team_data[team_data["Six-Group Position"] == six_group].copy()
+                if not group_data.empty:
+                    for pos in available_positions:
+                        if formation_positions.get(pos, 0) > 0:
+                            # Sort by Score (0–100) and take top player for this position
+                            top_player = group_data.sort_values("Score (0–100)", ascending=False).iloc[0]
+                            formation[pos] = {
+                                "Player": top_player["Player"],
+                                "Score": top_player["Score (0–100)"]
+                            }
+                            formation_positions[pos] -= 1
+                            group_data = group_data[group_data["Player"] != top_player["Player"]].copy()
+            
+            # Display 4-3-3 formation
+            st.markdown("### 4-3-3 Formation")
+            col1, col2, col3 = st.columns([1, 2, 1])
+            
+            with col1:
+                if "Goalkeeper" in formation:
+                    st.write(f"**GK:** {formation['Goalkeeper']['Player']} ({formation['Goalkeeper']['Score']:.0f}/100)")
+                if "Right Back" in formation:
+                    st.write(f"**RB:** {formation['Right Back']['Player']} ({formation['Right Back']['Score']:.0f}/100)")
+                if "Left Back" in formation:
+                    st.write(f"**LB:** {formation['Left Back']['Player']} ({formation['Left Back']['Score']:.0f}/100)")
+                if "Center Back" in formation and len([p for p in formation if "Center Back" in p]) < 2:
+                    cb_data = team_data[team_data["Six-Group Position"] == "Centre Back"].sort_values("Score (0–100)", ascending=False)
+                    if not cb_data.empty and len(cb_data) > 1:
+                        cb2 = cb_data.iloc[1]
+                        formation["Center Back 2"] = {"Player": cb2["Player"], "Score": cb2["Score (0–100)"]}
+                if "Center Back" in formation:
+                    st.write(f"**CB:** {formation['Center Back']['Player']} ({formation['Center Back']['Score']:.0f}/100)")
+                    if "Center Back 2" in formation:
+                        st.write(f"**CB:** {formation['Center Back 2']['Player']} ({formation['Center Back 2']['Score']:.0f}/100)")
+            
+            with col2:
+                if "Right Midfielder" in formation:
+                    st.write(f"**RM:** {formation['Right Midfielder']['Player']} ({formation['Right Midfielder']['Score']:.0f}/100)")
+                if "Central Midfielder" in formation and len([p for p in formation if "Central Midfielder" in p]) < 2:
+                    cm_data = team_data[team_data["Six-Group Position"].isin(["Number 6", "Number 8"])].sort_values("Score (0–100)", ascending=False)
+                    if len(cm_data) > 1 and len([p for p in formation if "Central Midfielder" in p]) == 1:
+                        cm2 = cm_data.iloc[1]
+                        formation["Central Midfielder 2"] = {"Player": cm2["Player"], "Score": cm2["Score (0–100)"]}
+                if "Central Midfielder" in formation:
+                    st.write(f"**CM:** {formation['Central Midfielder']['Player']} ({formation['Central Midfielder']['Score']:.0f}/100)")
+                    if "Central Midfielder 2" in formation:
+                        st.write(f"**CM:** {formation['Central Midfielder 2']['Player']} ({formation['Central Midfielder 2']['Score']:.0f}/100)")
+                if "Left Midfielder" in formation:
+                    st.write(f"**LM:** {formation['Left Midfielder']['Player']} ({formation['Left Midfielder']['Score']:.0f}/100)")
+            
+            with col3:
+                if "Right Winger" in formation:
+                    st.write(f"**RW:** {formation['Right Winger']['Player']} ({formation['Right Winger']['Score']:.0f}/100)")
+                if "Left Winger" in formation:
+                    st.write(f"**LW:** {formation['Left Winger']['Player']} ({formation['Left Winger']['Score']:.0f}/100)")
+                if "Striker" in formation:
+                    st.write(f"**ST:** {formation['Striker']['Player']} ({formation['Striker']['Score']:.0f}/100)")
