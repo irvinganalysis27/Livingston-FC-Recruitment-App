@@ -1008,9 +1008,13 @@ plot_data["Rank"] = plot_data[plot_data["Eligible Mins?"]].sort_values("Score (0
 plot_data.drop(columns=["_scale_min", "_scale_max", "_minutes_numeric"], inplace=True, errors="ignore")
 
 # --- Assemble plot_data (radar uses the CHART percentiles) ---
-keep_cols = [c for c in df.columns if c not in metrics]
+# Use only columns that exist in both df and plot_data for keep_cols
+keep_cols = [c for c in df.columns if c not in metrics and c in plot_data.columns]
 metrics_df = pd.DataFrame(index=df.index, columns=metrics, data=df[metrics].values)
 plot_data = pd.concat([plot_data[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")], axis=1)
+
+# Add debug print to verify columns (remove after testing)
+print("[DEBUG] Final plot_data columns:", list(plot_data.columns))
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
