@@ -1063,6 +1063,8 @@ if pos_col not in df.columns: df[pos_col] = np.nan
 
 percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
+    # Ensure metric is numeric
+    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
     percentile_df_globalpos_all[m] = (
         df_all.groupby(pos_col, group_keys=False)[m]
               .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
@@ -1073,6 +1075,8 @@ percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics]
 # Compute Z per metric: (raw - mean)/std per position; invert lower-better
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
+    # Ensure metric is numeric
+    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
     # Manual Z-score: (x - mean)/std per position group
     group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
     z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
@@ -1083,15 +1087,15 @@ for m in sel_metrics:
 avg_z_all = raw_z_all.mean(axis=1)  # Average Z across metrics
 
 # Apply to full df_all
-df_all["Avg Z Score"] = avg_z_all.values
-df_all["Multiplier"] = df_all.get("Multiplier", 1.0).fillna(1.0)
+df_all["Avg Z Score"] = pd.to_numeric(avg_z_all, errors="coerce").fillna(0)
+df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
 # For current view (plot_data): subset the raw Z's and avg
 raw_z_view = raw_z_all.loc[df.index, sel_metrics]
 avg_z_view = raw_z_view.mean(axis=1)
-plot_data["Avg Z Score"] = avg_z_view.values
-plot_data["Multiplier"] = plot_data["Multiplier"].fillna(1.0)
+plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
+plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
 # Flag eligibility
@@ -1123,11 +1127,27 @@ if small_positions:
 plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
 def _minmax_score(val, lo, hi):
+    # Convert inputs to float, handle non-numeric cases
+    try:
+        val = float(val)
+    except (TypeError, ValueError):
+        val = 0.0
+    try:
+        lo = float(lo)
+    except (TypeError, ValueError):
+        lo = 0.0
+    try:
+        hi = float(hi)
+    except (TypeError, ValueError):
+        hi = 1.0
     if pd.isna(val) or pd.isna(lo) or pd.isna(hi):
         return 0.0
-    val = val if pd.isfinite(val) else 0.0
-    lo = lo if pd.isfinite(lo) else 0.0
-    hi = hi if pd.isfinite(hi) else 1.0
+    if not np.isfinite(val):
+        val = 0.0
+    if not np.isfinite(lo):
+        lo = 0.0
+    if not np.isfinite(hi):
+        hi = 1.0
     if hi <= lo:
         return 50.0
     return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
@@ -1136,7 +1156,7 @@ plot_data["Score (0–100)"] = [
     _minmax_score(v, lo, hi)
     for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
 ]
-plot_data["Score (0–100)"] = plot_data["Score (0–100)"].round(1)
+plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
 
 # 5) Rank all filtered players
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
@@ -1152,6 +1172,8 @@ print("[DEBUG] Sample anchor ranges:",
                    .rename(columns={pos_col: "Pos"})
                    .head(6)
                    .to_dict(orient="records"))
+print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
+print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
