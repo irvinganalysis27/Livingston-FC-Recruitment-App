@@ -1053,8 +1053,6 @@ plot_data = pd.concat(
 
 # ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
 
-from scipy import stats  # For zscore; add if not imported earlier
-
 # Metrics for scoring (same as chart)
 sel_metrics = list(metric_groups.keys())
 
@@ -1088,12 +1086,13 @@ else:
 
 percentile_df_chart = percentile_df_chart.round(1)
 
-# --- B) Raw Z-Scores for RANKING (full dataset by position) ---
+# --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
 # Compute Z per metric: (raw - mean)/std per position; invert lower-better
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
-    # Group-wise zscore (handles NaNs by skipping)
-    z_per_group = df_all.groupby(pos_col, group_keys=False)[m].apply(stats.zscore)
+    # Manual Z-score: (x - mean)/std per position group
+    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
+    z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
     if m in LOWER_IS_BETTER:
         z_per_group *= -1  # Invert: lower raw → higher Z
     raw_z_all[m] = z_per_group.fillna(0)  # Fill NaN Z as 0 (neutral)
