@@ -493,7 +493,7 @@ position_metrics = {
             "Turnovers": "Possession",
             "OBV": "Possession",
             "D&C OBV": "Possession",
-            "Pressures F2": "Defensive:,
+            "Pressures F2": "Defensive",
         }
     },
 
