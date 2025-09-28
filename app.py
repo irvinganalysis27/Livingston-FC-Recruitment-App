@@ -950,27 +950,16 @@ plot_data["Avg Z Score"] = pd.to_numeric(avg_z_all.reindex(plot_data.index, fill
 plot_data["Multiplier"] = pd.to_numeric(plot_data.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
-# For current view
-raw_z_view = raw_z_all.reindex(plot_data.index, fill_value=0).loc[plot_data.index, metrics]
-avg_z_view = raw_z_view.mean(axis=1)
-plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
-plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
-plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
-
-# Flag eligibility
-plot_data["_mins_numeric"] = pd.to_numeric(plot_data["Minutes played"], errors="coerce")
-plot_data["Eligible Mins?"] = plot_data["_mins_numeric"] >= 600
-
-# Anchors from eligible (>=600 mins) on weighted Z
-anchor_minutes_floor = 600
-user_min_minutes = max(anchor_minutes_floor, min_minutes)
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
-eligible = df_all[_mins_all >= user_min_minutes].copy()
+# Ensure eligible is based on plot_data to inherit Weighted Z Score
+_mins_all = pd.to_numeric(plot_data.get("Minutes played", np.nan), errors="coerce")
+eligible = plot_data[_mins_all >= user_min_minutes].copy()
 if main_position:
     eligible = eligible[eligible[pos_col] == main_position].copy()
 if eligible.empty:
     st.warning(f"No players with >= {user_min_minutes} mins for {main_position if main_position else 'all positions'}. Falling back to full dataset.")
-    eligible = df_all.copy()
+    eligible = plot_data.copy()
+
+# Anchors from eligible (>=600 mins) on weighted Z
 anchor_minmax = (
     eligible.groupby(pos_col)["Weighted Z Score"]
             .agg(_scale_min="min", _scale_max="max")
@@ -1018,7 +1007,7 @@ plot_data.drop(columns=["_scale_min", "_scale_max", "_minutes_numeric"], inplace
 # --- Assemble plot_data (radar uses the CHART percentiles) ---
 keep_cols = [c for c in df.columns if c not in metrics]
 metrics_df = pd.DataFrame(index=df.index, columns=metrics, data=df[metrics].values)
-plot_data = pd.concat([df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")], axis=1)
+plot_data = pd.concat([plot_data[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")], axis=1)
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
