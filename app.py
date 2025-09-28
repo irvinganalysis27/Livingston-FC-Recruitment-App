@@ -1185,27 +1185,36 @@ print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
-
     if not isinstance(group_colors, dict) or len(group_colors) == 0:
         group_colors = {"Attacking": "crimson", "Possession": "seagreen", "Defensive": "royalblue", "Goalkeeping": "purple"}
-
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
         st.error(f"No player named '{player_name}' found.")
         return
-
     # For GK chart, keep Goalkeeping block together, then Possession
     group_order = ["Goalkeeping", "Possession", "Defensive", "Attacking", "Off The Ball"]
     sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
+    if not sel_metrics:
+        st.error(f"No valid metrics for template. Check position_metrics configuration.")
+        return
     raw_vals = row[sel_metrics].values.flatten()
-    pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
+    pct_cols = [m + " (percentile)" for m in sel_metrics]
+    if not all(c in row.columns for c in pct_cols):
+        st.error(f"Missing percentile columns for {player_name}. Check data for metrics: {sel_metrics}")
+        return
+    pct_vals = row[pct_cols].values.flatten()
+    # Ensure pct_vals are numeric and valid
+    pct_vals = pd.to_numeric(pct_vals, errors="coerce").fillna(50.0)
+    if not np.all(np.isfinite(pct_vals)):
+        st.warning(f"Invalid percentile values for {player_name}. Using neutral percentiles (50).")
+        pct_vals = np.full_like(pct_vals, 50.0)
     groups = [metric_groups[m] for m in sel_metrics]
-
     bar_colors = [group_colors.get(g, "grey") for g in groups]
-
     n = len(sel_metrics)
+    if n == 0 or len(pct_vals) != n:
+        st.error(f"Metric count mismatch for {player_name}. Expected {n}, got {len(pct_vals)}.")
+        return
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
-
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
@@ -1215,27 +1224,22 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_yticklabels([])
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
-
     ax.bar(angles, pct_vals, width=2 * np.pi / n * 0.9, color=bar_colors, edgecolor=bar_colors, alpha=0.78)
-
     for ang, raw_val in zip(angles, raw_vals):
         try:
             txt = f"{float(raw_val):.2f}"
-        except Exception:
+        except (ValueError, TypeError):
             txt = "-"
         ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
-
     for i, ang in enumerate(angles):
         label = sel_metrics[i].replace(" per 90", "").replace(", %", " (%)")
         ax.text(ang, 108, label, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
-
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
         fig.subplots_adjust(top=0.86, bottom=0.08)
         ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.06),
                   ncol=min(len(patches), 4), frameon=False)
-
     if "Weighted Z Score" in row.columns:
         weighted_z = float(row["Weighted Z Score"].values[0])
     else:
@@ -1243,46 +1247,37 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         avg_z = float(np.mean(z_scores))
         mult = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
         weighted_z = avg_z * mult
-
     score_100 = None
     if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
         score_100 = float(row["Score (0–100)"].values[0])
-
-    age      = row["Age"].values[0] if "Age" in row else np.nan
-    height   = row["Height"].values[0] if "Height" in row else np.nan
-    team     = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
-    mins     = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
-    role     = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
+    age = row["Age"].values[0] if "Age" in row else np.nan
+    height = row["Height"].values[0] if "Height" in row else np.nan
+    team = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
+    mins = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
+    role = row["Six-Group Position"].values[0] if "Six-Group Position" in row else ""
     rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
-
     if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
         comp = row["Competition_norm"].values[0]
     elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
         comp = row["Competition"].values[0]
     else:
         comp = ""
-
     top_parts = [player_name]
     if role: top_parts.append(role)
-    if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
+    if not pd.isnull(age): top_parts.append(f"{int(age)} years old")
     if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
     line1 = " | ".join(top_parts)
-
     bottom_parts = []
-    if team:                 bottom_parts.append(team)
-    if comp:                 bottom_parts.append(comp)
-    if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
+    if team: bottom_parts.append(team)
+    if comp: bottom_parts.append(comp)
+    if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
-
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
-
     line2 = " | ".join(bottom_parts)
-
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
-
     try:
         if logo is not None:
             imagebox = OffsetImage(np.array(logo), zoom=0.18)
@@ -1290,7 +1285,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             ax.add_artist(ab)
     except Exception:
         pass
-
     st.pyplot(fig, use_container_width=True)
 
 # ---------- Plot ----------
