@@ -978,12 +978,14 @@ else:
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
-# ensure columns exist in both df_all and df
+# Ensure columns exist and are numeric in both df_all and df
 for m in metrics:
-    if m not in df_all.columns: df_all[m] = 0
-    if m not in df.columns:     df[m] = 0
-df_all[metrics] = df_all[metrics].fillna(0)
-df[metrics]     = df[metrics].fillna(0)
+    if m not in df_all.columns:
+        df_all[m] = 0
+    if m not in df.columns:
+        df[m] = 0
+    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+    df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
 # Metrics where lower values are better (raw values unchanged; only percentiles invert)
 LOWER_IS_BETTER = {
@@ -994,50 +996,57 @@ LOWER_IS_BETTER = {
 }
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    # Convert series to numeric, handle invalid values
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
     # pandas: rank(pct=True, ascending=True) -> smallest ≈ 0, largest = 1.0
     r = series.rank(pct=True, ascending=True)
-
     if lower_is_better:
-        p = 1.0 - r          # smaller raw -> larger percentile
+        p = 1.0 - r  # smaller raw -> larger percentile
     else:
-        p = r                # larger raw -> larger percentile
-
+        p = r  # larger raw -> larger percentile
     return (p * 100.0).round(1)
 
 # --- A) Percentiles for RADAR BARS (within selected leagues vs pooled) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-compute_within_league = st.checkbox("Percentiles within each league", value=True)
-
+compute_within_league = st.checkbox("Percentiles within each league", value=True, key="percentiles_within_league")
+percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
 if compute_within_league and league_col in df.columns:
-    percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
     for m in metrics:
-        percentile_df_chart[m] = (
-            df.groupby(league_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-        )
+        try:
+            percentile_df_chart[m] = (
+                df.groupby(league_col, group_keys=False)[m]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+            )
+        except Exception as e:
+            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
+            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
 else:
-    percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
     for m in metrics:
-        percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
-
-percentile_df_chart = percentile_df_chart.round(1)
+        try:
+            percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
+        except Exception as e:
+            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
+            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
+percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)  # Fill any remaining NaN with neutral percentile
 
 # --- B) Percentiles for 0–100 SCORE (baseline = WHOLE DATASET by position) ---
 pos_col = "Six-Group Position"
 if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns:     df[pos_col]     = np.nan
-
+if pos_col not in df.columns: df[pos_col] = np.nan
 percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=metrics, dtype=float)
 for m in metrics:
-    percentile_df_globalpos_all[m] = (
-        df_all.groupby(pos_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-    )
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].round(1)
+    try:
+        percentile_df_globalpos_all[m] = (
+            df_all.groupby(pos_col, group_keys=False)[m]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+        )
+    except Exception as e:
+        print(f"[DEBUG] Global percentile calc failed for {m}: {e}")
+        percentile_df_globalpos_all[m] = 50.0  # Neutral percentile
+percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].fillna(50.0).round(1)
 
 # --- Assemble plot_data (radar uses the CHART percentiles) ---
 metrics_df = df[metrics].copy()
-
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
     "Positions played", "Minutes played", "Six-Group Position",
@@ -1045,7 +1054,6 @@ keep_cols = [
 ]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
-
 plot_data = pd.concat(
     [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
     axis=1
