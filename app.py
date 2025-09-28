@@ -629,10 +629,6 @@ print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_
 df_all = preprocess_df(df_all_raw)
 df = df_all.copy()
 
-# ---------- Sidebar for Page Navigation ----------
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Player Analysis", "Team Formation"])
-
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 if league_col not in df.columns:
@@ -919,6 +915,9 @@ if main_position not in ["Goalkeeper", "Full Back", "Centre Back", "Number 6", "
     st.warning(f"Unknown main position for {selected_position_template}. Using all positions as fallback.")
     main_position = None
 
+# Initialize plot_data with df
+plot_data = df.copy()
+
 # Percentiles for SCORE BASELINE
 df_all_600 = df_all[pd.to_numeric(df_all["Minutes played"], errors="coerce") >= 600].copy()
 if pos_col not in df_all_600.columns: df_all_600[pos_col] = np.nan
@@ -947,12 +946,12 @@ for m in metrics:
         z_per_group *= -1
     raw_z_all[m] = z_per_group.fillna(0)
 avg_z_all = raw_z_all.mean(axis=1)
-df_all["Avg Z Score"] = pd.to_numeric(avg_z_all.reindex(df_all.index, fill_value=0), errors="coerce")
-df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
+plot_data["Avg Z Score"] = pd.to_numeric(avg_z_all.reindex(plot_data.index, fill_value=0), errors="coerce")
+plot_data["Multiplier"] = pd.to_numeric(plot_data.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
 # For current view
-raw_z_view = raw_z_all.reindex(df_all.index, fill_value=0).loc[df.index, metrics]
+raw_z_view = raw_z_all.reindex(plot_data.index, fill_value=0).loc[plot_data.index, metrics]
 avg_z_view = raw_z_view.mean(axis=1)
 plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
 plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
@@ -1014,13 +1013,12 @@ plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], error
 plot_data["Rank"] = plot_data[plot_data["Eligible Mins?"]].sort_values("Score (0–100)", ascending=False)["Score (0–100)"].rank(ascending=False, method="min").reindex(plot_data.index, fill_value=np.nan).astype('Int64')
 
 # Clean up
-plot_data.drop(columns=["_scale_min", "_scale_max", "_minutes_numeric", "_mins_numeric"], inplace=True, errors="ignore")
+plot_data.drop(columns=["_scale_min", "_scale_max", "_minutes_numeric"], inplace=True, errors="ignore")
 
 # --- Assemble plot_data (radar uses the CHART percentiles) ---
-plot_data = pd.concat(
-    [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
-    axis=1
-)
+keep_cols = [c for c in df.columns if c not in metrics]
+metrics_df = pd.DataFrame(index=df.index, columns=metrics, data=df[metrics].values)
+plot_data = pd.concat([df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")], axis=1)
 
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
@@ -1130,38 +1128,38 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, use_container_width=True)
 
 # ---------- Page Content ----------
-if page == "Player Analysis":
-    # ---------- Plot ----------
-    if st.session_state.selected_player:
-        plot_radial_bar_grouped(
-            st.session_state.selected_player,
-            plot_data,
-            metric_groups,
-            group_colors
-        )
-    # ---------- Ranking table ----------
-    st.markdown("### Players Ranked by Score (0–100)")
-    cols_for_table = [
-        "Player", "Positions played", "Competition_norm",
-        "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
-    ]
-    for c in cols_for_table:
-        if c not in plot_data.columns:
-            plot_data[c] = np.nan
-    z_ranking = (
-        plot_data[cols_for_table]
-        .sort_values(by="Score (0–100)", ascending=False)
-        .reset_index(drop=True)
+# ---------- Plot ----------
+if st.session_state.selected_player:
+    plot_radial_bar_grouped(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups,
+        group_colors
     )
-    eligible_ranking = z_ranking[z_ranking["Minutes played"] >= 600].copy()
-    eligible_ranking["Rank"] = eligible_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-    z_ranking = z_ranking.merge(eligible_ranking[["Player", "Rank"]], on="Player", how="left", suffixes=("", "_eligible"))
-    z_ranking["Rank"] = z_ranking["Rank_eligible"].fillna(pd.NA).astype('Int64')
-    z_ranking.drop(columns=["Rank_eligible"], inplace=True)
-    z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
-    z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
-    if "Age" in z_ranking.columns:
-        z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-    z_ranking.index = np.arange(1, len(z_ranking) + 1)
-    z_ranking.index.name = "Row"
-    st.dataframe(z_ranking, use_container_width=True)
+
+# ---------- Ranking table ----------
+st.markdown("### Players Ranked by Score (0–100)")
+cols_for_table = [
+    "Player", "Positions played", "Competition_norm",
+    "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
+]
+for c in cols_for_table:
+    if c not in plot_data.columns:
+        plot_data[c] = np.nan
+z_ranking = (
+    plot_data[cols_for_table]
+    .sort_values(by="Score (0–100)", ascending=False)
+    .reset_index(drop=True)
+)
+eligible_ranking = z_ranking[z_ranking["Minutes played"] >= 600].copy()
+eligible_ranking["Rank"] = eligible_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+z_ranking = z_ranking.merge(eligible_ranking[["Player", "Rank"]], on="Player", how="left", suffixes=("", "_eligible"))
+z_ranking["Rank"] = z_ranking["Rank_eligible"].fillna(pd.NA).astype('Int64')
+z_ranking.drop(columns=["Rank_eligible"], inplace=True)
+z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
+z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+if "Age" in z_ranking.columns:
+    z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
+z_ranking.index = np.arange(1, len(z_ranking) + 1)
+z_ranking.index.name = "Row"
+st.dataframe(z_ranking, use_container_width=True)
