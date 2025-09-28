@@ -1056,10 +1056,10 @@ plot_data = pd.concat(
 # Metrics for scoring (same as chart)
 sel_metrics = list(metric_groups.keys())
 
-# --- A) Percentiles ONLY for RADAR/CHART (unchanged, full dataset by position) ---
+# --- A) Percentiles for SCORE BASELINE (full dataset by position, for reference) ---
 pos_col = "Six-Group Position"
 if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns:     df[pos_col]     = np.nan
+if pos_col not in df.columns: df[pos_col] = np.nan
 
 percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
@@ -1068,23 +1068,6 @@ for m in sel_metrics:
               .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
     )
 percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
-
-# For chart: within-league or pooled (unchanged)
-compute_within_league = st.checkbox("Percentiles within each league", value=True)
-league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-if compute_within_league and league_col in df.columns:
-    percentile_df_chart = pd.DataFrame(index=df.index, columns=sel_metrics, dtype=float)
-    for m in sel_metrics:
-        percentile_df_chart[m] = (
-            df.groupby(league_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-        )
-else:
-    percentile_df_chart = pd.DataFrame(index=df.index, columns=sel_metrics, dtype=float)
-    for m in sel_metrics:
-        percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
-
-percentile_df_chart = percentile_df_chart.round(1)
 
 # --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
 # Compute Z per metric: (raw - mean)/std per position; invert lower-better
