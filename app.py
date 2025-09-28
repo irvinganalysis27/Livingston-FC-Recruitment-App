@@ -987,14 +987,6 @@ for m in metrics:
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
     df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
-# Handle derived metrics (e.g., xG/Shot, Successful Box Cross%)
-if "xG/Shot" in metrics:
-    df_all["xG/Shot"] = np.where(df_all["Shots"] > 0, df_all["xG"] / df_all["Shots"], 0)
-    df["xG/Shot"] = np.where(df["Shots"] > 0, df["xG"] / df["Shots"], 0)
-if "Successful Box Cross%" in metrics:
-    df_all["Successful Box Cross%"] = pd.to_numeric(df_all["Successful Box Cross%"], errors="coerce").fillna(0)
-    df["Successful Box Cross%"] = pd.to_numeric(df["Successful Box Cross%"], errors="coerce").fillna(0)
-
 # Metrics where lower values are better (raw values unchanged; only percentiles invert)
 LOWER_IS_BETTER = {
     "Turnovers",
@@ -1006,9 +998,6 @@ LOWER_IS_BETTER = {
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
     # Convert series to numeric, handle invalid values
     series = pd.to_numeric(series, errors="coerce").fillna(0)
-    # Check for small group size
-    if len(series) < 2 or series.std() == 0:
-        return pd.Series(50.0, index=series.index)
     # pandas: rank(pct=True, ascending=True) -> smallest ≈ 0, largest = 1.0
     r = series.rank(pct=True, ascending=True)
     if lower_is_better:
@@ -1024,14 +1013,10 @@ percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
 if compute_within_league and league_col in df.columns:
     for m in metrics:
         try:
-            grouped = df.groupby(league_col, group_keys=False)[m]
-            if grouped.count().min() < 2:  # Check for small groups
-                print(f"[DEBUG] Small group for {m} in league grouping. Using neutral percentile.")
-                percentile_df_chart[m] = 50.0
-            else:
-                percentile_df_chart[m] = grouped.apply(
-                    lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER))
-                )
+            percentile_df_chart[m] = (
+                df.groupby(league_col, group_keys=False)[m]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+            )
         except Exception as e:
             print(f"[DEBUG] Percentile calc failed for {m}: {e}")
             percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
@@ -1051,14 +1036,10 @@ if pos_col not in df.columns: df[pos_col] = np.nan
 percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=metrics, dtype=float)
 for m in metrics:
     try:
-        grouped = df_all.groupby(pos_col, group_keys=False)[m]
-        if grouped.count().min() < 2:  # Check for small groups
-            print(f"[DEBUG] Small group for {m} in position grouping. Using neutral percentile.")
-            percentile_df_globalpos_all[m] = 50.0
-        else:
-            percentile_df_globalpos_all[m] = grouped.apply(
-                lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER))
-            )
+        percentile_df_globalpos_all[m] = (
+            df_all.groupby(pos_col, group_keys=False)[m]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+        )
     except Exception as e:
         print(f"[DEBUG] Global percentile calc failed for {m}: {e}")
         percentile_df_globalpos_all[m] = 50.0  # Neutral percentile
@@ -1201,7 +1182,6 @@ print("[DEBUG] Sample anchor ranges:",
                    .to_dict(orient="records"))
 print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
 print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
-
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
@@ -1222,16 +1202,12 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if not all(c in row.columns for c in pct_cols):
         st.error(f"Missing percentile columns for {player_name}. Check data for metrics: {sel_metrics}")
         return
-    # Extract percentile values as a pandas Series to ensure proper handling
-    pct_vals = pd.Series(row[pct_cols].values.flatten(), index=pct_cols)
-    # Convert to numeric, handling non-numeric values
-    pct_vals = pd.to_numeric(pct_vals, errors="coerce").fillna(50.0).values
-    # Debug: Log percentile values
-    print(f"[DEBUG] Percentile values for {player_name}: {pct_vals.tolist()}")
-    # Ensure all values are finite
+    pct_vals = row[pct_cols].values.flatten()
+    # Ensure pct_vals are numeric and valid
+    pct_vals = pd.to_numeric(pct_vals, errors="coerce").fillna(50.0)
     if not np.all(np.isfinite(pct_vals)):
         st.warning(f"Invalid percentile values for {player_name}. Using neutral percentiles (50).")
-        pct_vals = np.full(len(pct_vals), 50.0)
+        pct_vals = np.full_like(pct_vals, 50.0)
     groups = [metric_groups[m] for m in sel_metrics]
     bar_colors = [group_colors.get(g, "grey") for g in groups]
     n = len(sel_metrics)
