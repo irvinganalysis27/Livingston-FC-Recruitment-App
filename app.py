@@ -998,7 +998,10 @@ plot_data["Score (0–100)"] = [
 ]
 plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
 
-# Rank all filtered players (only eligible affect ranking)
+# Add eligibility column based on min_minutes
+plot_data["Eligible Mins?"] = _mins_all >= min_minutes
+
+# Rank all filtered players (using the eligibility column)
 plot_data["Rank"] = plot_data[plot_data["Eligible Mins?"]].sort_values("Score (0–100)", ascending=False)["Score (0–100)"].rank(ascending=False, method="min").reindex(plot_data.index, fill_value=np.nan).astype('Int64')
 
 # Clean up
