@@ -1015,7 +1015,7 @@ LOWER_IS_BETTER = {
     "Turnovers",
     "Fouls",
     "Pr. Long Balls",
-    "Upr. Long Balls",
+    "UPr. Long Balls",
 }
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
