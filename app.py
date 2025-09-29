@@ -256,8 +256,8 @@ position_metrics = {
         "Aerial Win%": "Defensive",
         "Passing%": "Possession",
         "Pr. Pass% Dif.": "Possession",
-        "Pressured Long Balls": "Possession",
-        "Unpressured Long Balls": "Possession",
+        "Pr. Long Balls": "Possession",
+        "Upr. Long Balls": "Possession",
         "OBV": "Possession",
         "xG": "Attacking",
         "NP Goals": "Attacking",
@@ -384,7 +384,7 @@ position_metrics = {
             # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
             # Defensive
-            "Pressure Regains", "PAdj Pressures", "Opposition Half Ball Recoveries",
+            "Pressure Regains", "PAdj Pressures", "Ball Recov. F2",
             "Aggressive Actions",
         ],
         "groups": {
@@ -398,7 +398,7 @@ position_metrics = {
             "xG": "Attacking",
             "Pressure Regains": "Defensive",
             "PAdj Pressures": "Defensive",
-            "Opposition Half Ball Recoveries": "Defensive",
+            "Ball Recov. F2": "Defensive",
             "Aggressive Actions": "Defensive",
             "OBV": "Possession",
         }
@@ -412,7 +412,7 @@ position_metrics = {
             # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
             # Defensive
-            "Pressure Regains", "PAdj Pressures", "Opposition Half Ball Recoveries",
+            "Pressure Regains", "PAdj Pressures", "Ball Recov. F2",
             "Aggressive Actions",
         ],
         "groups": {
@@ -428,7 +428,7 @@ position_metrics = {
             "NP Goals": "Attacking",
             "Pressure Regains": "Defensive",
             "PAdj Pressures": "Defensive",
-            "Opposition Half Ball Recoveries": "Defensive",
+            "Ball Recov. F2": "Defensive",
             "Aggressive Actions": "Defensive",
             "OBV": "Possession",
         }
@@ -521,7 +521,7 @@ position_metrics = {
 
     "Striker New": {
     "metrics": [
-        "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
+        "All Goals", "NP Goals", "xG", "Shots", "xG/Shot",
         "Goal Conversion%", 
         "Shot Touch%", "Touches In Box", "xG Assisted",
         "Fouls Won", "Deep Completions", "OP Key Passes",
@@ -529,7 +529,7 @@ position_metrics = {
     ],
     "groups": {
         "All Goals": "Attacking",
-        "Penalty Goals": "Attacking",
+        "NP Goals": "Attacking",
         "xG": "Attacking",
         "Shots": "Attacking",
         "xG/Shot": "Attacking",
