@@ -165,7 +165,7 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, "Winger")  # safe default
+    return RAW_TO_SIX.get(tok, None)  # don’t force into Winger
 
 # ========== Default template mapping ==========
 DEFAULT_TEMPLATE = {
