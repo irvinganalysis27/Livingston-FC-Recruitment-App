@@ -523,7 +523,7 @@ position_metrics = {
     "Striker New": {
     "metrics": [
         "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
-        "Goal Conversion%",   # <-- add this to match groups
+        "Goal Conversion%", 
         "Shot Touch%", "Touches In Box", "xG Assisted",
         "Fouls Won", "Deep Completions", "OP Key Passes",
         "Aerial Win%", "Aerial Wins", "Pressures F2",
@@ -534,7 +534,7 @@ position_metrics = {
         "xG": "Attacking",
         "Shots": "Attacking",
         "xG/Shot": "Attacking",
-        "Goal Conversion%": "Attacking",   # now consistent
+        "Goal Conversion%": "Attacking",
         "Shot Touch%": "Attacking",
         "Touches In Box": "Attacking",
         "xG Assisted": "Attacking",
@@ -543,8 +543,9 @@ position_metrics = {
         "OP Key Passes": "Possession",
         "Aerial Win%": "Defensive",
         "Aerial Wins": "Defensive",
-        "Pressures F2": "Defensive",
-     }
+        "Pressures F2": "Defensive"
+    }
+}
 }
 # ---------- Data source: local repo ----------
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
