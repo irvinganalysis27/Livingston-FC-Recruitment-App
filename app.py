@@ -234,36 +234,35 @@ position_metrics = {
         }
     },
 
-    # ---------- Centre Back New ----------
     "Centre Back New": {
-        "metrics": [
-            # Attacking
-            "xG", "NP Goals",
-            # Possession
-            "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV", "Pr. Pass% Dif."
-            # Defensive
-            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
-            "Defensive Actions", "Aggressive Actions", "Fouls",
-            "Aerial Wins", "Aerial Win%",
-        ],
-        "groups": {
-            "PAdj Interceptions": "Defensive",
-            "PAdj Tackles": "Defensive",
-            "Tack/DP%": "Defensive",
-            "Defensive Actions": "Defensive",
-            "Aggressive Actions": "Defensive",
-            "Fouls": "Defensive",
-            "Aerial Wins": "Defensive",
-            "Aerial Win%": "Defensive",
-            "Passing%": "Possession",
-            "Pr. Pass% Dif.": "Possession",
-            "Pressured Long Balls": "Possession",
-            "Unpressured Long Balls": "Possession",
-            "OBV": "Possession",
-            "xG": "Attacking",
-            "NP Goals": "Attacking",
-        }
-    },
+    "metrics": [
+        # Attacking
+        "xG", "NP Goals",
+        # Possession
+        "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV", "Pr. Pass% Dif.",
+        # Defensive
+        "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+        "Defensive Actions", "Aggressive Actions", "Fouls",
+        "Aerial Wins", "Aerial Win%",
+    ],
+    "groups": {
+        "PAdj Interceptions": "Defensive",
+        "PAdj Tackles": "Defensive",
+        "Tack/DP%": "Defensive",
+        "Defensive Actions": "Defensive",
+        "Aggressive Actions": "Defensive",
+        "Fouls": "Defensive",
+        "Aerial Wins": "Defensive",
+        "Aerial Win%": "Defensive",
+        "Passing%": "Possession",
+        "Pr. Pass% Dif.": "Possession",
+        "Pressured Long Balls": "Possession",
+        "Unpressured Long Balls": "Possession",
+        "OBV": "Possession",
+        "xG": "Attacking",
+        "NP Goals": "Attacking",
+    }
+},
 
     # ---------- Full Back Old ----------
     "Full Back Old": {
