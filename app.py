@@ -731,6 +731,20 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
+        # --- Debug: Check all leagues and their multipliers ---
+    league_check = (
+        df_all[["Competition_norm", "Multiplier"]]
+        .drop_duplicates()
+        .sort_values("Competition_norm")
+    )
+    
+    print("[DEBUG] League multiplier check:")
+    print(league_check.to_string(index=False))
+    
+    # Optional: also show it in the Streamlit app
+    st.markdown("### League → Multiplier mapping (debug)")
+    st.dataframe(league_check, use_container_width=True)
+
     return df
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
