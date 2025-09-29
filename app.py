@@ -785,18 +785,23 @@ df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
 df = df_all.copy()                   # working copy (filtered by UI)
 
 # ---------- League filter ----------
-# Always use competition_id internally
+# Ensure ID and names exist
 if "competition_id" not in df.columns:
     df["competition_id"] = np.nan
 if "competition_name" not in df.columns:
-    df["competition_name"] = np.nan
+    df["competition_name"] = "Unknown League"
 if "country_name" not in df.columns:
-    df["country_name"] = ""
+    df["country_name"] = "Unknown Country"
 
-# Build display names like "Scotland - Premiership"
+# Fill NAs with defaults
+df["competition_id"] = df["competition_id"].fillna(-1).astype(int)
+df["competition_name"] = df["competition_name"].fillna("Unknown League")
+df["country_name"] = df["country_name"].fillna("Unknown Country")
+
+# Build display string "Country - League"
 df["_league_display"] = df["country_name"].astype(str).str.strip() + " - " + df["competition_name"].astype(str).str.strip()
 
-# Map display -> ID for selection
+# Create mapping from display → ID
 league_map = (
     df[["competition_id", "_league_display"]]
     .drop_duplicates()
@@ -807,7 +812,7 @@ league_map = (
 
 all_leagues_display = list(league_map.keys())
 
-# Keep session_state safe
+# Default session state
 if "league_selection" not in st.session_state:
     st.session_state.league_selection = all_leagues_display.copy()
 else:
@@ -822,7 +827,7 @@ selected_leagues_display = st.multiselect(
     key="league_selection",
 )
 
-# Translate back to IDs for filtering
+# Convert back to IDs for filtering
 selected_league_ids = [league_map[d] for d in selected_leagues_display]
 
 if selected_league_ids:
