@@ -731,15 +731,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
-    # ---------- Debug unmatched metrics ----------
-    all_metrics = {m for pos in position_metrics.values() for m in pos["metrics"]}
-    missing_metrics = [m for m in all_metrics if m not in df.columns]
-    if missing_metrics:
-        print(f"[DEBUG] Missing metrics after rename: {missing_metrics[:15]}{'...' if len(missing_metrics) > 15 else ''}")
-        st.warning(f"Some metrics are missing in the data: {missing_metrics[:10]}{'...' if len(missing_metrics) > 10 else ''}")
-
-    return df
-
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 # ---------- Clean raw column headers (do this immediately after loading) ----------
