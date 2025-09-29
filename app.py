@@ -239,7 +239,7 @@ position_metrics = {
         # Attacking
         "xG", "NP Goals",
         # Possession
-        "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV", "Pr. Pass% Dif.",
+        "Passing%", "Pr. Long Balls", "Upr. Long Balls", "OBV", "Pr. Pass% Dif.",
         # Defensive
         "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
         "Defensive Actions", "Aggressive Actions", "Fouls",
