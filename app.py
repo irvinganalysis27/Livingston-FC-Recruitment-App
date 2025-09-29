@@ -693,6 +693,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns=rename_map, inplace=True)
 
+        # --- Standard renames (StatsBomb → App schema) ---
+        rename_map = {
+        "player_name": "Player",
+        "team_name": "Team",
+        "competition_name": "Competition",
+        "season_name": "Season",
+        "primary_position": "Position",
+        "secondary_position": "Secondary Position",
+        "player_season_minutes": "Minutes played",
+        "player_height": "Height",
+        "player_weight": "Weight",
+        # Add others as needed
+    }
+
+df.rename(columns=rename_map, inplace=True)
+
     # --- Step 2: League normalisation ---
     if "Competition" in df.columns:
         df["Competition_norm"] = (
