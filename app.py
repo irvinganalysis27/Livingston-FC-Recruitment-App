@@ -294,35 +294,31 @@ position_metrics = {
         }
     },
 
-    # ---------- Full Back New ----------
     "Full Back New": {
-        "metrics": [
-            # Possession
-            "Passing%", "OP Passes Into Box", "Deep Progressions",
-            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-            # Defensive
-            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-            "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions",
-        ],
-        "groups": {
-            "Passing%": "Possession",
-            "Pr. Pass% Dif.": "Possession",
-            "OP Passes Into Box": "Possession",
-            "Deep Progressions": "Possession",
-            "xGBuildup": "Attacking",
-            "Successful Dribbles": "Possession",
-            "Turnovers": "Possession",
-            "Defensive Actions": "Defensive",
-            "Aerial Win%": "Defensive",
-            "PAdj Pressures": "Defensive",
-            "PAdj Tack&Int": "Defensive",
-            "Tack/DP%": "Defensive",
-            "Ball Recoveries": "Defensive",
-            "Aggressive Actions": "Defensive:",
-            "OBV": "Possession",
-            "Pass OBV": "Possession",
-        }
-    },
+    "metrics": [
+        "Passing%", "Pr. Pass% Dif.", "OP Passes Into Box", "Deep Progressions",
+        "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+        "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+        "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions", "Ball Recoveries"
+    ],
+    "groups": {
+        "Passing%": "Possession",
+        "Pr. Pass% Dif.": "Possession",
+        "OP Passes Into Box": "Possession",
+        "Deep Progressions": "Possession",
+        "Successful Dribbles": "Possession",
+        "Turnovers": "Possession",
+        "OBV": "Possession",
+        "Pass OBV": "Possession",
+        "Defensive Actions": "Defensive",
+        "Aerial Win%": "Defensive",
+        "PAdj Pressures": "Defensive",
+        "PAdj Tack&Int": "Defensive",
+        "Tack/DP%": "Defensive",
+        "Aggressive Actions": "Defensive",   # fixed colon typo
+        "Ball Recoveries": "Defensive"
+    }
+}
 
     # ---------- Number 6 New ----------
     "Number 6 New": {
@@ -524,35 +520,31 @@ position_metrics = {
         }
     },
 
-    # ---------- Striker New ----------
     "Striker New": {
-        "metrics": [
-            # Attacking
-            "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
-            "Shot Touch%", "Touches In Box", "xG Assisted",
-            # Possession
-            "Fouls Won", "Deep Completions", "OP Key Passes",
-            # Defensive
-            "Aerial Win%", "Aerial Wins", "Pressures F2",
-        ],
-        "groups": {
-            "All Goals": "Attacking",
-            "Penalty Goals": "Attacking",
-            "xG": "Attacking",
-            "Shots": "Attacking",
-            "xG/Shot": "Attacking",
-            "Goal Conversion%": "Attacking",
-            "Shot Touch%": "Attacking",
-            "Touches In Box": "Attacking",
-            "xG Assisted": "Attacking",
-            "Fouls Won": "Possession",
-            "Deep Completions": "Possession",
-            "OP Key Passes": "Possession",
-            "Aerial Win%": "Defensive",
-            "Aerial Wins": "Defensive",
-            "Pressures F2": "Defensive",
-        }
-    },
+    "metrics": [
+        "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
+        "Goal Conversion%",   # <-- add this to match groups
+        "Shot Touch%", "Touches In Box", "xG Assisted",
+        "Fouls Won", "Deep Completions", "OP Key Passes",
+        "Aerial Win%", "Aerial Wins", "Pressures F2",
+    ],
+    "groups": {
+        "All Goals": "Attacking",
+        "Penalty Goals": "Attacking",
+        "xG": "Attacking",
+        "Shots": "Attacking",
+        "xG/Shot": "Attacking",
+        "Goal Conversion%": "Attacking",   # now consistent
+        "Shot Touch%": "Attacking",
+        "Touches In Box": "Attacking",
+        "xG Assisted": "Attacking",
+        "Fouls Won": "Possession",
+        "Deep Completions": "Possession",
+        "OP Key Passes": "Possession",
+        "Aerial Win%": "Defensive",
+        "Aerial Wins": "Defensive",
+        "Pressures F2": "Defensive",
+    }
 }
 
 # ---------- Data source: local repo ----------
