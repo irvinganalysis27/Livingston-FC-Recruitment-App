@@ -665,7 +665,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
         # Handle common suffixes
         if new.endswith(" 90"):
-            new = new.replace(" 90", "_90")  # keep your per-90 naming consistent
+            new = new.replace(" 90", "_90")  # keep per-90 naming consistent
         if new.endswith(" ratio"):
             new = new.replace(" ratio", "%")
 
@@ -688,13 +688,15 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         if new == "Season Name": new = "Season"
         if new == "Primary Position": new = "Position"
         if new == "Secondary Position": new = "Secondary Position"
+        if new == "Player Name": new = "Player"
 
         rename_map[col] = new.strip()
 
+    # Apply cleaning renames
     df.rename(columns=rename_map, inplace=True)
 
-        # --- Standard renames (StatsBomb → App schema) ---
-        rename_map = {
+    # --- Step 2: Ensure key columns exist (old Excel vs new API consistency) ---
+    fallback_map = {
         "player_name": "Player",
         "team_name": "Team",
         "competition_name": "Competition",
@@ -704,10 +706,10 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         "player_season_minutes": "Minutes played",
         "player_height": "Height",
         "player_weight": "Weight",
-        # Add others as needed
     }
+    df.rename(columns=fallback_map, inplace=True)
 
-df.rename(columns=rename_map, inplace=True)
+    return df
 
     # --- Step 2: League normalisation ---
     if "Competition" in df.columns:
