@@ -318,7 +318,7 @@ position_metrics = {
         "Aggressive Actions": "Defensive",   # fixed colon typo
         "Ball Recoveries": "Defensive"
     }
-}
+},
 
     # ---------- Number 6 New ----------
     "Number 6 New": {
