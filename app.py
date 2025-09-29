@@ -544,8 +544,7 @@ position_metrics = {
         "Aerial Win%": "Defensive",
         "Aerial Wins": "Defensive",
         "Pressures F2": "Defensive",
-        }
-    }
+     }
 }
 # ---------- Data source: local repo ----------
 DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
