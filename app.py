@@ -785,36 +785,49 @@ df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
 df = df_all.copy()                   # working copy (filtered by UI)
 
 # ---------- League filter ----------
-league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-if league_col not in df.columns:
-    df[league_col] = np.nan
+# Always use competition_id internally
+if "competition_id" not in df.columns:
+    df["competition_id"] = np.nan
+if "competition_name" not in df.columns:
+    df["competition_name"] = np.nan
+if "country_name" not in df.columns:
+    df["country_name"] = ""
 
-df[league_col] = df[league_col].astype(str).str.strip()
-all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
+# Build display names like "Scotland - Premiership"
+df["_league_display"] = df["country_name"].astype(str).str.strip() + " - " + df["competition_name"].astype(str).str.strip()
 
-st.markdown("### Choose league (multiple allowed)")
+# Map display -> ID for selection
+league_map = (
+    df[["competition_id", "_league_display"]]
+    .drop_duplicates()
+    .sort_values("_league_display")
+    .set_index("_league_display")["competition_id"]
+    .to_dict()
+)
 
+all_leagues_display = list(league_map.keys())
+
+# Keep session_state safe
 if "league_selection" not in st.session_state:
-    st.session_state.league_selection = all_leagues.copy()
+    st.session_state.league_selection = all_leagues_display.copy()
+else:
+    st.session_state.league_selection = [
+        l for l in st.session_state.league_selection if l in all_leagues_display
+    ]
 
-b1, b2, _ = st.columns([1, 1, 6])
-with b1:
-    if st.button("Select all"):
-        st.session_state.league_selection = all_leagues.copy()
-with b2:
-    if st.button("Clear all"):
-        st.session_state.league_selection = []
-
-selected_leagues = st.multiselect(
+selected_leagues_display = st.multiselect(
     "Leagues to include",
-    options=all_leagues,
+    options=all_leagues_display,
     default=st.session_state.league_selection,
     key="league_selection",
 )
 
-if selected_leagues:
-    df = df[df[league_col].isin(selected_leagues)].copy()
-    st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
+# Translate back to IDs for filtering
+selected_league_ids = [league_map[d] for d in selected_leagues_display]
+
+if selected_league_ids:
+    df = df[df["competition_id"].isin(selected_league_ids)].copy()
+    st.caption(f"Leagues selected: {len(selected_league_ids)} | Players: {len(df)}")
     if df.empty:
         st.warning("No players match the selected leagues. Clear or change the league filter.")
         st.stop()
