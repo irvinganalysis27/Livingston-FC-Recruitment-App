@@ -710,7 +710,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Positions played"] = np.nan
 
-    # Fallbacks
+        # Fallbacks
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
@@ -723,7 +723,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Six-Group Position"] = np.nan
 
     # Duplicate generic CMs into both 6 & 8 (baseline only)
-        if "Six-Group Position" in df.columns:
+    if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"] == "Centre Midfield"
         if cm_mask.any():
             cm_rows = df.loc[cm_mask].copy()
@@ -732,7 +732,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
-
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 # ---------- Clean raw column headers (do this immediately after loading) ----------
