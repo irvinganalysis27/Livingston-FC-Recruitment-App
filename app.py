@@ -658,7 +658,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-        # Merge league multipliers (fallback 1.0)
+    # Merge league multipliers (fallback 1.0)
     try:
         multipliers_df = pd.read_excel("league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(multipliers_df.columns):
@@ -683,6 +683,18 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Name" in df.columns: rename_map["Name"] = "Player"
     if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
     if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+
+    # --- Extra rename fixes for metrics ---
+    rename_map.update({
+        "Successful Box Cross %": "Successful Box Cross%",
+        "Long Balls: Pressured": "Pressured Long Balls",
+        "Long Balls Pressured": "Pressured Long Balls",
+        "Long Balls: Unpressured": "Unpressured Long Balls",
+        "Long Balls Unpressured": "Unpressured Long Balls",
+        "Shot Conversion %": "Goal Conversion%",
+        "Goal Conversion %": "Goal Conversion%",   # unify spacing
+    })
+
     df.rename(columns=rename_map, inplace=True)
 
     # Build "Positions played"
@@ -718,6 +730,13 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
             cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
+    # ---------- Debug unmatched metrics ----------
+    all_metrics = {m for pos in position_metrics.values() for m in pos["metrics"]}
+    missing_metrics = [m for m in all_metrics if m not in df.columns]
+    if missing_metrics:
+        print(f"[DEBUG] Missing metrics after rename: {missing_metrics[:15]}{'...' if len(missing_metrics) > 15 else ''}")
+        st.warning(f"Some metrics are missing in the data: {missing_metrics[:10]}{'...' if len(missing_metrics) > 10 else ''}")
 
     return df
 
