@@ -83,32 +83,35 @@ LEAGUE_SYNONYMS = {
     "Czech Liga": "Czech First Tier",
     "1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
-    "Denmark Superliga": "Denmark Superliga",  # fix mismatch
+    "Denmark Superliga": "Denmark Superliga",
     "League One": "England League One",
     "League Two": "England League Two",
     "National League": "England National League",
     "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
+
+    # France (only lower divisions)
     "Championnat National": "France National 1",
-    "Ligue 1": "Ligue 1",
-    "France Ligue 1": "Ligue 1",  # fix mismatch
+    "France National 1": "France National 1",
     "Ligue 2": "Ligue 2",
     "France Ligue 2": "Ligue 2",
+
     "2. Bundesliga": "2. Bundesliga",
     "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
     "Super League": "Greece Super League 1",
-    "Greece Super League": "Greece Super League 1",  # fix mismatch
+    "Greece Super League": "Greece Super League 1",
     "NB I": "Hungary NB I",
     "Besta deild karla": "Iceland Besta Deild",
+    "Serie B": "Italy Serie B",
     "Serie C": "Italy Serie C",
     "J2 League": "Japan J2 League",
     "Virsliga": "Latvia Virsliga",
     "A Lyga": "Lithuania A Lyga",
     "Botola Pro": "Morocco Botola Pro",
     "Eredivisie": "Eredivisie",
-    "Netherlands Eredivisie": "Eredivisie",  # fix mismatch
+    "Netherlands Eredivisie": "Eredivisie",
     "Eerste Divisie": "Netherlands Eerste Divisie",
     "1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
@@ -117,35 +120,33 @@ LEAGUE_SYNONYMS = {
     "Segunda Liga": "Portugal Segunda Liga",
     "Liga Pro": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
-    "Ireland Premier Division": "Republic of Ireland Premier Division",  # fix mismatch
+    "Ireland Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
     "Championship": "Scotland Championship",
     "Premiership": "Scotland Premiership",
     "Super Liga": "Serbia Super Liga",
     "Slovakia Super Liga": "Slovakia 1. Liga",
-    "Slovakia First League": "Slovakia 1. Liga",  # fix mismatch
+    "Slovakia First League": "Slovakia 1. Liga",
     "1. Liga": "Slovakia 1. Liga",
     "1. Liga (SVN)": "Slovenia 1. Liga",
     "PSL": "South Africa Premier Division",
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
-    "Ligue 1 (TUN)": "Tunisia Ligue 1",
+
+    # Tunisia (only Ligue 1 here)
     "Tunisia Ligue 1": "Tunisia Ligue 1",
+    "Ligue 1 (TUN)": "Tunisia Ligue 1",
+    "Ligue 1": "Tunisia Ligue 1",  # if provider sometimes just says 'Ligue 1'
+
+    # USA
     "USL Championship": "USA USL Championship",
 
     # Belgium top flight fixes
     "Jupiler Pro League": "Jupiler Pro League",
     "Belgium Pro League": "Jupiler Pro League",
     "Belgian Pro League": "Jupiler Pro League",
-    "Belgium Jupiler Pro League": "Jupiler Pro League",  # fix mismatch
-    # France Ligue 1
-    "Ligue 1": "France Ligue 1",
-    "France Ligue 1": "France Ligue 1",
-
-    # Denmark Superliga
-    "Superliga": "Denmark Superliga",
-    "Denmark Superliga": "Denmark Superliga",
+    "Belgium Jupiler Pro League": "Jupiler Pro League",
 }
 
 # ========== Role groups shown in filters ==========
