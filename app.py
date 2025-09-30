@@ -1212,31 +1212,33 @@ print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
+    import matplotlib.cm as cm
+    import matplotlib.colors as mcolors
 
     if not isinstance(group_colors, dict) or len(group_colors) == 0:
-        group_colors = {"Attacking": "crimson", "Possession": "seagreen", "Defensive": "royalblue", "Goalkeeping": "purple"}
+        group_colors = {
+            "Attacking": "crimson",
+            "Possession": "seagreen",
+            "Defensive": "royalblue",
+            "Goalkeeping": "purple",
+            "Off The Ball": "orange"
+        }
 
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
         st.error(f"No player named '{player_name}' found.")
         return
 
-    # For GK chart, keep Goalkeeping block together, then Possession
+    # Order metrics by group
     group_order = ["Goalkeeping", "Possession", "Defensive", "Attacking", "Off The Ball"]
     sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
     raw_vals = row[sel_metrics].values.flatten()
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
 
-    # Define a red → green colormap
-    cmap = cm.get_cmap("RdYlGn")  # red-yellow-green
-    norm = mcolors.Normalize(vmin=0, vmax=100)  # your percentiles are 0–100
-
-    # Colour each bar by its percentile value
-    bar_colors = [cmap(norm(val)) for val in pct_vals]
-
     n = len(sel_metrics)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    step = 2 * np.pi / n
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
@@ -1248,23 +1250,49 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    ax.bar(angles, pct_vals, width=2 * np.pi / n * 0.9, color=bar_colors, edgecolor=bar_colors, alpha=0.78)
+    # --- Background wedges (group colors, faint) ---
+    if metric_groups and group_colors:
+        group_seq = [metric_groups.get(m, "") for m in sel_metrics]
+        runs, run_start = [], 0
+        for i in range(1, n):
+            if group_seq[i] != group_seq[i - 1]:
+                runs.append((run_start, i - 1, group_seq[i - 1]))
+                run_start = i
+        runs.append((run_start, n - 1, group_seq[-1]))
 
+        for start_idx, end_idx, g in runs:
+            width  = (end_idx - start_idx + 1) * step
+            center = start_idx * step + width / 2.0
+            color  = group_colors.get(g, "#999999")
+            ax.bar([center], [100], width=width, bottom=0,
+                   color=color, alpha=0.08, edgecolor=None, linewidth=0, zorder=0)
+
+    # --- Foreground bars (red→green by percentile) ---
+    cmap = cm.get_cmap("RdYlGn")
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+    bar_colors = [cmap(norm(val)) for val in pct_vals]
+
+    ax.bar(angles, pct_vals, width=2 * np.pi / n * 0.9,
+           color=bar_colors, edgecolor=bar_colors, alpha=0.85, zorder=5)
+
+    # --- Raw values inside ---
     for ang, raw_val in zip(angles, raw_vals):
         try:
             txt = f"{float(raw_val):.2f}"
         except Exception:
             txt = "-"
-        ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
+        ax.text(ang, 50, txt, ha="center", va="center",
+                color="black", fontsize=10, fontweight="bold", zorder=10)
 
+    # --- Metric labels outside ---
     for i, ang in enumerate(angles):
         raw_name = sel_metrics[i]
-        # Use friendly display name if available
         label = DISPLAY_NAMES.get(raw_name, raw_name)
         label = label.replace(" per 90", "").replace(", %", " (%)")
         ax.text(ang, 108, label, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
+                color="black", fontsize=10, fontweight="bold", zorder=10)
 
+    # --- Legend (still group colors) ---
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
@@ -1272,18 +1300,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.06),
                   ncol=min(len(patches), 4), frameon=False)
 
-    if "Weighted Z Score" in row.columns:
-        weighted_z = float(row["Weighted Z Score"].values[0])
-    else:
-        z_scores = (pct_vals - 50) / 15
-        avg_z = float(np.mean(z_scores))
-        mult = float(row["Multiplier"].values[0]) if "Multiplier" in row.columns and pd.notnull(row["Multiplier"].values[0]) else 1.0
-        weighted_z = avg_z * mult
-
-    score_100 = None
-    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
-        score_100 = float(row["Score (0–100)"].values[0])
-
+    # --- Player info title ---
+    weighted_z = float(row.get("Weighted Z Score", [0]).values[0])
+    score_100 = float(row["Score (0–100)"].values[0]) if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]) else None
     age      = row["Age"].values[0] if "Age" in row else np.nan
     height   = row["Height"].values[0] if "Height" in row else np.nan
     team     = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row else ""
@@ -1309,12 +1328,10 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if comp:                 bottom_parts.append(comp)
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
     if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
-
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
-
     line2 = " | ".join(bottom_parts)
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
