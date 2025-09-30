@@ -779,6 +779,23 @@ df_all_raw.columns = (
     .str.replace(r"\s+", " ", regex=True)     # collapse multiple spaces to a single space
 )
 
+# ---------- Clean raw column headers ----------
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.strip()
+    .str.replace(u"\xa0", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+)
+
+# ---------- Add Age column from Birth Date ----------
+if "Birth Date" in df_all_raw.columns:
+    today = datetime.today()
+    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
+        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if pd.notna(dob) else np.nan
+    )
+    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
+
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
 print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
