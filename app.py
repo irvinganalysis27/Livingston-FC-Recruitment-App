@@ -748,17 +748,26 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
 
-# Reset if old template name is invalid
+# Initialise template if missing or invalid
 if "template_select" not in st.session_state or st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
-idx = template_names.index(st.session_state.template_select)
+# Single dropdown (only once in the app!)
 selected_position_template = st.selectbox(
     "Choose a position template for the chart",
     template_names,
-    index=idx,
+    index=template_names.index(st.session_state.template_select),
     key="template_select",
 )
+
+# Handle manual vs auto updates
+if st.session_state.auto_just_applied:
+    st.session_state.last_template_choice = st.session_state.template_select
+    st.session_state.auto_just_applied = False
+else:
+    if st.session_state.template_select != st.session_state.last_template_choice:
+        st.session_state.manual_override = True
+        st.session_state.last_template_choice = st.session_state.template_select
 
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
