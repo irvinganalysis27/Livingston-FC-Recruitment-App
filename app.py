@@ -1236,18 +1236,21 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     groups = [metric_groups[m] for m in sel_metrics]
     
     # --- Livingston FC position-specific averages ---
-livi_mask = (
-    (plot_data["Team within selected timeframe"].astype(str).str.contains("Livingston", case=False, na=False))
-    & (plot_data["Six-Group Position"] == row["Six-Group Position"].values[0])
-)
+current_pos = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else None
 
-if livi_mask.any():
-    livi_means = plot_data.loc[livi_mask, [m + " (percentile)" for m in sel_metrics]].mean().values
+if current_pos:
+    livi_mask = (
+        plot_data["Team within selected timeframe"].astype(str).str.contains("Livingston", case=False, na=False)
+        & (plot_data["Six-Group Position"] == current_pos)
+    )
 
-    # Draw a black marker (dot) for Livingston average on each metric
-    for ang, val in zip(angles, livi_means):
-        ax.scatter([ang], [val], color="black", s=50, zorder=12, edgecolors="white", linewidths=1.2)
-        # s=50 makes it clear but not too large
+    if livi_mask.any():
+        livi_means = plot_data.loc[livi_mask, [m + " (percentile)" for m in sel_metrics]].mean().values
+
+        # Draw black markers for the Livingston FC average
+        for ang, val in zip(angles, livi_means):
+            ax.scatter([ang], [val], color="black", s=50, zorder=12,
+                       edgecolors="white", linewidths=1.2)
 
     # Colormap for bars (red → green by percentile)
     cmap = cm.get_cmap("RdYlGn")
