@@ -134,6 +134,7 @@ LEAGUE_SYNONYMS = {
     "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
     "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
+    "France Ligue 1": "Tunisia Ligue 1",
 
     # --- USA ---
     "USL Championship": "USA USL Championship",
