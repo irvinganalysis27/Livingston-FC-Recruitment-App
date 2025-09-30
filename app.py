@@ -524,9 +524,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         "Successful Box Cross %": "Successful Box Cross%",
         "Player Season Box Cross Ratio": "Successful Box Cross%",
 
-        # 1v1 defending
-        "Dribbles Stopped%": "1v1 Defending %",
-
         # Pass% under pressure
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
 
