@@ -1208,36 +1208,36 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     else:
         comp = ""
 
-    # ---------- Title lines ----------
-    top_parts = [player_name]
-    if role: top_parts.append(role)
-    if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
-    if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
+        # ---------- Title lines ----------
+    top_parts = [str(player_name)]
+
+    if role and isinstance(role, str):
+        top_parts.append(str(role))
+    if not pd.isnull(age):
+        top_parts.append(f"{int(age)} years old")
+    if not pd.isnull(height):
+        top_parts.append(f"{int(height)} cm")
+
+    # ensure all are strings
+    top_parts = [str(x) for x in top_parts if x and str(x) != "nan"]
     line1 = " | ".join(top_parts)
 
     bottom_parts = []
-    if team:                 bottom_parts.append(team)
-    if comp:                 bottom_parts.append(comp)
-    if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
-    if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
+    if team and isinstance(team, str):
+        bottom_parts.append(team)
+    if comp and isinstance(comp, str):
+        bottom_parts.append(comp)
+    if pd.notnull(mins):
+        bottom_parts.append(f"{int(mins)} mins")
+    if rank_val is not None:
+        bottom_parts.append(f"Rank #{rank_val}")
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
 
+    bottom_parts = [str(x) for x in bottom_parts if x and str(x) != "nan"]
     line2 = " | ".join(bottom_parts)
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
-
-    # Logo overlay
-    try:
-        if logo is not None:
-            imagebox = OffsetImage(np.array(logo), zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-    except Exception:
-        pass
-
-    st.pyplot(fig, use_container_width=True)
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
