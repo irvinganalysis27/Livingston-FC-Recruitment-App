@@ -615,12 +615,6 @@ if "Birth Date" in df_all_raw.columns:
 df_all = preprocess_df(df_all_raw)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
-]
-
-st.markdown("### Debug: Metric existence check")
-for m in debug_metrics:
-    st.write(f"{m}: {'✅ Found' if m in df_all.columns else '❌ Missing'}")
-
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
 print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
