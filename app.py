@@ -541,19 +541,12 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns=rename_map, inplace=True)
 
-    # --- Derive Successful Crosses ---
-    if "Crosses" in df.columns and "Crossing%" in df.columns:
-        df["Successful Crosses"] = (
-            pd.to_numeric(df["Crosses"], errors="coerce") *
-            (pd.to_numeric(df["Crossing%"], errors="coerce") / 100.0)
-        )
-
     # --- Derive Successful Dribbles ---
-    if "Player Season Total Dribbles 90" in df.columns and "Player Season Dribble Ratio" in df.columns:
-        df["Successful Dribbles"] = (
-            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce") *
-            (pd.to_numeric(df["Player Season Dribble Ratio"], errors="coerce") / 100.0)
-        )
+if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
+    df["Successful Dribbles"] = (
+        pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce") -
+        pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce")
+    )
 
     # --- Build "Positions played" ---
     if "Position" in df.columns:
