@@ -793,6 +793,23 @@ if "Birth Date" in df_all_raw.columns:
 df_all = preprocess_df(df_all_raw)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
+# --- Debug metrics existence (shows in Streamlit UI) ---
+debug_metrics = [
+    "Ball Recovery Opp. Half",
+    "1v1 Defending %",
+    "Pr. Pass% Dif.",
+    "Successful Crosses",
+    "Successful Dribbles",
+    "Pr. Long Balls",
+    "UPr. Long Balls",
+    "xGBuildup",
+    "Pressures in Final 1/3",
+]
+
+st.markdown("### Debug: Metric existence check")
+for m in debug_metrics:
+    st.write(f"{m}: {'✅ Found' if m in df_all.columns else '❌ Missing'}")
+
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
 print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
