@@ -1289,12 +1289,14 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
                 color="black", fontsize=10, fontweight="bold")
 
     # Metric labels
-    for i, ang in enumerate(angles):
-        raw_name = sel_metrics[i]
-        label = DISPLAY_NAMES.get(raw_name, raw_name)
-        label = label.replace(" per 90", "").replace(", %", " (%)")
-        ax.text(ang, 108, label, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
+for i, ang in enumerate(angles):
+    raw_name = sel_metrics[i]
+    label = DISPLAY_NAMES.get(raw_name, raw_name)
+    label = label.replace(" per 90", "").replace(", %", " (%)")
+    group = metric_groups.get(raw_name, "")
+    color = group_colors.get(group, "black")  # fallback to black if group not found
+    ax.text(ang, 108, label, ha="center", va="center",
+            color=color, fontsize=10, fontweight="bold")
 
     # Legend (group colours)
     present_groups = list(dict.fromkeys(groups))
