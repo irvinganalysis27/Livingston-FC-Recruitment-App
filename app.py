@@ -68,6 +68,7 @@ DISPLAY_NAMES = {
     "Turnovers": "Turnovers Won",
     "Deep Progressions": "Progressions to Final 1/3",
     "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
+    "Player Season Ball Recoveries 90": "Ball Recoveries",
 }
 
 # --- League name normalisation: StatsBomb -> your Opta names ---
@@ -236,7 +237,7 @@ position_metrics = {
             "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Ball Recoveries"
+            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
         ],
         "groups": {
             "Passing%": "Possession",
@@ -254,7 +255,7 @@ position_metrics = {
             "PAdj Tack&Int": "Defensive",
             "Dribbles Stopped%": "Defensive",
             "Aggressive Actions": "Defensive",
-            "Ball Recoveries": "Defensive"
+            "Player Season Ball Recoveries 90": "Defensive"
         }
     },
 
@@ -267,7 +268,7 @@ position_metrics = {
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
             # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-            "Aggressive Actions", "Aerial Win%", "Ball Recoveries", "Pressure Regains",
+            "Aggressive Actions", "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains",
         ],
         "groups": {
             "Passing%": "Possession",
@@ -278,7 +279,7 @@ position_metrics = {
             "Dribbles Stopped%": "Defensive",
             "Aggressive Actions": "Defensive",
             "Aerial Win%": "Defensive",
-            "Ball Recoveries": "Defensive",
+            "Player Season Ball Recoveries 90": "Defensive",
             "Pressure Regains": "Defensive",
             "Turnovers": "Possession",
             "OBV": "Possession",
