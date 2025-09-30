@@ -768,6 +768,10 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
+
+df_all = preprocess_df(df_all_raw)
+print("[DEBUG] Final columns:", list(df_all.columns))
+
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 # ---------- Clean raw column headers (do this immediately after loading) ----------
