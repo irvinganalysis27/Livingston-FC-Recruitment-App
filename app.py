@@ -73,6 +73,7 @@ DISPLAY_NAMES = {
 }
 
 # --- League name normalisation: StatsBomb -> your Opta names ---
+# --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
     "2. Liga": "Austria 2. Liga",
@@ -90,13 +91,9 @@ LEAGUE_SYNONYMS = {
     "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
-
-    # France (only lower divisions)
     "Championnat National": "France National 1",
-    "France National 1": "France National 1",
     "Ligue 2": "Ligue 2",
     "France Ligue 2": "Ligue 2",
-
     "2. Bundesliga": "2. Bundesliga",
     "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
@@ -104,7 +101,6 @@ LEAGUE_SYNONYMS = {
     "Greece Super League": "Greece Super League 1",
     "NB I": "Hungary NB I",
     "Besta deild karla": "Iceland Besta Deild",
-    "Serie B": "Italy Serie B",
     "Serie C": "Italy Serie C",
     "J2 League": "Japan J2 League",
     "Virsliga": "Latvia Virsliga",
@@ -134,18 +130,15 @@ LEAGUE_SYNONYMS = {
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
 
-    # Tunisia (only Ligue 1 here)
-    "Tunisia Ligue 1": "Tunisia Ligue 1",
-    "Ligue 1 (TUN)": "Tunisia Ligue 1",
-    "Ligue 1": "Tunisia Ligue 1",  # if provider sometimes just says 'Ligue 1'
-    "Ligue 1": "Tunisia Ligue 1",   # always treat bare 'Ligue 1' as Tunisia
+    # --- Tunisia fixes ---
+    "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
     "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
 
-    # USA
+    # --- USA ---
     "USL Championship": "USA USL Championship",
 
-    # Belgium top flight fixes
+    # --- Belgium top flight fixes ---
     "Jupiler Pro League": "Jupiler Pro League",
     "Belgium Pro League": "Jupiler Pro League",
     "Belgian Pro League": "Jupiler Pro League",
