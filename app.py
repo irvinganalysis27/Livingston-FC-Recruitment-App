@@ -59,6 +59,16 @@ group_colors = {
     "Goalkeeping": "purple",
 }
 
+# ---------- Display name overrides for radar ----------
+DISPLAY_NAMES = {
+    "Pressures F2": "Pressures in Final 1/3",
+    "Deep Completions": "Completed Passes Final 1/3",
+    "Turnovers": "Turnovers Won",
+    "Deep Progressions": "Progressions to Final 1/3",
+    "Ball Recov. F2": "Ball Recovery Opp. Half",
+    "Tack/DP%": "1v1 Defending %",
+}
+
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
@@ -1241,8 +1251,12 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
     for i, ang in enumerate(angles):
-        label = sel_metrics[i].replace(" per 90", "").replace(", %", " (%)")
-        ax.text(ang, 108, label, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
+    raw_name = sel_metrics[i]
+    # Use friendly display name if available
+    label = DISPLAY_NAMES.get(raw_name, raw_name)
+    label = label.replace(" per 90", "").replace(", %", " (%)")
+    ax.text(ang, 108, label, ha="center", va="center",
+            color="black", fontsize=10, fontweight="bold")
 
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
