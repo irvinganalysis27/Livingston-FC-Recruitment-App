@@ -237,9 +237,9 @@ position_metrics = {
     "Centre Back New": {
     "metrics": [
         # Attacking
-        "xG", "NP Goals",
+        "NP Goals",
         # Possession
-        "Passing%", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
+        "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
         # Defensive
         "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
         "Defensive Actions", "Aggressive Actions", "Fouls",
@@ -259,7 +259,7 @@ position_metrics = {
         "Pr. Long Balls": "Possession",
         "UPr. Long Balls": "Possession",
         "OBV": "Possession",
-        "xG": "Attacking",
+        "Pass OBV": "Possession",
         "NP Goals": "Attacking",
     }
 },
@@ -295,7 +295,7 @@ position_metrics = {
 
     "Full Back New": {
     "metrics": [
-        "Passing%", "Pr. Pass% Dif.", "OP Passes Into Box", "Deep Progressions",
+        "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
         "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
         "Defensive Actions", "Aerial Win%", "PAdj Pressures",
         "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions", "Ball Recoveries"
@@ -303,7 +303,8 @@ position_metrics = {
     "groups": {
         "Passing%": "Possession",
         "Pr. Pass% Dif.": "Possession",
-        "OP Passes Into Box": "Possession",
+        "Successful Crosses": "Possession",
+        "Crossing%": "Possession",
         "Deep Progressions": "Possession",
         "Successful Dribbles": "Possession",
         "Turnovers": "Possession",
@@ -521,20 +522,18 @@ position_metrics = {
 
     "Striker New": {
     "metrics": [
-        "All Goals", "NP Goals", "xG", "Shots", "xG/Shot",
+        "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
         "Goal Conversion%", 
-        "Shot Touch%", "Touches In Box", "xG Assisted",
+        "Touches In Box", "xG Assisted",
         "Fouls Won", "Deep Completions", "OP Key Passes",
         "Aerial Win%", "Aerial Wins", "Pressures F2",
     ],
     "groups": {
-        "All Goals": "Attacking",
         "NP Goals": "Attacking",
         "xG": "Attacking",
         "Shots": "Attacking",
         "xG/Shot": "Attacking",
         "Goal Conversion%": "Attacking",
-        "Shot Touch%": "Attacking",
         "Touches In Box": "Attacking",
         "xG Assisted": "Attacking",
         "Fouls Won": "Possession",
@@ -542,6 +541,7 @@ position_metrics = {
         "OP Key Passes": "Possession",
         "Aerial Win%": "Defensive",
         "Aerial Wins": "Defensive",
+        "Aggressive Actions": "Defensive",
         "Pressures F2": "Defensive"
     }
 }
