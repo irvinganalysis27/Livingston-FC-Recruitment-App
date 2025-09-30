@@ -68,10 +68,8 @@ DISPLAY_NAMES = {
     "Turnovers": "Turnovers Won",
     "Deep Progressions": "Progressions to Final 1/3",
     "Ball Recov. F2": "Ball Recovery Opp. Half",
-    "Tack/DP%": "1v1 Defending %",
 }
 
-# --- League name normalisation: StatsBomb -> your Opta names ---
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
@@ -209,14 +207,14 @@ position_metrics = {
             # Possession
             "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
             # Defensive
-            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
             "Defensive Actions", "Aggressive Actions", "Fouls",
             "Aerial Wins", "Aerial Win%",
         ],
         "groups": {
             "PAdj Interceptions": "Defensive",
             "PAdj Tackles": "Defensive",
-            "Tack/DP%": "Defensive",
+            "Dribbles Stopped%": "Defensive",
             "Defensive Actions": "Defensive",
             "Aggressive Actions": "Defensive",
             "Fouls": "Defensive",
@@ -238,7 +236,7 @@ position_metrics = {
             "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-            "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions", "Ball Recoveries"
+            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Ball Recoveries"
         ],
         "groups": {
             "Passing%": "Possession",
@@ -254,7 +252,7 @@ position_metrics = {
             "Aerial Win%": "Defensive",
             "PAdj Pressures": "Defensive",
             "PAdj Tack&Int": "Defensive",
-            "Tack/DP%": "Defensive",
+            "Dribbles Stopped%": "Defensive",
             "Aggressive Actions": "Defensive",
             "Ball Recoveries": "Defensive"
         }
@@ -268,7 +266,7 @@ position_metrics = {
             # Possession
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
             # Defensive
-            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
             "Aggressive Actions", "Aerial Win%", "Ball Recoveries", "Pressure Regains",
         ],
         "groups": {
@@ -277,7 +275,7 @@ position_metrics = {
             "xGBuildup": "Attacking",
             "PAdj Interceptions": "Defensive",
             "PAdj Tackles": "Defensive",
-            "Tack/DP%": "Defensive",
+            "Dribbles Stopped%": "Defensive",
             "Aggressive Actions": "Defensive",
             "Aerial Win%": "Defensive",
             "Ball Recoveries": "Defensive",
@@ -528,7 +526,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
         # 1v1 defending
         "Dribbles Stopped%": "1v1 Defending %",
-        "Tack/DP%": "1v1 Defending %",   # backwards compat
 
         # Pass% under pressure
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
