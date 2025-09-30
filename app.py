@@ -1209,7 +1209,6 @@ print("[DEBUG] Sample anchor ranges:",
                    .to_dict(orient="records"))
 print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
 print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
-
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
@@ -1224,25 +1223,28 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             "Goalkeeping": "purple",
         }
 
-    # --- Select player row ---
     row = plot_data.loc[plot_data["Player"] == player_name]
     if row.empty:
         st.error(f"No player named '{player_name}' found.")
         return
 
-    # Metric ordering
+    # Metric ordering (keeps blocks grouped)
     group_order = ["Goalkeeping", "Possession", "Defensive", "Attacking", "Off The Ball"]
     sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
-
     raw_vals = row[sel_metrics].values.flatten()
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
+
+    # Colormap for bars (red → green by percentile)
+    cmap = cm.get_cmap("RdYlGn")
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+    bar_colors = [cmap(norm(val)) for val in pct_vals]
 
     n = len(sel_metrics)
     step = 2 * np.pi / n
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
 
-    # --- Setup plot ---
+    # --- Plot setup ---
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
@@ -1253,113 +1255,22 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # --- Background wedges (per metric) ---
+        # ----- Background wedges (aligned exactly with metrics) -----
+    step = 2 * np.pi / n  # angle width per metric
     for i, g in enumerate(groups):
-        angle = angles[i] - step / 2
+        angle = angles[i] - step / 2  # shift so wedge is centered on the bar
         ax.bar(
-            [angle], [100],
-            width=step, bottom=0,
+            [angle],
+            [100],
+            width=step,
+            bottom=0,
             color=group_colors.get(g, "grey"),
-            alpha=0.12, edgecolor="white", linewidth=1,
-            zorder=0, align="edge"
+            alpha=0.10,   # adjust to taste (0.08–0.15 usually good)
+            edgecolor=None,
+            linewidth=0,
+            zorder=0,
+            align="edge"
         )
-
-    # --- Percentile bars (red→green colormap) ---
-    cmap = cm.get_cmap("RdYlGn")
-    norm = mcolors.Normalize(vmin=0, vmax=100)
-    bar_colors = [cmap(norm(val)) for val in pct_vals]
-
-    ax.bar(
-        angles, pct_vals,
-        width=2 * np.pi / n * 0.9,
-        color=bar_colors, edgecolor=bar_colors, alpha=0.78
-    )
-
-    # --- Livingston FC averages (position-specific) ---
-    current_pos = row.iloc[0].get("Six-Group Position", None)
-    if current_pos:
-        livi_mask = (
-            plot_data["Team within selected timeframe"].astype(str).str.contains("Livingston", case=False, na=False)
-            & (plot_data["Six-Group Position"] == current_pos)
-        )
-        if livi_mask.any():
-            livi_means = plot_data.loc[livi_mask, [m + " (percentile)" for m in sel_metrics]].mean().values
-            for ang, val in zip(angles, livi_means):
-                ax.scatter([ang], [val], color="black", s=55, zorder=12,
-                           edgecolors="white", linewidths=1.3)
-
-    # --- Raw values inside bars ---
-    for ang, raw_val in zip(angles, raw_vals):
-        try:
-            txt = f"{float(raw_val):.2f}"
-        except Exception:
-            txt = "-"
-        ax.text(ang, 50, txt, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
-
-    # --- Metric labels ---
-    for i, ang in enumerate(angles):
-        raw_name = sel_metrics[i]
-        label = DISPLAY_NAMES.get(raw_name, raw_name)
-        label = label.replace(" per 90", "").replace(", %", " (%)")
-        ax.text(ang, 108, label, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
-
-    # --- Legend ---
-    present_groups = list(dict.fromkeys(groups))
-    patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
-    if patches:
-        fig.subplots_adjust(top=0.86, bottom=0.08)
-        ax.legend(
-            handles=patches,
-            loc="upper center", bbox_to_anchor=(0.5, -0.06),
-            ncol=min(len(patches), 4), frameon=False
-        )
-
-    # --- Player info ---
-    weighted_z = float(row["Weighted Z Score"].values[0]) if "Weighted Z Score" in row.columns else 0.0
-    score_100 = float(row["Score (0–100)"].values[0]) if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]) else None
-    age = row["Age"].values[0] if "Age" in row.columns else np.nan
-    height = row["Height"].values[0] if "Height" in row.columns else np.nan
-    team = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row.columns else ""
-    mins = row["Minutes played"].values[0] if "Minutes played" in row.columns else np.nan
-    role = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else ""
-    rank_val = int(row["Rank"].values[0]) if "Rank" in row.columns and pd.notnull(row["Rank"].values[0]) else None
-
-    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
-        comp = row["Competition_norm"].values[0]
-    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
-        comp = row["Competition"].values[0]
-    else:
-        comp = ""
-
-    top_parts = [player_name]
-    if role: top_parts.append(role)
-    if not pd.isnull(age): top_parts.append(f"{int(age)} years old")
-    if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(top_parts)
-
-    bottom_parts = []
-    if team: bottom_parts.append(team)
-    if comp: bottom_parts.append(comp)
-    if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
-    if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
-    if score_100 is not None: bottom_parts.append(f"{score_100:.0f}/100")
-    else: bottom_parts.append(f"Z {weighted_z:.2f}")
-
-    line2 = " | ".join(bottom_parts)
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
-
-    # Logo overlay
-    try:
-        if logo is not None:
-            imagebox = OffsetImage(np.array(logo), zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-    except Exception:
-        pass
-
-    st.pyplot(fig, use_container_width=True)
 
     # --- Percentile bars ---
     ax.bar(
