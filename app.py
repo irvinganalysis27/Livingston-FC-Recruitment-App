@@ -559,7 +559,7 @@ position_metrics = {
 }
 }
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbombdata.xlsx")  # or APP_DIR / "statsbombdata" or a folder
+DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")  # or APP_DIR / "statsbombdata" or a folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
