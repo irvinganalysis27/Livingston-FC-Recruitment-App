@@ -572,8 +572,10 @@ position_metrics = {
     }
 }
 }
+from datetime import datetime
+
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")  # or APP_DIR / "statsbombdata" or a folder
+DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
@@ -642,6 +644,18 @@ def _data_signature(path: Path):
                     continue
         return ("dir", str(path.resolve()), tuple(sigs))
 
+def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Add Age column based on birth_date compared to today's date."""
+    if "birth_date" in df.columns:
+        today = datetime.today()
+        df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+            lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+            if pd.notnull(d) else None
+        )
+    else:
+        df["Age"] = None
+    return df
+
 @st.cache_data(show_spinner=False)
 def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     print(f"[DEBUG] Data path configured as: {path}")
@@ -649,27 +663,30 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
         raise FileNotFoundError(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
 
     if path.is_file():
-        return load_one_file(path)
+        df = load_one_file(path)
+    else:
+        files = sorted(
+            f for f in path.iterdir()
+            if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
+        )
+        if not files:
+            raise FileNotFoundError(f"No data files found inside {path.name}. Add CSV or XLSX.")
 
-    files = sorted(
-        f for f in path.iterdir()
-        if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
-    )
-    if not files:
-        raise FileNotFoundError(f"No data files found inside {path.name}. Add CSV or XLSX.")
+        frames = []
+        for f in files:
+            try:
+                frames.append(load_one_file(f))
+            except Exception as e:
+                print(f"[WARNING] Skipping {f.name} ({e})")
 
-    frames = []
-    for f in files:
-        try:
-            frames.append(load_one_file(f))
-        except Exception as e:
-            print(f"[WARNING] Skipping {f.name} ({e})")
+        if not frames:
+            raise ValueError("No readable files found in statsbombdata")
 
-    if not frames:
-        raise ValueError("No readable files found in statsbombdata")
+        df = pd.concat(frames, ignore_index=True, sort=False)
+        print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
 
-    df = pd.concat(frames, ignore_index=True, sort=False)
-    print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
+    # Always add Age column
+    df = add_age_column(df)
     return df
 
 # ---------- Preprocess DataFrame (define BEFORE it’s used) ----------
