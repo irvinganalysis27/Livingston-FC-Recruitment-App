@@ -63,7 +63,7 @@ group_colors = {
 
 # ---------- Display name overrides for radar ----------
 DISPLAY_NAMES = {
-    "Pressures F2": "Pressures in Final 1/3",
+    "Player Season Fhalf Pressures 90": "Pressures in Opposition Half",
     "Deep Completions": "Completed Passes Final 1/3",
     "Turnovers": "Turnovers Won",
     "Deep Progressions": "Progressions to Final 1/3",
@@ -327,7 +327,7 @@ position_metrics = {
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
             # Defensive
-            "Pressures F2",
+            "Player Season Fhalf Pressures 90",
         ],
         "groups": {
             "NP Goals": "Attacking",
@@ -344,7 +344,7 @@ position_metrics = {
             "Turnovers": "Possession",
             "OBV": "Possession",
             "D&C OBV": "Possession",
-            "Pressures F2": "Defensive",
+            "Player Season Fhalf Pressures 90": "Defensive",
         }
     },
 
@@ -355,7 +355,7 @@ position_metrics = {
             "Goal Conversion%", 
             "Touches In Box", "xG Assisted",
             "Fouls Won", "Deep Completions", "OP Key Passes",
-            "Aerial Win%", "Aerial Wins", "Pressures F2",
+            "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90",
         ],
         "groups": {
             "NP Goals": "Attacking",
@@ -371,7 +371,7 @@ position_metrics = {
             "Aerial Win%": "Defensive",
             "Aerial Wins": "Defensive",
             "Aggressive Actions": "Defensive",
-            "Pressures F2": "Defensive"
+            "Player Season Fhalf Pressures 90": "Defensive"
         }
     }
 }
