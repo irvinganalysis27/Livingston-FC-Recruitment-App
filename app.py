@@ -138,6 +138,13 @@ LEAGUE_SYNONYMS = {
     "Belgium Pro League": "Jupiler Pro League",
     "Belgian Pro League": "Jupiler Pro League",
     "Belgium Jupiler Pro League": "Jupiler Pro League",  # fix mismatch
+    # France Ligue 1
+    "Ligue 1": "France Ligue 1",
+    "France Ligue 1": "France Ligue 1",
+
+    # Denmark Superliga
+    "Superliga": "Denmark Superliga",
+    "Denmark Superliga": "Denmark Superliga",
 }
 
 # ========== Role groups shown in filters ==========
