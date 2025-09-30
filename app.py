@@ -769,19 +769,8 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-df_all = preprocess_df(df_all_raw)
-print("[DEBUG] Final columns:", list(df_all.columns))
-
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
-# ---------- Clean raw column headers (do this immediately after loading) ----------
-# Removes stray spaces and non-breaking spaces so column lookups match
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()                              # trim leading/trailing spaces
-    .str.replace(u"\xa0", " ", regex=False)   # replace non-breaking spaces with normal spaces
-    .str.replace(r"\s+", " ", regex=True)     # collapse multiple spaces to a single space
-)
 
 # ---------- Clean raw column headers ----------
 df_all_raw.columns = (
@@ -799,6 +788,10 @@ if "Birth Date" in df_all_raw.columns:
         if pd.notna(dob) else np.nan
     )
     print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
+
+# ---------- Preprocess ----------
+df_all = preprocess_df(df_all_raw)
+print("[DEBUG] Final columns:", list(df_all.columns))
 
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
