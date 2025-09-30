@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from PIL import Image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
 APP_DIR = Path(__file__).parent
 ASSETS_DIR = APP_DIR / "assets"
@@ -1226,7 +1228,12 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
 
-    bar_colors = [group_colors.get(g, "grey") for g in groups]
+    # Define a red → green colormap
+    cmap = cm.get_cmap("RdYlGn")  # red-yellow-green
+    norm = mcolors.Normalize(vmin=0, vmax=100)  # your percentiles are 0–100
+
+    # Colour each bar by its percentile value
+    bar_colors = [cmap(norm(val)) for val in pct_vals]
 
     n = len(sel_metrics)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
