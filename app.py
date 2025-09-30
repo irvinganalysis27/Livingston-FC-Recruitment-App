@@ -1255,29 +1255,21 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # --- Background wedges per group ---
-    runs, run_start = [], 0
-    for i in range(1, n):
-        if groups[i] != groups[i - 1]:
-            runs.append((run_start, i - 1, groups[i - 1]))
-            run_start = i
-    runs.append((run_start, n - 1, groups[-1]))
-
-    for start_idx, end_idx, g in runs:
-        if g == "" or g not in group_colors:
-            continue
-        start_angle = angles[start_idx]
-        end_angle = angles[end_idx] + step
-        width = end_angle - start_angle
-        color = group_colors[g]
-
+        # ----- Background wedges (aligned exactly with metrics) -----
+    step = 2 * np.pi / n  # angle width per metric
+    for i, g in enumerate(groups):
+        angle = angles[i] - step / 2  # shift so wedge is centered on the bar
         ax.bar(
-            [start_angle], [100],
-            width=width, bottom=0,
-            align="edge",
-            color=color, alpha=0.18,
-            edgecolor="none", linewidth=0,
-            zorder=0
+            [angle],
+            [100],
+            width=step,
+            bottom=0,
+            color=group_colors.get(g, "grey"),
+            alpha=0.10,   # adjust to taste (0.08–0.15 usually good)
+            edgecolor=None,
+            linewidth=0,
+            zorder=0,
+            align="edge"
         )
 
     # --- Percentile bars ---
