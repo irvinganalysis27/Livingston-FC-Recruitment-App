@@ -745,6 +745,21 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
         st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
+# ---------- Template select ----------
+template_names = list(position_metrics.keys())
+
+# Reset if old template name is invalid
+if "template_select" not in st.session_state or st.session_state.template_select not in template_names:
+    st.session_state.template_select = template_names[0]
+
+idx = template_names.index(st.session_state.template_select)
+selected_position_template = st.selectbox(
+    "Choose a position template for the chart",
+    template_names,
+    index=idx,
+    key="template_select",
+)
+
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
 current_metrics = position_metrics[current_template_name]["metrics"]
