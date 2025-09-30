@@ -1250,7 +1250,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # --- Background wedges (group colors, faint) ---
+        # --- Background wedges (group colors, deeper + aligned to metrics) ---
     if metric_groups and group_colors:
         group_seq = [metric_groups.get(m, "") for m in sel_metrics]
         runs, run_start = [], 0
@@ -1261,11 +1261,18 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         runs.append((run_start, n - 1, group_seq[-1]))
 
         for start_idx, end_idx, g in runs:
-            width  = (end_idx - start_idx + 1) * step
-            center = start_idx * step + width / 2.0
-            color  = group_colors.get(g, "#999999")
-            ax.bar([center], [100], width=width, bottom=0,
-                   color=color, alpha=0.08, edgecolor=None, linewidth=0, zorder=0)
+            if g == "" or g not in group_colors:
+                continue
+            start_angle = angles[start_idx]
+            end_angle = angles[end_idx] + step
+            width = end_angle - start_angle
+            color = group_colors[g]
+
+            ax.bar([start_angle], [100],
+                   width=width, bottom=0,
+                   align="edge",  # ensures it starts exactly at start_angle
+                   color=color, alpha=0.18,   # darker alpha than before
+                   edgecolor=None, linewidth=0, zorder=0)
 
     # --- Foreground bars (red→green by percentile) ---
     cmap = cm.get_cmap("RdYlGn")
