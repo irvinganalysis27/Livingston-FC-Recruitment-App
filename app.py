@@ -680,11 +680,10 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     df = add_age_column(df)
     return df
 
-# ---------- Preprocess DataFrame (define BEFORE it’s used) ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
 
-    # Normalise Competition name
+    # ---------- Normalise Competition name ----------
     if "Competition" in df.columns:
         df["Competition_norm"] = (
             df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
@@ -692,19 +691,18 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # Merge league multipliers (fallback 1.0)
+    # ---------- Merge league multipliers ----------
     try:
         multipliers_df = pd.read_excel("league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(multipliers_df.columns):
             df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-            
-            # Debug: show leagues that failed to match multipliers
+
             missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
             if missing_mult:
                 print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
                 st.warning(f"Some leagues did not match multipliers: {missing_mult}")
-            
-            df["Multiplier"] = df["Multiplier"].fillna(1.0)  # fallback
+
+            df["Multiplier"] = df["Multiplier"].fillna(1.0)
         else:
             st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
             df["Multiplier"] = 1.0
@@ -712,26 +710,48 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         print(f"[DEBUG] Failed to load multipliers: {e}")
         df["Multiplier"] = 1.0
 
-    # Rename new-provider identifiers
-    rename_map = {}
-    if "Name" in df.columns: rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+    # ---------- Rename columns ----------
+    rename_map = {
+        "Name": "Player",
+        "Primary Position": "Position",
+        "Minutes": "Minutes played",
 
-    # --- Extra rename fixes for metrics ---
-    rename_map.update({
+        # Fix spacing issues
         "Successful Box Cross %": "Successful Box Cross%",
-        "Long Balls: Pressured": "Pressured Long Balls",
-        "Long Balls Pressured": "Pressured Long Balls",
-        "Long Balls: Unpressured": "Unpressured Long Balls",
-        "Long Balls Unpressured": "Unpressured Long Balls",
+        "Long Balls: Pressured": "Pr. Long Balls",
+        "Long Balls Pressured": "Pr. Long Balls",
+        "Long Balls: Unpressured": "UPr. Long Balls",
+        "Long Balls Unpressured": "UPr. Long Balls",
         "Shot Conversion %": "Goal Conversion%",
-        "Goal Conversion %": "Goal Conversion%",   # unify spacing
-    })
+        "Goal Conversion %": "Goal Conversion%",
 
+        # API-only names → template names
+        "Player Season Ball Recoveries 90": "Ball Recoveries",
+        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
+        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
+        "Player Season Xgbuildup 90": "xBuildup",
+        "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
+        "Player Season Box Cross Ratio": "Successful Box Cross%",
+        "Player Season Fhalf Pressures 90": "Pressures in Final 1/3",
+    }
     df.rename(columns=rename_map, inplace=True)
 
-    # Build "Positions played"
+    # ---------- Derived metrics ----------
+    # Successful Crosses = Crosses × Crossing%
+    if "Crosses" in df.columns and "Crossing%" in df.columns:
+        try:
+            df["Successful Crosses"] = df["Crosses"] * (df["Crossing%"] / 100.0)
+        except Exception:
+            df["Successful Crosses"] = np.nan
+
+    # Successful Dribbles = Total Dribbles – Failed Dribbles
+    if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
+        try:
+            df["Successful Dribbles"] = df["Player Season Total Dribbles 90"] - df["Player Season Failed Dribbles 90"]
+        except Exception:
+            df["Successful Dribbles"] = np.nan
+
+    # ---------- Positions played ----------
     if "Position" in df.columns:
         if "Secondary Position" in df.columns:
             df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
@@ -744,19 +764,19 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Positions played"] = np.nan
 
-        # Fallbacks
+    # ---------- Fallbacks ----------
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # Six-Group mapping (from PRIMARY position only)
+    # ---------- Six-Group mapping ----------
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
 
-    # Duplicate generic CMs into both 6 & 8 (baseline only)
+    # Duplicate CMs into both 6 & 8
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"] == "Centre Midfield"
         if cm_mask.any():
