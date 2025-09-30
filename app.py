@@ -1094,7 +1094,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         return
 
     # Metric ordering (keeps blocks grouped)
-    group_order = ["Possession", "Defensive", "Attacking"]
+    group_order = ["Possession", "Defensive", "Attacking", "Off The Ball"]
     sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
     raw_vals = row[sel_metrics].values.flatten()
     pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
@@ -1106,6 +1106,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     bar_colors = [cmap(norm(val)) for val in pct_vals]
 
     n = len(sel_metrics)
+    step = 2 * np.pi / n
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
 
     # --- Plot setup ---
@@ -1135,18 +1136,15 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         ax.text(ang, 50, txt, ha="center", va="center",
                 color="black", fontsize=10, fontweight="bold")
 
-    # Metric labels (now group-coloured)
+    # Metric labels (coloured by group)
     for i, ang in enumerate(angles):
         raw_name = sel_metrics[i]
         label = DISPLAY_NAMES.get(raw_name, raw_name)
         label = label.replace(" per 90", "").replace(", %", " (%)")
         group = groups[i]
-        ax.text(
-            ang, 108, label,
-            ha="center", va="center",
-            color=group_colors.get(group, "black"),  # use exact group colour
-            fontsize=10, fontweight="bold"
-        )
+        color = group_colors.get(group, "black")
+        ax.text(ang, 108, label, ha="center", va="center",
+                color=color, fontsize=10, fontweight="bold")
 
     # Legend (group colours)
     present_groups = list(dict.fromkeys(groups))
@@ -1160,8 +1158,14 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         )
 
     # ---------- Player info ----------
-    weighted_z = float(row.get("Weighted Z Score", [0.0])[0])
-    score_100 = float(row["Score (0–100)"].values[0]) if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]) else None
+    if "Weighted Z Score" in row.columns and pd.notnull(row["Weighted Z Score"].values[0]):
+        weighted_z = float(row["Weighted Z Score"].values[0])
+    else:
+        weighted_z = 0.0
+
+    score_100 = None
+    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
+        score_100 = float(row["Score (0–100)"].values[0])
 
     age      = row["Age"].values[0] if "Age" in row.columns else np.nan
     height   = row["Height"].values[0] if "Height" in row.columns else np.nan
@@ -1170,7 +1174,12 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     role     = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else ""
     rank_val = int(row["Rank"].values[0]) if "Rank" in row.columns and pd.notnull(row["Rank"].values[0]) else None
 
-    comp = row["Competition_norm"].values[0] if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]) else row.get("Competition", [""])[0]
+    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
+        comp = row["Competition_norm"].values[0]
+    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
+        comp = row["Competition"].values[0]
+    else:
+        comp = ""
 
     # ---------- Title lines ----------
     top_parts = [player_name]
