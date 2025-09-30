@@ -1236,7 +1236,9 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     groups = [metric_groups[m] for m in sel_metrics]
     
     # --- Livingston FC position-specific averages ---
-current_pos = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else None
+current_pos = None
+if "Six-Group Position" in plot_data.columns and not row.empty:
+    current_pos = row.iloc[0].get("Six-Group Position", None)
 
 if current_pos:
     livi_mask = (
