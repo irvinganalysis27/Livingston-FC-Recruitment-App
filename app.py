@@ -573,10 +573,9 @@ position_metrics = {
     }
 }
 }
-from datetime import datetime
 
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")
+DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")  # or APP_DIR / "statsbombdata" or a folder
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
@@ -588,11 +587,8 @@ def load_one_file(p: Path) -> pd.DataFrame:
         except ImportError:
             print("[DEBUG] openpyxl not available, trying CSV reader next.")
             return None
-        except ValueError as e:
-            print(f"[DEBUG] Excel parse failed: {e}. Trying CSV.")
-            return None
         except Exception as e:
-            print(f"[DEBUG] Excel read raised {type(e).__name__}, trying CSV. {e}")
+            print(f"[DEBUG] Excel read failed: {e}. Trying CSV instead.")
             return None
 
     def try_csv() -> pd.DataFrame | None:
@@ -607,6 +603,7 @@ def load_one_file(p: Path) -> pd.DataFrame:
                 continue
         return None
 
+    # Decide reader
     df = None
     if p.suffix.lower() in {".xlsx", ".xls"}:
         df = try_excel()
@@ -618,13 +615,7 @@ def load_one_file(p: Path) -> pd.DataFrame:
             df = try_excel()
 
     if df is None:
-        try:
-            with open(p, "rb") as fh:
-                head = fh.read(256)
-            print(f"[ERROR] Could not read {p.name}. File preview: {head[:256]}")
-        except Exception:
-            pass
-        raise ValueError(f"Unsupported or unreadable file, {p.name}")
+        raise ValueError(f"Unsupported or unreadable file: {p.name}")
 
     print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
     return df
@@ -646,26 +637,26 @@ def _data_signature(path: Path):
         return ("dir", str(path.resolve()), tuple(sigs))
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Add Age column based on birth_date compared to today's date."""
-    if "birth_date" in df.columns:
-        today = datetime.today()
-        # Calculate raw age
-        ages = pd.to_datetime(df["birth_date"], errors="coerce").apply(
-            lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day))
-            if pd.notnull(d) else np.nan
-        )
-        # Force proper numeric dtype (float, then int if possible)
-        ages = pd.to_numeric(ages, errors="coerce")
-        df["Age"] = ages.round(0).astype("Int64")  # Nullable int, handles NaN
-    else:
-        df["Age"] = pd.Series(dtype="Int64")
+    """Add numeric Age column based on birth_date."""
+    if "birth_date" not in df.columns:
+        df["Age"] = np.nan
+        return df
+
+    today = datetime.today()
+
+    df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if pd.notna(dob) else np.nan
+    )
+
+    print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
     return df
 
 @st.cache_data(show_spinner=False)
 def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     print(f"[DEBUG] Data path configured as: {path}")
     if not path.exists():
-        raise FileNotFoundError(f"statsbombdata not found at {path}. Put a CSV or XLSX there, or a folder of them.")
+        raise FileNotFoundError(f"{path} not found. Put a CSV or XLSX there, or a folder of them.")
 
     if path.is_file():
         df = load_one_file(path)
@@ -676,19 +667,16 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
         )
         if not files:
             raise FileNotFoundError(f"No data files found inside {path.name}. Add CSV or XLSX.")
-
         frames = []
         for f in files:
             try:
                 frames.append(load_one_file(f))
             except Exception as e:
                 print(f"[WARNING] Skipping {f.name} ({e})")
-
         if not frames:
             raise ValueError("No readable files found in statsbombdata")
-
         df = pd.concat(frames, ignore_index=True, sort=False)
-        print(f"[DEBUG] Merged {len(files)} files from {path.name}, total rows {len(df)}")
+        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df)}")
 
     # Always add Age column
     df = add_age_column(df)
