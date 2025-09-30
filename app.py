@@ -1120,12 +1120,15 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # --- Percentile bars ---
+    # --- Percentile bars (make colors bolder) ---
     ax.bar(
         angles, pct_vals,
-        width=2 * np.pi / n * 0.9,
-        color=bar_colors, edgecolor=bar_colors, alpha=0.78
-    )
+        width=2 * np.pi / n * 0.85,   # a bit thinner so edges show
+        color=bar_colors,
+        edgecolor="black",            # add crisp outline
+        linewidth=0.6,
+        alpha=0.95                    # stronger fill
+)
 
     # Raw values inside
     for ang, raw_val in zip(angles, raw_vals):
