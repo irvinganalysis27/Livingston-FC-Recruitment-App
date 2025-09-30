@@ -615,17 +615,6 @@ if "Birth Date" in df_all_raw.columns:
 df_all = preprocess_df(df_all_raw)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
-# --- Debug metrics existence (shows in Streamlit UI) ---
-debug_metrics = [
-    "Ball Recovery Opp. Half",
-    "1v1 Defending %",
-    "Pr. Pass% Dif.",
-    "Successful Crosses",
-    "Successful Dribbles",
-    "Pr. Long Balls",
-    "UPr. Long Balls",
-    "xGBuildup",
-    "Pressures in Final 1/3",
 ]
 
 st.markdown("### Debug: Metric existence check")
