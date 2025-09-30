@@ -892,24 +892,6 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# ---------- Template select ----------
-template_names = list(position_metrics.keys())
-idx = template_names.index(st.session_state.template_select) if st.session_state.template_select in template_names else 0
-selected_position_template = st.selectbox(
-    "Choose a position template for the chart",
-    template_names,
-    index=idx,
-    key="template_select",
-)
-
-if st.session_state.auto_just_applied:
-    st.session_state.last_template_choice = st.session_state.template_select
-    st.session_state.auto_just_applied = False
-else:
-    if st.session_state.template_select != st.session_state.last_template_choice:
-        st.session_state.manual_override = True
-        st.session_state.last_template_choice = st.session_state.template_select
-
 # ---------- Metrics + percentiles ----------
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
