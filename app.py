@@ -1315,18 +1315,31 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             ncol=min(len(patches), 4), frameon=False
         )
 
-    # Player info
-    weighted_z = float(row.get("Weighted Z Score", [0])[0])
-    score_100 = float(row["Score (0–100)"].values[0]) if "Score (0–100)" in row and pd.notnull(row["Score (0–100)"].values[0]) else None
+        # ---------- Player info ----------
+    if "Weighted Z Score" in row.columns:
+        weighted_z = float(row["Weighted Z Score"].values[0])
+    else:
+        weighted_z = 0.0
 
-    age      = row.get("Age", [np.nan])[0]
-    height   = row.get("Height", [np.nan])[0]
-    team     = row.get("Team within selected timeframe", [""])[0]
-    mins     = row.get("Minutes played", [np.nan])[0]
-    role     = row.get("Six-Group Position", [""])[0]
-    rank_val = int(row["Rank"].values[0]) if "Rank" in row and pd.notnull(row["Rank"].values[0]) else None
-    comp     = row.get("Competition_norm", row.get("Competition", [""]))[0]
+    score_100 = None
+    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
+        score_100 = float(row["Score (0–100)"].values[0])
 
+    age      = row["Age"].values[0] if "Age" in row.columns else np.nan
+    height   = row["Height"].values[0] if "Height" in row.columns else np.nan
+    team     = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row.columns else ""
+    mins     = row["Minutes played"].values[0] if "Minutes played" in row.columns else np.nan
+    role     = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else ""
+    rank_val = int(row["Rank"].values[0]) if "Rank" in row.columns and pd.notnull(row["Rank"].values[0]) else None
+
+    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
+        comp = row["Competition_norm"].values[0]
+    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
+        comp = row["Competition"].values[0]
+    else:
+        comp = ""
+
+    # ---------- Title lines ----------
     top_parts = [player_name]
     if role: top_parts.append(role)
     if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
