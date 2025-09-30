@@ -10,6 +10,9 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from datetime import datetime
 
+# =========================================
+# App + Assets
+# =========================================
 APP_DIR = Path(__file__).parent
 ASSETS_DIR = APP_DIR / "assets"
 
@@ -19,15 +22,12 @@ def open_image(path: Path):
     except Exception:
         return None
 
-# --- Basic password protection ---
 PASSWORD = "Livi2025"
-
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
 # ---------- Club Branding Row ----------
 left, mid, right = st.columns([1, 6, 1])
-
-logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"   # case-sensitive
+logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"
 logo = open_image(logo_path)
 
 with left:
@@ -48,13 +48,13 @@ with right:
     if logo:
         st.image(logo, use_container_width=True)
 
-# Ask for password
+# ---------- Basic password ----------
 pwd = st.text_input("Enter password:", type="password")
 if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
-# ---------- Fixed group colours ----------
+# ---------- Group colours ----------
 group_colors = {
     "Attacking":   "crimson",
     "Possession":  "seagreen",
@@ -62,7 +62,7 @@ group_colors = {
     "Goalkeeping": "purple",
 }
 
-# ---------- Display name overrides for radar ----------
+# ---------- Display names for chart labels only ----------
 DISPLAY_NAMES = {
     "Pressures F2": "Pressures in Final 1/3",
     "Deep Completions": "Completed Passes Final 1/3",
@@ -72,8 +72,33 @@ DISPLAY_NAMES = {
     "Tack/DP%": "1v1 Defending %",
 }
 
-# --- League name normalisation: StatsBomb -> your Opta names ---
-# --- League name normalisation: StatsBomb -> your Opta names ---
+# ---------- Metric aliasing (TEMPLATE NAME -> actual DF column) ----------
+# If the first alias is not found, the resolver tries the next, etc.
+METRIC_ALIASES = {
+    # Common mismatches between template names and DataFrame columns
+    "Tack/DP%": ["1v1 Defending %", "Dribbles Stopped%"],
+    "Pressures F2": ["Pressures in Final 1/3"],
+    "Ball Recov. F2": ["Ball Recovery Opp. Half"],
+    "Deep Completions": ["Deep Completions", "Completed Passes Final 1/3"],
+    "Pr. Pass% Dif.": ["Pr. Pass% Dif.", "Player Season Change In Passing Ratio"],
+    "Pr. Long Balls": ["Pr. Long Balls", "Player Season Pressured Long Balls 90", "Pressured Long Balls"],
+    "UPr. Long Balls": ["UPr. Long Balls", "Player Season Unpressured Long Balls 90", "Unpressured Long Balls"],
+    "Successful Box Cross%": ["Successful Box Cross%", "Player Season Box Cross Ratio", "Successful Box Cross %"],
+    "xGBuildup": ["xGBuildup", "Player Season Xgbuildup 90"],
+    "Successful Dribbles": ["Successful Dribbles", "Player Season Total Dribbles 90"],
+    "OP Key Passes": ["OP Key Passes", "Key Passes (Open Play)"],
+}
+
+def resolve_metric_name(template_metric: str, available_cols: pd.Index) -> str | None:
+    """Return the actual df column to use for a given template metric name, or None if not found."""
+    if template_metric in available_cols:
+        return template_metric
+    for cand in METRIC_ALIASES.get(template_metric, []):
+        if cand in available_cols:
+            return cand
+    return None
+
+# ---------- League name normalisation: StatsBomb -> Opta-ish names ----------
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
     "2. Liga": "Austria 2. Liga",
@@ -130,16 +155,17 @@ LEAGUE_SYNONYMS = {
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
 
-    # --- Tunisia fixes ---
-    "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
+    # Tunisia block (keep your intent for bare "Ligue 1" if your data uses it that way)
     "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
-    "France Ligue 1": "Tunisia Ligue 1",
 
-    # --- USA ---
+    # France top flight fix (this was incorrectly mapped to Tunisia before)
+    "France Ligue 1": "Ligue 1",
+
+    # USA
     "USL Championship": "USA USL Championship",
 
-    # --- Belgium top flight fixes ---
+    # Belgium top flight fixes
     "Jupiler Pro League": "Jupiler Pro League",
     "Belgium Pro League": "Jupiler Pro League",
     "Belgian Pro League": "Jupiler Pro League",
@@ -147,9 +173,7 @@ LEAGUE_SYNONYMS = {
 }
 
 # ========== Role groups shown in filters ==========
-SIX_GROUPS = [
-    "Goalkeeper", "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
-]
+SIX_GROUPS = ["Goalkeeper", "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"]
 
 # ========== Position → group mapping ==========
 def _clean_pos_token(tok: str) -> str:
@@ -161,25 +185,17 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
-    # GK
     "GOALKEEPER": "Goalkeeper",
-    # Full backs & wing backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    # Centre backs
     "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    # Centre mid (generic) → duplicated into 6 & 8 later
     "CENTREMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    # Defensive mids → 6
     "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    # Attacking mids / 10 → 8
     "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
     "SECONDSTRIKER": "Number 8", "10": "Number 8",
-    # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
 }
 
@@ -190,9 +206,8 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)  # don’t force into Winger
+    return RAW_TO_SIX.get(tok, None)
 
-# ========== Default template mapping ==========
 DEFAULT_TEMPLATE = {
     "Goalkeeper": "Goalkeeper",
     "Full Back": "Full Back",
@@ -205,12 +220,9 @@ DEFAULT_TEMPLATE = {
 
 # ========== Radar metric sets ==========
 position_metrics = {
-    # ---------- Goalkeeper ----------
     "Goalkeeper": {
         "metrics": [
-            # Possession
             "Pass into Danger%", "Pass into Pressure%",
-            # Goalkeeping
             "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
             "Shots Faced", "Shots Faced OT%", "Positive Outcome%", "Goalkeeper OBV",
         ],
@@ -230,14 +242,10 @@ position_metrics = {
         }
     },
 
-    # ---------- Centre Back Old ----------
     "Centre Back Old": {
         "metrics": [
-            # Attacking
             "xG",
-            # Possession
             "Passing%", "Pressured Long Balls", "Unpressured Long Balls", "OBV",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
             "Defensive Actions", "Aggressive Actions", "Fouls",
             "Aerial Wins", "Aerial Win%",
@@ -260,44 +268,37 @@ position_metrics = {
     },
 
     "Centre Back New": {
-    "metrics": [
-        # Attacking
-        "NP Goals",
-        # Possession
-        "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
-        # Defensive
-        "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
-        "Defensive Actions", "Aggressive Actions", "Fouls",
-        "Aerial Wins", "Aerial Win%",
-    ],
-    "groups": {
-        "PAdj Interceptions": "Defensive",
-        "PAdj Tackles": "Defensive",
-        "Tack/DP%": "Defensive",
-        "Defensive Actions": "Defensive",
-        "Aggressive Actions": "Defensive",
-        "Fouls": "Defensive",
-        "Aerial Wins": "Defensive",
-        "Aerial Win%": "Defensive",
-        "Passing%": "Possession",
-        "Pr. Pass% Dif.": "Possession",
-        "Pr. Long Balls": "Possession",
-        "UPr. Long Balls": "Possession",
-        "OBV": "Possession",
-        "Pass OBV": "Possession",
-        "NP Goals": "Attacking",
-    }
-},
+        "metrics": [
+            "NP Goals",
+            "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
+            "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
+            "Defensive Actions", "Aggressive Actions", "Fouls",
+            "Aerial Wins", "Aerial Win%",
+        ],
+        "groups": {
+            "PAdj Interceptions": "Defensive",
+            "PAdj Tackles": "Defensive",
+            "Tack/DP%": "Defensive",
+            "Defensive Actions": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "Fouls": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Aerial Win%": "Defensive",
+            "Passing%": "Possession",
+            "Pr. Pass% Dif.": "Possession",
+            "Pr. Long Balls": "Possession",
+            "UPr. Long Balls": "Possession",
+            "OBV": "Possession",
+            "Pass OBV": "Possession",
+            "NP Goals": "Attacking",
+        }
+    },
 
-    # ---------- Full Back Old ----------
     "Full Back Old": {
         "metrics": [
-            # Attacking
             "xGBuildup",
-            # Possession
             "Passing%", "OP Passes Into Box", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-            # Defensive
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
             "PAdj Tack&Int", "Tack/DP%",
         ],
@@ -319,40 +320,36 @@ position_metrics = {
     },
 
     "Full Back New": {
-    "metrics": [
-        "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
-        "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-        "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-        "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions", "Ball Recoveries"
-    ],
-    "groups": {
-        "Passing%": "Possession",
-        "Pr. Pass% Dif.": "Possession",
-        "Successful Crosses": "Possession",
-        "Crossing%": "Possession",
-        "Deep Progressions": "Possession",
-        "Successful Dribbles": "Possession",
-        "Turnovers": "Possession",
-        "OBV": "Possession",
-        "Pass OBV": "Possession",
-        "Defensive Actions": "Defensive",
-        "Aerial Win%": "Defensive",
-        "PAdj Pressures": "Defensive",
-        "PAdj Tack&Int": "Defensive",
-        "Tack/DP%": "Defensive",
-        "Aggressive Actions": "Defensive",   # fixed colon typo
-        "Ball Recoveries": "Defensive"
-    }
-},
+        "metrics": [
+            "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
+            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tack&Int", "Tack/DP%", "Aggressive Actions", "Ball Recoveries"
+        ],
+        "groups": {
+            "Passing%": "Possession",
+            "Pr. Pass% Dif.": "Possession",
+            "Successful Crosses": "Possession",
+            "Crossing%": "Possession",
+            "Deep Progressions": "Possession",
+            "Successful Dribbles": "Possession",
+            "Turnovers": "Possession",
+            "OBV": "Possession",
+            "Pass OBV": "Possession",
+            "Defensive Actions": "Defensive",
+            "Aerial Win%": "Defensive",
+            "PAdj Pressures": "Defensive",
+            "PAdj Tack&Int": "Defensive",
+            "Tack/DP%": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "Ball Recoveries": "Defensive"
+        }
+    },
 
-    # ---------- Number 6 New ----------
     "Number 6 New": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted",
-            # Possession
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
             "Aggressive Actions", "Aerial Win%", "Ball Recoveries", "Pressure Regains",
         ],
@@ -375,14 +372,10 @@ position_metrics = {
         }
     },
 
-    # ---------- Number 6 Old ----------
     "Number 6 Old": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted",
-            # Possession
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Tack/DP%",
             "Aggressive Actions", "Aerial Win%",
         ],
@@ -402,14 +395,10 @@ position_metrics = {
         }
     },
 
-    # ---------- Number 8 Old ----------
     "Number 8 Old": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted", "Shots", "xG",
-            # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
-            # Defensive
             "Pressure Regains", "PAdj Pressures", "Ball Recov. F2",
             "Aggressive Actions",
         ],
@@ -430,14 +419,10 @@ position_metrics = {
         }
     },
 
-    # ---------- Number 8 New ----------
     "Number 8 New": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
-            # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
-            # Defensive
             "Pressure Regains", "PAdj Pressures", "Ball Recov. F2",
             "Aggressive Actions",
         ],
@@ -460,15 +445,11 @@ position_metrics = {
         }
     },
 
-    # ---------- Winger Old ----------
     "Winger Old": {
         "metrics": [
-            # Attacking
             "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted",
-            # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
-            # Defensive
             "Pressure Regains",
         ],
         "groups": {
@@ -488,15 +469,11 @@ position_metrics = {
         }
     },
 
-    # ---------- Winger New ----------
     "Winger New": {
         "metrics": [
-            # Attacking
             "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
-            # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
-            # Defensive
             "Pressures F2",
         ],
         "groups": {
@@ -518,15 +495,11 @@ position_metrics = {
         }
     },
 
-    # ---------- Striker Old ----------
     "Striker Old": {
         "metrics": [
-            # Attacking
             "All Goals", "Penalty Goals", "xG", "Shots", "xG/Shot",
             "Shot Touch%", "Touches In Box", "xG Assisted",
-            # Possession
             "Fouls Won",
-            # Defensive
             "Aerial Win%", "Aerial Wins", "Pressure Regains",
         ],
         "groups": {
@@ -546,34 +519,34 @@ position_metrics = {
     },
 
     "Striker New": {
-    "metrics": [
-        "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
-        "Goal Conversion%", 
-        "Touches In Box", "xG Assisted",
-        "Fouls Won", "Deep Completions", "OP Key Passes",
-        "Aerial Win%", "Aerial Wins", "Pressures F2",
-    ],
-    "groups": {
-        "NP Goals": "Attacking",
-        "xG": "Attacking",
-        "Shots": "Attacking",
-        "xG/Shot": "Attacking",
-        "Goal Conversion%": "Attacking",
-        "Touches In Box": "Attacking",
-        "xG Assisted": "Attacking",
-        "Fouls Won": "Possession",
-        "Deep Completions": "Possession",
-        "OP Key Passes": "Possession",
-        "Aerial Win%": "Defensive",
-        "Aerial Wins": "Defensive",
-        "Aggressive Actions": "Defensive",
-        "Pressures F2": "Defensive"
+        "metrics": [
+            "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
+            "Goal Conversion%",
+            "Touches In Box", "xG Assisted",
+            "Fouls Won", "Deep Completions", "OP Key Passes",
+            "Aerial Win%", "Aerial Wins", "Pressures F2",
+        ],
+        "groups": {
+            "NP Goals": "Attacking",
+            "xG": "Attacking",
+            "Shots": "Attacking",
+            "xG/Shot": "Attacking",
+            "Goal Conversion%": "Attacking",
+            "Touches In Box": "Attacking",
+            "xG Assisted": "Attacking",
+            "Fouls Won": "Possession",
+            "Deep Completions": "Possession",
+            "OP Key Passes": "Possession",
+            "Aerial Win%": "Defensive",
+            "Aerial Wins": "Defensive",
+            "Aggressive Actions": "Defensive",
+            "Pressures F2": "Defensive"
+        }
     }
 }
-}
 
-# ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")  # or APP_DIR / "statsbombdata" or a folder
+# ---------- Data source ----------
+DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
@@ -601,8 +574,6 @@ def load_one_file(p: Path) -> pd.DataFrame:
                 continue
         return None
 
-    # Decide reader
-    df = None
     if p.suffix.lower() in {".xlsx", ".xls"}:
         df = try_excel()
         if df is None:
@@ -635,18 +606,23 @@ def _data_signature(path: Path):
         return ("dir", str(path.resolve()), tuple(sigs))
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Add numeric Age column based on birth_date."""
-    if "birth_date" not in df.columns:
+    """Adds numeric Age column based on Birth Date / birth_date if present."""
+    dob_col = None
+    for c in ["Birth Date", "birth_date"]:
+        if c in df.columns:
+            dob_col = c
+            break
+
+    if not dob_col:
         df["Age"] = np.nan
         return df
 
     today = datetime.today()
-
-    df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
-        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if pd.notna(dob) else np.nan
+    dob = pd.to_datetime(df[dob_col], errors="coerce")
+    df["Age"] = dob.apply(
+        lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+        if pd.notna(d) else np.nan
     )
-
     print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
     return df
 
@@ -676,7 +652,13 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
         df = pd.concat(frames, ignore_index=True, sort=False)
         print(f"[DEBUG] Merged {len(files)} files, total rows {len(df)}")
 
-    # Always add Age column
+    # Clean headers & add age once here
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.replace(u"\xa0", " ", regex=False)
+        .str.replace(r"\s+", " ", regex=True)
+    )
     df = add_age_column(df)
     return df
 
@@ -716,31 +698,17 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     # --- Metric renames / fixes ---
     rename_map.update({
-        # Successful Box Cross variants
         "Successful Box Cross %": "Successful Box Cross%",
         "Player Season Box Cross Ratio": "Successful Box Cross%",
-
-        # 1v1 defending
         "Dribbles Stopped%": "1v1 Defending %",
-        "Tack/DP%": "1v1 Defending %",   # backwards compat
-
-        # Pass% under pressure
+        "Tack/DP%": "1v1 Defending %",
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-
-        # Build-up involvement
         "Player Season Xgbuildup 90": "xGBuildup",
-
-        # Ball recoveries in opp half
         "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
-
-        # Pressures in attacking 3rd
         "Player Season F3 Pressures 90": "Pressures in Final 1/3",
-
-        # Long balls
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
-
     df.rename(columns=rename_map, inplace=True)
 
     # --- Derive Successful Crosses ---
@@ -757,7 +725,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             (pd.to_numeric(df["Player Season Dribble Ratio"], errors="coerce") / 100.0)
         )
 
-    # --- Build "Positions played" ---
+    # --- Positions played ---
     if "Position" in df.columns:
         if "Secondary Position" in df.columns:
             df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
@@ -793,28 +761,9 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-# ---------- Load & preprocess ----------
-df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
-
-# ---------- Clean raw column headers ----------
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()
-    .str.replace(u"\xa0", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-)
-
-# ---------- Add Age column from Birth Date ----------
-if "Birth Date" in df_all_raw.columns:
-    today = datetime.today()
-    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
-        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if pd.notna(dob) else np.nan
-    )
-    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
-
-# ---------- Preprocess ----------
-df_all = preprocess_df(df_all_raw)
+# ---------- Load & preprocess once ----------
+df_all = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+df_all = preprocess_df(df_all)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
 # --- Debug metrics existence (shows in Streamlit UI) ---
@@ -829,16 +778,12 @@ debug_metrics = [
     "xGBuildup",
     "Pressures in Final 1/3",
 ]
-
 st.markdown("### Debug: Metric existence check")
 for m in debug_metrics:
     st.write(f"{m}: {'✅ Found' if m in df_all.columns else '❌ Missing'}")
 
-# (Optional) quick debug to verify key columns are present exactly as expected
-print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
-print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
-df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (filtered by UI)
+# Working copy for filtering
+df = df_all.copy()
 
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
@@ -849,7 +794,6 @@ df[league_col] = df[league_col].astype(str).str.strip()
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
 st.markdown("### Choose league (multiple allowed)")
-
 if "league_selection" not in st.session_state:
     st.session_state.league_selection = all_leagues.copy()
 
@@ -896,7 +840,8 @@ if "Age" in df.columns:
     if df["_age_numeric"].notna().any():
         age_min = int(np.nanmin(df["_age_numeric"]))
         age_max = int(np.nanmax(df["_age_numeric"]))
-        sel_min, sel_max = st.slider("Age range to include", min_value=age_min, max_value=age_max, value=(age_min, age_max), step=1)
+        sel_min, sel_max = st.slider("Age range to include", min_value=age_min, max_value=age_max,
+                                     value=(age_min, age_max), step=1)
         df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
     else:
         st.info("Age column has no numeric values, age filter skipped.")
@@ -941,18 +886,32 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
 
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
-current_metrics = position_metrics[current_template_name]["metrics"]
+current_metrics_labels = position_metrics[current_template_name]["metrics"]
 
-for m in current_metrics:
-    if m not in df.columns:
-        df[m] = 0
-df[current_metrics] = df[current_metrics].fillna(0)
+# Resolve metrics to actual df columns
+metric_map = {}   # label -> actual column
+unresolved = []
+for label in current_metrics_labels:
+    col = resolve_metric_name(label, df.columns)
+    if col is None:
+        # create a fallback zero column so app keeps working
+        df[label] = 0
+        df_all[label] = 0
+        metric_map[label] = label
+        unresolved.append(label)
+    else:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0)
+        metric_map[label] = col
+
+if unresolved:
+    st.info(f"These template metrics were not found in data and are filled with 0s: {', '.join(unresolved)}")
 
 # ---------- Essential Criteria ----------
 with st.expander("Essential Criteria", expanded=False):
     use_all_cols = st.checkbox("Pick from all numeric columns", value=False)
     numeric_cols_all = sorted([c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])])
-    metric_pool_base = numeric_cols_all if use_all_cols else current_metrics
+    metric_pool_base = numeric_cols_all if use_all_cols else list(metric_map.keys())
 
     cbtn1, cbtn2, cbtn3 = st.columns(3)
     with cbtn1:
@@ -981,7 +940,7 @@ with st.expander("Essential Criteria", expanded=False):
             metric_pool_display = [prev_metric] + [m for m in metric_pool_display if m != prev_metric]
 
         with c1:
-            metric_name = st.selectbox("Metric", metric_pool_display, key=prev_key_metric)
+            metric_label = st.selectbox("Metric", metric_pool_display, key=prev_key_metric)
 
         with c2:
             mode = st.radio("Apply to", ["Raw", "Percentile"], horizontal=True, key=f"ec_mode_{i}")
@@ -990,10 +949,12 @@ with st.expander("Essential Criteria", expanded=False):
             op = st.selectbox("Operator", [">=", ">", "<=", "<"], index=0, key=f"ec_op_{i}")
 
         with c4:
+            # default threshold
+            col = metric_map.get(metric_label, metric_label)
             if mode == "Percentile":
                 default_thr = 50.0
             else:
-                default_thr = float(np.nanmedian(pd.to_numeric(df[metric_name], errors="coerce")))
+                default_thr = float(np.nanmedian(pd.to_numeric(df[col], errors="coerce")))
                 if not np.isfinite(default_thr):
                     default_thr = 0.0
             thr_str = st.text_input("Threshold", value=str(int(default_thr)), key=f"ec_thr_{i}")
@@ -1002,22 +963,23 @@ with st.expander("Essential Criteria", expanded=False):
             except ValueError:
                 thr_val = default_thr
 
-        criteria.append((metric_name, mode, op, thr_val))
+        criteria.append((metric_label, mode, op, thr_val))
 
     if apply_nonneg and len(criteria) > 0:
         temp_cols = []
         mask_all = pd.Series(True, index=df.index)
 
-        for metric_name, mode, op, thr_val in criteria:
+        for metric_label, mode, op, thr_val in criteria:
+            col = metric_map.get(metric_label, metric_label)
             if mode == "Percentile":
-                df[metric_name] = pd.to_numeric(df[metric_name], errors="coerce")
-                perc_series = (df[metric_name].rank(pct=True) * 100).round(1)
-                tmp_col = f"__tmp_percentile__{metric_name}"
+                s = pd.to_numeric(df[col], errors="coerce")
+                perc_series = (s.rank(pct=True) * 100).round(1)
+                tmp_col = f"__tmp_percentile__{metric_label}"
                 df[tmp_col] = perc_series
                 filter_col = tmp_col
                 temp_cols.append(tmp_col)
             else:
-                filter_col = metric_name
+                filter_col = col
                 df[filter_col] = pd.to_numeric(df[filter_col], errors="coerce")
 
             if op == ">=":
@@ -1081,78 +1043,65 @@ else:
         st.session_state.last_template_choice = st.session_state.template_select
 
 # ---------- Metrics + percentiles ----------
-metrics = position_metrics[selected_position_template]["metrics"]
+metrics_labels = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
-# Ensure columns exist and are numeric in both df_all and df
-for m in metrics:
-    if m not in df_all.columns:
-        df_all[m] = 0
-    if m not in df.columns:
-        df[m] = 0
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
+# Build/extend metric map for this template
+for label in metrics_labels:
+    if label not in metric_map:
+        col = resolve_metric_name(label, df.columns)
+        if col is None:
+            df[label] = 0
+            df_all[label] = 0
+            metric_map[label] = label
+            unresolved.append(label)
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0)
+            metric_map[label] = col
 
-# Metrics where lower values are better (raw values unchanged; only percentiles invert)
-LOWER_IS_BETTER = {
-    "Turnovers",
-    "Fouls",
-    "Pr. Long Balls",
-    "UPr. Long Balls",
-}
+if unresolved:
+    st.caption(f"Note: still unresolved → {', '.join(sorted(set(unresolved)))}")
+
+# Metrics where lower values are better (for percentile inversion only)
+LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
-    # Convert series to numeric, handle invalid values
     series = pd.to_numeric(series, errors="coerce").fillna(0)
-    # pandas: rank(pct=True, ascending=True) -> smallest ≈ 0, largest = 1.0
     r = series.rank(pct=True, ascending=True)
-    if lower_is_better:
-        p = 1.0 - r  # smaller raw -> larger percentile
-    else:
-        p = r  # larger raw -> larger percentile
+    p = (1.0 - r) if lower_is_better else r
     return (p * 100.0).round(1)
 
 # --- A) Percentiles for RADAR BARS (within selected leagues vs pooled) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True, key="percentiles_within_league")
-percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
-if compute_within_league and league_col in df.columns:
-    for m in metrics:
-        try:
-            percentile_df_chart[m] = (
-                df.groupby(league_col, group_keys=False)[m]
-                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-            )
-        except Exception as e:
-            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
-            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
-else:
-    for m in metrics:
-        try:
-            percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
-        except Exception as e:
-            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
-            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
-percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)  # Fill any remaining NaN with neutral percentile
 
-# --- B) Percentiles for 0–100 SCORE (baseline = WHOLE DATASET by position) ---
+percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics_labels, dtype=float)
+for label in metrics_labels:
+    col = metric_map[label]
+    try:
+        if compute_within_league and league_col in df.columns:
+            percentile_df_chart[label] = (
+                df.groupby(league_col, group_keys=False)[col]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(label in LOWER_IS_BETTER)))
+            )
+        else:
+            percentile_df_chart[label] = pct_rank(df[col], lower_is_better=(label in LOWER_IS_BETTER))
+    except Exception as e:
+        print(f"[DEBUG] Percentile calc failed for {label}/{col}: {e}")
+        percentile_df_chart[label] = 50.0
+percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)
+
+# --- B) Percentiles for SCORE baseline (whole dataset by position) ---
 pos_col = "Six-Group Position"
 if pos_col not in df_all.columns: df_all[pos_col] = np.nan
 if pos_col not in df.columns: df[pos_col] = np.nan
-percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=metrics, dtype=float)
-for m in metrics:
-    try:
-        percentile_df_globalpos_all[m] = (
-            df_all.groupby(pos_col, group_keys=False)[m]
-                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-        )
-    except Exception as e:
-        print(f"[DEBUG] Global percentile calc failed for {m}: {e}")
-        percentile_df_globalpos_all[m] = 50.0  # Neutral percentile
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].fillna(50.0).round(1)
 
-# --- Assemble plot_data (radar uses the CHART percentiles) ---
-metrics_df = df[metrics].copy()
+# Assemble plot_data (raw values + chart percentiles)
+metrics_df = pd.DataFrame(index=df.index)
+for label in metrics_labels:
+    metrics_df[label] = df[metric_map[label]]
+
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
     "Positions played", "Minutes played", "Six-Group Position",
@@ -1160,63 +1109,42 @@ keep_cols = [
 ]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
+
 plot_data = pd.concat(
     [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
     axis=1
 )
 
-# ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
+# ---------- Z + 0–100 score ----------
+sel_metrics = list(metric_groups.keys())  # labels
 
-# Metrics for scoring (same as chart)
-sel_metrics = list(metric_groups.keys())
-
-# --- A) Percentiles for SCORE BASELINE (full dataset by position, for reference) ---
-pos_col = "Six-Group Position"
-if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns: df[pos_col] = np.nan
-
-percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    percentile_df_globalpos_all[m] = (
-        df_all.groupby(pos_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-    )
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
-
-# --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
-# Compute Z per metric: (raw - mean)/std per position; invert lower-better
+# Raw Z-scores per metric (grouped by position), invert if LOWER_IS_BETTER (by label)
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    # Manual Z-score: (x - mean)/std per position group
-    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
-    z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
-    if m in LOWER_IS_BETTER:
-        z_per_group *= -1  # Invert: lower raw → higher Z
-    raw_z_all[m] = z_per_group.fillna(0)  # Fill NaN Z as 0 (neutral)
+for label in sel_metrics:
+    col = metric_map.get(label, label)
+    df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0)
+    z_per_group = df_all.groupby(pos_col)[col].transform(
+        lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
+    )
+    if label in LOWER_IS_BETTER:
+        z_per_group *= -1
+    raw_z_all[label] = z_per_group.fillna(0)
 
-avg_z_all = raw_z_all.mean(axis=1)  # Average Z across metrics
+avg_z_all = raw_z_all.mean(axis=1)
 
 # Apply to full df_all
 df_all["Avg Z Score"] = pd.to_numeric(avg_z_all, errors="coerce").fillna(0)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-# For current view (plot_data): subset the raw Z's and avg
+# For current view
 raw_z_view = raw_z_all.loc[df.index, sel_metrics]
 avg_z_view = raw_z_view.mean(axis=1)
 plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
 plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
-# Flag eligibility
-plot_data["_mins_numeric"] = pd.to_numeric(plot_data["Minutes played"], errors="coerce")
-plot_data["Eligible Mins?"] = plot_data["_mins_numeric"] >= 600
-
-# 3) Anchors from eligible (>=600 mins) on weighted Z (full dataset)
+# Anchors from eligible (>=600 mins) on weighted Z (full dataset)
 anchor_minutes_floor = 600
 user_min_minutes = max(anchor_minutes_floor, min_minutes)
 _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
@@ -1237,33 +1165,21 @@ small_positions = eligible_counts[eligible_counts < 5].index.tolist()
 if small_positions:
     st.warning(f"Small eligible pools (<5 players) for anchors in positions: {', '.join(small_positions)}. Scores may bunch up.")
 
-# 4) Scale to 0-100 for all in plot_data
+# Scale to 0-100
 plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
 def _minmax_score(val, lo, hi):
-    # Convert inputs to float, handle non-numeric cases
-    try:
-        val = float(val)
-    except (TypeError, ValueError):
-        val = 0.0
-    try:
-        lo = float(lo)
-    except (TypeError, ValueError):
-        lo = 0.0
-    try:
-        hi = float(hi)
-    except (TypeError, ValueError):
-        hi = 1.0
-    if pd.isna(val) or pd.isna(lo) or pd.isna(hi):
-        return 0.0
-    if not np.isfinite(val):
-        val = 0.0
-    if not np.isfinite(lo):
-        lo = 0.0
-    if not np.isfinite(hi):
-        hi = 1.0
-    if hi <= lo:
-        return 50.0
+    try: val = float(val)
+    except (TypeError, ValueError): val = 0.0
+    try: lo = float(lo)
+    except (TypeError, ValueError): lo = 0.0
+    try: hi = float(hi)
+    except (TypeError, ValueError): hi = 1.0
+    if pd.isna(val) or pd.isna(lo) or pd.isna(hi): return 0.0
+    if not np.isfinite(val): val = 0.0
+    if not np.isfinite(lo): lo = 0.0
+    if not np.isfinite(hi): hi = 1.0
+    if hi <= lo: return 50.0
     return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
 
 plot_data["Score (0–100)"] = [
@@ -1271,29 +1187,24 @@ plot_data["Score (0–100)"] = [
     for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
 ]
 plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
-
-# 5) Rank all filtered players
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
 # Clean up
-plot_data.drop(columns=["_scale_min", "_scale_max", "_mins_numeric"], inplace=True, errors="ignore")
+plot_data.drop(columns=["_scale_min", "_scale_max", "_minutes_numeric"], inplace=True, errors="ignore")
 
-# Debug
+# Debug prints
 print("[DEBUG] Anchor minutes floor =", user_min_minutes)
 print("[DEBUG] Eligible counts per pos:", dict(eligible_counts))
-print("[DEBUG] Sample anchor ranges:",
-      anchor_minmax.reset_index()
-                   .rename(columns={pos_col: "Pos"})
-                   .head(6)
-                   .to_dict(orient="records"))
+try:
+    print("[DEBUG] Sample anchor ranges:", anchor_minmax.reset_index().rename(columns={pos_col: "Pos"}).head(6).to_dict(orient="records"))
+except Exception:
+    pass
 print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
 print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
+
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
-    import matplotlib.cm as cm
-    import matplotlib.colors as mcolors
-
     if not isinstance(group_colors, dict) or len(group_colors) == 0:
         group_colors = {
             "Attacking": "crimson",
@@ -1311,19 +1222,17 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     group_order = ["Goalkeeping", "Possession", "Defensive", "Attacking", "Off The Ball"]
     sel_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
     raw_vals = row[sel_metrics].values.flatten()
-    pct_vals = row[[m + " (percentile)" for m in sel_metrics]].values.flatten()
+    pct_cols = [m + " (percentile)" for m in sel_metrics]
+    pct_vals = row[pct_cols].values.flatten()
     groups = [metric_groups[m] for m in sel_metrics]
 
-    # Colormap for bars (red → green by percentile)
     cmap = cm.get_cmap("RdYlGn")
     norm = mcolors.Normalize(vmin=0, vmax=100)
     bar_colors = [cmap(norm(val)) for val in pct_vals]
 
     n = len(sel_metrics)
-    step = 2 * np.pi / n
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
 
-    # --- Plot setup ---
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
@@ -1334,29 +1243,25 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-        # ----- Background wedges (aligned exactly with metrics) -----
-    step = 2 * np.pi / n  # angle width per metric
+    # Background wedges
+    step = 2 * np.pi / n
     for i, g in enumerate(groups):
-        angle = angles[i] - step / 2  # shift so wedge is centered on the bar
+        angle = angles[i] - step / 2
         ax.bar(
             [angle],
             [100],
             width=step,
             bottom=0,
             color=group_colors.get(g, "grey"),
-            alpha=0.10,   # adjust to taste (0.08–0.15 usually good)
+            alpha=0.10,
             edgecolor=None,
             linewidth=0,
             zorder=0,
             align="edge"
         )
 
-    # --- Percentile bars ---
-    ax.bar(
-        angles, pct_vals,
-        width=2 * np.pi / n * 0.9,
-        color=bar_colors, edgecolor=bar_colors, alpha=0.78
-    )
+    # Percentile bars
+    ax.bar(angles, pct_vals, width=2 * np.pi / n * 0.9, color=bar_colors, edgecolor=bar_colors, alpha=0.78)
 
     # Raw values inside
     for ang, raw_val in zip(angles, raw_vals):
@@ -1364,37 +1269,25 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             txt = f"{float(raw_val):.2f}"
         except Exception:
             txt = "-"
-        ax.text(ang, 50, txt, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
+        ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
     # Metric labels
     for i, ang in enumerate(angles):
         raw_name = sel_metrics[i]
         label = DISPLAY_NAMES.get(raw_name, raw_name)
         label = label.replace(" per 90", "").replace(", %", " (%)")
-        ax.text(ang, 108, label, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
+        ax.text(ang, 108, label, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
-    # Legend (group colours)
+    # Legend
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
         fig.subplots_adjust(top=0.86, bottom=0.08)
-        ax.legend(
-            handles=patches,
-            loc="upper center", bbox_to_anchor=(0.5, -0.06),
-            ncol=min(len(patches), 4), frameon=False
-        )
+        ax.legend(handles=patches, loc="upper center", bbox_to_anchor=(0.5, -0.06), ncol=min(len(patches), 4), frameon=False)
 
-        # ---------- Player info ----------
-    if "Weighted Z Score" in row.columns:
-        weighted_z = float(row["Weighted Z Score"].values[0])
-    else:
-        weighted_z = 0.0
-
-    score_100 = None
-    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
-        score_100 = float(row["Score (0–100)"].values[0])
+    # ---------- Player info ----------
+    weighted_z = float(row["Weighted Z Score"].values[0]) if "Weighted Z Score" in row.columns else 0.0
+    score_100 = float(row["Score (0–100)"].values[0]) if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]) else None
 
     age      = row["Age"].values[0] if "Age" in row.columns else np.nan
     height   = row["Height"].values[0] if "Height" in row.columns else np.nan
@@ -1410,7 +1303,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     else:
         comp = ""
 
-    # ---------- Title lines ----------
     top_parts = [player_name]
     if role: top_parts.append(role)
     if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
@@ -1452,14 +1344,10 @@ if st.session_state.selected_player:
 
 # ---------- Ranking table ----------
 st.markdown("### Players Ranked by Score (0–100)")
-
-# Include Score (0–100) so we can sort by it and display it
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",
     "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
 ]
-
-# Ensure the columns exist (defensive)
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
@@ -1469,14 +1357,11 @@ z_ranking = (
     .sort_values(by="Score (0–100)", ascending=False)
     .reset_index(drop=True)
 )
-
-# Nice display tweaks
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-# 1-based row index
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
