@@ -649,12 +649,14 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     """Add Age column based on birth_date compared to today's date."""
     if "birth_date" in df.columns:
         today = datetime.today()
-        df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+        # Calculate raw age
+        ages = pd.to_datetime(df["birth_date"], errors="coerce").apply(
             lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day))
             if pd.notnull(d) else np.nan
         )
-        # Force Age to numeric (int) and fill NaN if needed
-        df["Age"] = pd.to_numeric(df["Age"], errors="coerce").astype("Int64")
+        # Force proper numeric dtype (float, then int if possible)
+        ages = pd.to_numeric(ages, errors="coerce")
+        df["Age"] = ages.round(0).astype("Int64")  # Nullable int, handles NaN
     else:
         df["Age"] = pd.Series(dtype="Int64")
     return df
