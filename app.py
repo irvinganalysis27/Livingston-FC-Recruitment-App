@@ -716,12 +716,29 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     # --- Metric renames / fixes ---
     rename_map.update({
-        "Successful Box Cross %": "Successful Box Cross%",   # spacing fix
-        "Player Season Box Cross Ratio": "Successful Box Cross%",  # API version
-        "Tack/DP%": "1v1 Defending %",
+        # Successful Box Cross variants
+        "Successful Box Cross %": "Successful Box Cross%",
+        "Player Season Box Cross Ratio": "Successful Box Cross%",
+
+        # 1v1 defending
+        "Dribbles Stopped%": "1v1 Defending %",
+        "Tack/DP%": "1v1 Defending %",   # backwards compat
+
+        # Pass% under pressure
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
+
+        # Build-up involvement
         "Player Season Xgbuildup 90": "xGBuildup",
+
+        # Ball recoveries in opp half
         "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
+
+        # Pressures in attacking 3rd
+        "Player Season F3 Pressures 90": "Pressures in Final 1/3",
+
+        # Long balls
+        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
+        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
 
     df.rename(columns=rename_map, inplace=True)
@@ -730,7 +747,14 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Crosses" in df.columns and "Crossing%" in df.columns:
         df["Successful Crosses"] = (
             pd.to_numeric(df["Crosses"], errors="coerce") *
-            (pd.to_numeric(df["Crossing%"], errors="coerce") / 100)
+            (pd.to_numeric(df["Crossing%"], errors="coerce") / 100.0)
+        )
+
+    # --- Derive Successful Dribbles ---
+    if "Player Season Total Dribbles 90" in df.columns and "Player Season Dribble Ratio" in df.columns:
+        df["Successful Dribbles"] = (
+            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce") *
+            (pd.to_numeric(df["Player Season Dribble Ratio"], errors="coerce") / 100.0)
         )
 
     # --- Build "Positions played" ---
