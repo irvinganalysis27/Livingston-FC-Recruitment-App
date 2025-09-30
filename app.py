@@ -67,7 +67,7 @@ DISPLAY_NAMES = {
     "Deep Completions": "Completed Passes Final 1/3",
     "Turnovers": "Turnovers Won",
     "Deep Progressions": "Progressions to Final 1/3",
-    "Ball Recov. F2": "Ball Recovery Opp. Half",
+    "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
 }
 
 # --- League name normalisation: StatsBomb -> your Opta names ---
@@ -529,9 +529,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
         # Build-up involvement
         "Player Season Xgbuildup 90": "xGBuildup",
-
-        # Ball recoveries in opp half
-        "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
 
         # Pressures in attacking 3rd
         "Player Season F3 Pressures 90": "Pressures in Final 1/3",
