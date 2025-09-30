@@ -296,7 +296,7 @@ position_metrics = {
             # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
             # Defensive
-            "Pressure Regains", "PAdj Pressures", "Ball Recov. F2",
+            "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90",
             "Aggressive Actions",
         ],
         "groups": {
@@ -312,7 +312,7 @@ position_metrics = {
             "NP Goals": "Attacking",
             "Pressure Regains": "Defensive",
             "PAdj Pressures": "Defensive",
-            "Ball Recov. F2": "Defensive",
+            "Player Season Fhalf Ball Recoveries 90": "Defensive",
             "Aggressive Actions": "Defensive",
             "OBV": "Possession",
         }
