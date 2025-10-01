@@ -626,7 +626,6 @@ with b2:
         st.session_state.league_selection = []
 
 selected_leagues = st.multiselect(
-    "Leagues to include",
     options=all_leagues,
     default=st.session_state.league_selection,
     key="league_selection",
