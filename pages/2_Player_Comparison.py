@@ -707,7 +707,9 @@ rowB_pct = pct_df.loc[df["Player"] == pB, metrics].iloc[0] if pB and pB in df["P
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
-                  labels_to_genre=None, genre_colors=None, genre_alpha=0.08):
+                  labels_to_genre=None, genre_colors=None):
+    import matplotlib.patches as mpatches
+
     if not labels:
         fig, ax = plt.subplots(figsize=(6, 3))
         ax.axis("off")
@@ -721,35 +723,41 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     A = list(A_vals) + [A_vals[0]]
     B = list(B_vals) + [B_vals[0]] if B_vals is not None else None
 
-    fig = plt.figure(figsize=(10, 10))
-    ax = plt.subplot(111, polar=True)
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     ax.set_theta_offset(np.pi / 2)
     ax.set_theta_direction(-1)
     ax.set_ylim(0, 100)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontsize=10)
     ax.spines["polar"].set_visible(False)
 
-    if labels_to_genre and genre_colors:
-        genres = [labels_to_genre.get(lbl, "") for lbl in labels]
-        runs, start = [], 0
-        for i in range(1, N):
-            if genres[i] != genres[i-1]:
-                runs.append((start, i-1, genres[i-1]))
-                start = i
-        runs.append((start, N-1, genres[-1]))
-        for s, e, g in runs:
-            width = (e - s + 1) * step
-            center = s * step + width/2
-            ax.bar([center], [100], width=width, bottom=0,
-                   color=genre_colors.get(g, "#999"), alpha=genre_alpha, zorder=0)
-
+    # Plot radar lines
     ax.plot(angles, A, linewidth=2.5, color="#1f77b4", label=A_name)
     ax.fill(angles, A, color="#1f77b4", alpha=0.2)
     if B is not None:
         ax.plot(angles, B, linewidth=2.5, color="#d62728", label=B_name)
         ax.fill(angles, B, color="#d62728", alpha=0.2)
-    ax.legend(loc="upper right")
+
+    # Metric labels, coloured by group
+    for ang, lbl in zip(angles[:-1], labels):
+        group = labels_to_genre.get(lbl, "")
+        color = genre_colors.get(group, "black") if genre_colors else "black"
+        ax.text(ang, 108, lbl, ha="center", va="center",
+                fontsize=10, fontweight="bold", color=color)
+
+    # Push player names a bit further outside
+    ax.text(0, 118, A_name, ha="center", va="center",
+            fontsize=14, fontweight="bold", color="#1f77b4")
+    if B is not None:
+        ax.text(np.pi, 118, B_name, ha="center", va="center",
+                fontsize=14, fontweight="bold", color="#d62728")
+
+    # Legend for groups (bottom, like in other page)
+    if labels_to_genre and genre_colors:
+        present_groups = sorted(set(labels_to_genre.values()))
+        patches = [mpatches.Patch(color=genre_colors[g], label=g) for g in present_groups if g in genre_colors]
+        ax.legend(handles=patches,
+                  loc="upper center", bbox_to_anchor=(0.5, -0.08),
+                  ncol=len(patches), frameon=False)
+
     return fig
 
 labels_clean = [m.replace(" per 90", "").replace(", %", " (%)") for m in metrics]
