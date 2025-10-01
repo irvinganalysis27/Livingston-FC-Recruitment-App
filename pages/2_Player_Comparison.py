@@ -748,24 +748,25 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(ang, 108, lbl, ha="center", va="center",
                 fontsize=10, fontweight="bold", color=color)
 
-    # Title with A vs B, coloured to match lines
+        # Title with A vs B, coloured to match lines
     if B_name:
-        ax.set_title(f"{A_name} vs {B_name}",
-                     fontsize=16, fontweight="bold", pad=30)
-
-        # manually override colors by drawing text
-        ax.text(0.45, 1.08, A_name,
+        # Player A name in yellow
+        ax.text(0.5, 1.08, A_name,
                 transform=ax.transAxes,
                 ha="right", va="center",
                 fontsize=16, fontweight="bold", color=color_A)
 
-        ax.text(0.45, 1.08, f" vs {B_name}",
+        # Player B name in black
+        ax.text(0.5, 1.08, f" vs {B_name}",
                 transform=ax.transAxes,
                 ha="left", va="center",
                 fontsize=16, fontweight="bold", color=color_B)
     else:
-        ax.set_title(A_name,
-                     fontsize=16, fontweight="bold", color=color_A, pad=30)
+        # Only Player A, in yellow
+        ax.text(0.5, 1.08, A_name,
+                transform=ax.transAxes,
+                ha="center", va="center",
+                fontsize=16, fontweight="bold", color=color_A)
 
     # Legend for metric groups at the bottom
     if labels_to_genre and genre_colors:
