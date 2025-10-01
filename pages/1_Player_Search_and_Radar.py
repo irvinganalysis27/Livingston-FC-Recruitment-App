@@ -612,7 +612,7 @@ if league_col not in df.columns:
 df[league_col] = df[league_col].astype(str).str.strip()
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
-st.markdown("### Choose league(s)")
+st.markdown("#### Choose league(s)")
 
 if "league_selection" not in st.session_state:
     st.session_state.league_selection = all_leagues.copy()
@@ -719,10 +719,11 @@ if st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
 selected_position_template = st.selectbox(
-    "Radar Template",
+    "Radar Template",   # dummy label (required)
     template_names,
     index=template_names.index(st.session_state.template_select),
     key="template_select",
+    label_visibility="collapsed"   # hides the text
 )
 
 # Handle manual override
