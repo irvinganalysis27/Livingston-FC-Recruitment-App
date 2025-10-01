@@ -1,17 +1,16 @@
 import streamlit as st
 
-PASSWORD = "Livi2025"
-
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
+    if "password_ok" not in st.session_state:
+        st.session_state["password_ok"] = False
 
-    if not st.session_state.authenticated:
-        pwd = st.text_input("Enter password:", type="password")
-        if pwd == PASSWORD:
-            st.session_state.authenticated = True
-            st.sidebar.success("Logged in!")
-        else:
-            st.stop()
-    else:
-        st.sidebar.success("Logged in!")
+    if not st.session_state["password_ok"]:
+        st.markdown("## Welcome to the Livingston FC Recruitment App")
+        password = st.text_input("Enter password:", type="password")
+        if st.button("Login"):
+            if password == "Livi2025":
+                st.session_state["password_ok"] = True
+                st.rerun()
+            else:
+                st.warning("Please enter the correct password to access the app.")
+        st.stop()
