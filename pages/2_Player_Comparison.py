@@ -807,7 +807,11 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
 
     return fig
 
-labels_clean = [m.replace(" per 90", "").replace(", %", " (%)") for m in metrics]
+labels_clean = []
+for m in metrics:
+    nice = DISPLAY_NAMES.get(m, m)  # use override if it exists
+    nice = nice.replace(" per 90", "").replace(", %", " (%)")
+    labels_clean.append(nice)
 labels_to_genre = {
     lbl: metric_groups.get(m, "Other")
     for lbl, m in zip(labels_clean, metrics)
