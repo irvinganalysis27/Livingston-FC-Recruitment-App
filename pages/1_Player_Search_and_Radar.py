@@ -709,8 +709,6 @@ if len(selected_groups) == 1:
     if pos in position_metrics and not st.session_state.get("manual_override", False):
         st.session_state.template_select = pos
 
-st.write("DEBUG:", selected_groups, "→ template:", st.session_state.template_select)
-
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
 
