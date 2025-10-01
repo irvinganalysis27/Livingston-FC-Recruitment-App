@@ -703,6 +703,17 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
         st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
+# ---------- Auto-sync radar template with selected group ----------
+if tuple(selected_groups) != st.session_state.last_groups_tuple:
+    # Group filter changed
+    if len(selected_groups) == 1:
+        pos = selected_groups[0]
+        if pos in position_metrics:
+            st.session_state.template_select = pos
+            st.session_state.auto_just_applied = True
+            st.session_state.manual_override = False  # reset override on group change
+    st.session_state.last_groups_tuple = tuple(selected_groups)
+
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
 
@@ -710,7 +721,6 @@ template_names = list(position_metrics.keys())
 if "template_select" not in st.session_state or st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
-# Single dropdown (only once in the app!)
 selected_position_template = st.selectbox(
     "Choose a position template for the chart",
     template_names,
