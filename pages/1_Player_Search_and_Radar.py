@@ -35,30 +35,6 @@ PASSWORD = "Livi2025"
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-# ---------- Club Branding Row ----------
-left, mid, right = st.columns([1, 6, 1])
-
-logo_path = ASSETS_DIR / "Livingston_FC_club_badge_new.png"   # case-sensitive
-logo = open_image(logo_path)
-
-with left:
-    if logo:
-        st.image(logo, use_container_width=True)
-
-with mid:
-    st.markdown(
-        """
-        <div style='text-align: center;'>
-            <h1>Livingston FC Recruitment<br>App</h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with right:
-    if logo:
-        st.image(logo, use_container_width=True)
-
 # ---------- Fixed group colours ----------
 group_colors = {
     "Attacking":   "crimson",
