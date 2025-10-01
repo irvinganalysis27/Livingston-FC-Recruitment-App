@@ -773,6 +773,6 @@ fig = radar_compare(
     labels_clean, A_vals, B_vals,
     A_name=pA, B_name=pB,
     labels_to_genre=labels_to_genre,
-    genre_colors=GENRE_BG,
+    genre_colors=group_colors   # <-- FIXED
 )
 st.pyplot(fig, use_container_width=True)
