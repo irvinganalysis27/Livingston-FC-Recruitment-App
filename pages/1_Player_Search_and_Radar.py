@@ -612,7 +612,7 @@ if league_col not in df.columns:
 df[league_col] = df[league_col].astype(str).str.strip()
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
-st.markdown("### Choose league (multiple allowed)")
+st.markdown("### Choose league(s)")
 
 if "league_selection" not in st.session_state:
     st.session_state.league_selection = all_leagues.copy()
