@@ -16,12 +16,11 @@ if not check_password():
 show_branding()
 st.title("Player Comparison Page")
 
-# ========== Fixed colours ==========
-GENRE_BG = {
-    "Attacking":    "#3b82f6",
-    "Possession":   "#10b981",
-    "Defensive":    "#f59e0b",
-    "Goalkeeping":  "#8b5cf6",
+# ---------- Fixed group colours ----------
+group_colors = {
+    "Attacking":   "crimson",
+    "Possession":  "seagreen",
+    "Defensive":   "royalblue",
 }
 GENRE_ALPHA = 0.08
 
