@@ -728,6 +728,9 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     ax.set_ylim(0, 100)
     ax.spines["polar"].set_visible(False)
 
+    # Remove radial angle labels (0°, 45°, etc.)
+    ax.set_xticks([])
+    
     # Plot radar lines
     ax.plot(angles, A, linewidth=2.5, color="#1f77b4", label=A_name)
     ax.fill(angles, A, color="#1f77b4", alpha=0.2)
@@ -742,12 +745,13 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(ang, 108, lbl, ha="center", va="center",
                 fontsize=10, fontweight="bold", color=color)
 
-    # Push player names a bit further outside
-    ax.text(0, 118, A_name, ha="center", va="center",
-            fontsize=14, fontweight="bold", color="#1f77b4")
-    if B is not None:
-        ax.text(np.pi, 118, B_name, ha="center", va="center",
-                fontsize=14, fontweight="bold", color="#d62728")
+    # Single title with both names at the top
+    if B_name:
+        ax.set_title(f"{A_name} vs {B_name}",
+                     fontsize=16, fontweight="bold", color="black", pad=30)
+    else:
+        ax.set_title(f"{A_name}",
+                     fontsize=16, fontweight="bold", color="black", pad=30)
 
     # Legend for groups (bottom, like in other page)
     if labels_to_genre and genre_colors:
