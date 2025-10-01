@@ -11,7 +11,8 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 
-check_password()
+if not check_password():
+    st.stop()
 
 APP_DIR = Path(__file__).parent          # pages/
 ROOT_DIR = APP_DIR.parent                # repo root
