@@ -643,6 +643,10 @@ else:
     st.stop()
 
 # ---------- Minutes + Age filters (side by side) ----------
+minutes_col = "Minutes played"
+if minutes_col not in df.columns:
+    df[minutes_col] = np.nan
+
 c1, c2 = st.columns(2)
 
 with c1:
