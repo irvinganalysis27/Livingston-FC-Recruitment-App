@@ -1,5 +1,15 @@
 import streamlit as st
 import pandas as pd
+from auth import check_password
+from branding import show_branding
+
+# ---------- Protect page ----------
+if not check_password():
+    st.stop()
+
+# ---------- Branding ----------
+show_branding()
+st.title("Player Comparison Page")
 
 # ---------- Define weightings ----------
 weightings_data = {
