@@ -343,7 +343,6 @@ position_metrics = {
 }
 
 # ---------- Data source: local repo ----------
-DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
