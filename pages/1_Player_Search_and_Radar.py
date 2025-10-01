@@ -670,7 +670,7 @@ else:
 st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
 
 # ---------- Position Group Section ----------
-st.markdown("### 🟡 Select Position Group")
+st.markdown("#### 🟡 Select Position Group")
 
 available_groups = [
     g for g in SIX_GROUPS
@@ -712,7 +712,7 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
 # ---------- Template Section ----------
-st.markdown("### 📊 Choose Radar Template")
+st.markdown("#### 📊 Choose Radar Template")
 
 template_names = list(position_metrics.keys())
 if st.session_state.template_select not in template_names:
