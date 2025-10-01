@@ -53,9 +53,9 @@ pwd = st.text_input("Enter password:", type="password")
 if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
-else:
-    # --- everything else goes here ---
-    st.sidebar.success("Logged in!")
+
+# If we get here, password is correct
+st.sidebar.success("Logged in!")
 
 # ---------- Fixed group colours ----------
 group_colors = {
