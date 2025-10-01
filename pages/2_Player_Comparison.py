@@ -748,21 +748,27 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(ang, 108, lbl, ha="center", va="center",
                 fontsize=10, fontweight="bold", color=color)
 
-        # Title with A vs B, coloured to match lines
+            # Title with A vs B, centred
     if B_name:
-        # Player A name in yellow
+        # Combined title, centered
+        ax.text(0.5, 1.08, f"{A_name} vs {B_name}",
+                transform=ax.transAxes,
+                ha="center", va="center",
+                fontsize=16, fontweight="bold", color="black")
+
+        # Overdraw Player A in yellow (just the substring)
         ax.text(0.5, 1.08, A_name,
                 transform=ax.transAxes,
-                ha="right", va="center",
+                ha="center", va="center",
                 fontsize=16, fontweight="bold", color=color_A)
 
-        # Player B name in black
-        ax.text(0.5, 1.08, f" vs {B_name}",
+        # Overdraw Player B in black (just the substring after "vs ")
+        ax.text(0.5, 1.08, f"{B_name}",
                 transform=ax.transAxes,
-                ha="left", va="center",
-                fontsize=16, fontweight="bold", color=color_B)
+                ha="center", va="center",
+                fontsize=16, fontweight="bold", color=color_B,
+                x=0.5 + 0.08)  # small nudge to the right
     else:
-        # Only Player A, in yellow
         ax.text(0.5, 1.08, A_name,
                 transform=ax.transAxes,
                 ha="center", va="center",
