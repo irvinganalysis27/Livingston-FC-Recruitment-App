@@ -1,15 +1,5 @@
 import streamlit as st
 import pandas as pd
-from auth import check_password
-from branding import show_branding
-
-# ---------- Protect page ----------
-if not check_password():
-    st.stop()
-
-# ---------- Branding ----------
-show_branding()
-st.title("League Weightings")
 
 # ---------- Define weightings ----------
 weightings_data = {
@@ -51,14 +41,22 @@ weightings_data = {
     "USA USL Championship": 0.61,
 }
 
-# ---------- Convert to DataFrame ----------
-df_weightings = pd.DataFrame(
-    list(weightings_data.items()), columns=["League", "Multiplier"]
-).sort_values(by="Multiplier", ascending=False).reset_index(drop=True)
+# Convert to DataFrame
+df_weightings = pd.DataFrame(list(weightings_data.items()), columns=["League", "Multiplier"])
 
-# ---------- Show table ----------
-st.dataframe(df_weightings, use_container_width=True)
+st.markdown("## League Weightings")
 
-# Optional: CSV download
-csv = df_weightings.to_csv(index=False).encode("utf-8")
-st.download_button("Download CSV", csv, "league_weightings.csv", "text/csv")
+# Wrap table inside middle column to shrink width
+left, mid, right = st.columns([1,2,1])  # adjust numbers to make it skinnier/wider
+with mid:
+    st.dataframe(df_weightings, use_container_width=True)
+
+    # Optional: Download CSV button
+    csv = df_weightings.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download CSV",
+        csv,
+        "league_weightings.csv",
+        "text/csv",
+        key="download-csv"
+    )
