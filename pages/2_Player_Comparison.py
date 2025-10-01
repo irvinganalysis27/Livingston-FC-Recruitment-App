@@ -808,7 +808,10 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     return fig
 
 labels_clean = [m.replace(" per 90", "").replace(", %", " (%)") for m in metrics]
-labels_to_genre = {lbl: metric_groups[m] for lbl, m in zip(labels_clean, metrics)}
+labels_to_genre = {
+    lbl: metric_groups.get(m, "Other")
+    for lbl, m in zip(labels_clean, metrics)
+}
 
 A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
 B_vals = rowB_pct.values if rowB_pct is not None else None
