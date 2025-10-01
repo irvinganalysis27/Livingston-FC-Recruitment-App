@@ -13,8 +13,9 @@ from auth import check_password
 
 check_password()
 
-APP_DIR = Path(__file__).parent
-ASSETS_DIR = APP_DIR / "assets"
+APP_DIR = Path(__file__).parent          # pages/
+ROOT_DIR = APP_DIR.parent                # repo root
+ASSETS_DIR = ROOT_DIR / "assets"         # assets/ lives in root
 
 def open_image(path: Path):
     try:
@@ -375,7 +376,7 @@ position_metrics = {
 }
 
 # ---------- Data source: local repo ----------
-DATA_PATH = (APP_DIR / "statsbomb_player_stats_clean.csv")  # or APP_DIR / "statsbombdata" or a folder
+DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 def load_one_file(p: Path) -> pd.DataFrame:
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
