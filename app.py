@@ -9,6 +9,9 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from datetime import datetime
+from auth import check_password
+
+check_password()
 
 APP_DIR = Path(__file__).parent
 ASSETS_DIR = APP_DIR / "assets"
