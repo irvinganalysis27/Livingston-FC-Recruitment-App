@@ -1241,4 +1241,8 @@ if "Age" in z_ranking.columns:
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
+# Format Minutes played to integer (no decimals)
+if "Minutes played" in z_ranking.columns:
+    z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+
 st.dataframe(z_ranking, use_container_width=True)
