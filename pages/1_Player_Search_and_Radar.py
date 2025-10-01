@@ -20,6 +20,8 @@ if not check_password():
 # Show branding header
 show_branding()
 
+st.title("Player Radar Page")
+
 APP_DIR = Path(__file__).parent          # pages/
 ROOT_DIR = APP_DIR.parent                # repo root
 ASSETS_DIR = ROOT_DIR / "assets"         # assets/ lives in root
