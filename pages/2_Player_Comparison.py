@@ -715,8 +715,11 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(0.5, 0.5, "No metrics", ha="center", va="center")
         return fig
 
+    # Colours to match Livingston badge
+    color_A = "#FFD700"  # Yellow
+    color_B = "#000000"  # Black
+
     N = len(labels)
-    step = 2 * np.pi / N
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
     angles += angles[:1]
     A = list(A_vals) + [A_vals[0]]
@@ -728,15 +731,15 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     ax.set_ylim(0, 100)
     ax.spines["polar"].set_visible(False)
 
-    # Remove radial angle labels (0°, 45°, etc.)
+    # Remove radial angle labels
     ax.set_xticks([])
-    
+
     # Plot radar lines
-    ax.plot(angles, A, linewidth=2.5, color="#1f77b4", label=A_name)
-    ax.fill(angles, A, color="#1f77b4", alpha=0.2)
+    ax.plot(angles, A, linewidth=2.5, color=color_A, label=A_name)
+    ax.fill(angles, A, color=color_A, alpha=0.25)
     if B is not None:
-        ax.plot(angles, B, linewidth=2.5, color="#d62728", label=B_name)
-        ax.fill(angles, B, color="#d62728", alpha=0.2)
+        ax.plot(angles, B, linewidth=2.5, color=color_B, label=B_name)
+        ax.fill(angles, B, color=color_B, alpha=0.15)
 
     # Metric labels, coloured by group
     for ang, lbl in zip(angles[:-1], labels):
@@ -745,15 +748,19 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(ang, 108, lbl, ha="center", va="center",
                 fontsize=10, fontweight="bold", color=color)
 
-    # Single title with both names at the top
+    # Title with A vs B, coloured to match lines
     if B_name:
-        ax.set_title(f"{A_name} vs {B_name}",
-                     fontsize=16, fontweight="bold", color="black", pad=30)
+        ax.set_title(
+            f"$\\bf{{\\color{{{color_A}}}{A_name}}}$ vs $\\bf{{\\color{{{color_B}}}{B_name}}}$",
+            fontsize=16, pad=30
+        )
     else:
-        ax.set_title(f"{A_name}",
-                     fontsize=16, fontweight="bold", color="black", pad=30)
+        ax.set_title(
+            f"$\\bf{{\\color{{{color_A}}}{A_name}}}$",
+            fontsize=16, pad=30
+        )
 
-    # Legend for groups (bottom, like in other page)
+    # Legend for metric groups at the bottom
     if labels_to_genre and genre_colors:
         present_groups = sorted(set(labels_to_genre.values()))
         patches = [mpatches.Patch(color=genre_colors[g], label=g) for g in present_groups if g in genre_colors]
