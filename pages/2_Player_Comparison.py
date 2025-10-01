@@ -566,6 +566,16 @@ df_all_raw.columns = (
     .str.replace(u"\xa0", " ", regex=False)
     .str.replace(r"\s+", " ", regex=True)
 )
+
+# ---------- Add Age column from Birth Date (fix for comparison page) ----------
+if "Birth Date" in df_all_raw.columns:
+    today = datetime.today()
+    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
+        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if pd.notna(dob) else np.nan
+    )
+    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
+
 df_all = preprocess_df(df_all_raw)
 df = df_all.copy()
 
