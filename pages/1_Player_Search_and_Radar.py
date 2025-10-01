@@ -712,7 +712,7 @@ if current_groups != st.session_state.get("last_groups_tuple", ()):
         if pos in position_metrics:
             st.session_state.template_select = pos
             st.session_state.auto_just_applied = True
-            st.session_state.manual_override = False  # reset manual override
+            st.session_state.manual_override = False
     st.session_state.last_groups_tuple = current_groups
 
 st.write("DEBUG:", selected_groups, "→ template:", st.session_state.template_select)
@@ -720,7 +720,6 @@ st.write("DEBUG:", selected_groups, "→ template:", st.session_state.template_s
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
 
-# Initialise template if missing or invalid
 if "template_select" not in st.session_state or st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
