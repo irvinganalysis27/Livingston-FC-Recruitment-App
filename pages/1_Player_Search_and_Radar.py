@@ -704,15 +704,18 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
 # ---------- Auto-sync radar template with selected group ----------
-if tuple(selected_groups) != st.session_state.last_groups_tuple:
-    # Group filter changed
+current_groups = tuple(selected_groups)  # latest chosen
+
+if current_groups != st.session_state.get("last_groups_tuple", ()):
     if len(selected_groups) == 1:
         pos = selected_groups[0]
         if pos in position_metrics:
             st.session_state.template_select = pos
             st.session_state.auto_just_applied = True
-            st.session_state.manual_override = False  # reset override on group change
-    st.session_state.last_groups_tuple = tuple(selected_groups)
+            st.session_state.manual_override = False  # reset manual override
+    st.session_state.last_groups_tuple = current_groups
+
+st.write("DEBUG:", selected_groups, "→ template:", st.session_state.template_select)
 
 # ---------- Template select ----------
 template_names = list(position_metrics.keys())
