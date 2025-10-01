@@ -48,7 +48,7 @@ group_colors = {
 DISPLAY_NAMES = {
     "Player Season Fhalf Pressures 90": "Pressures in Opposition Half",
     "Deep Completions": "Completed Passes Final 1/3",
-    "Turnovers": "Turnovers Won",
+    "Turnovers": "Lost Balls",
     "Deep Progressions": "Progressions to Final 1/3",
     "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
     "Player Season Ball Recoveries 90": "Ball Recoveries",
