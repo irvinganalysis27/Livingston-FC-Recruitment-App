@@ -1,6 +1,7 @@
 import streamlit as st
 
 def check_password():
+    """Return True if the user entered the correct password, False otherwise."""
     if "password_ok" not in st.session_state:
         st.session_state["password_ok"] = False
 
@@ -14,3 +15,5 @@ def check_password():
             else:
                 st.warning("Please enter the correct password to access the app.")
         st.stop()
+
+    return True
