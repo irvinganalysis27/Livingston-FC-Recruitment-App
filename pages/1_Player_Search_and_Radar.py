@@ -754,6 +754,10 @@ for m in current_metrics:
         df[m] = 0
 df[current_metrics] = df[current_metrics].fillna(0)
 
+# ---------- Session state setup for Essential Criteria ----------
+if "ec_rows" not in st.session_state:
+    st.session_state.ec_rows = 1
+
 # ---------- Essential Criteria ----------
 with st.expander("Essential Criteria", expanded=False):
     use_all_cols = st.checkbox("Pick from all numeric columns", value=False)
