@@ -644,6 +644,10 @@ if df.empty:
 
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
+# ---------- Sync template with selected position ----------
+if current_single_group and st.session_state.template_select != current_single_group:
+    st.session_state.template_select = current_single_group
+
 # ---------- Template ----------
 st.markdown("#### 📊 Choose Radar Template")
 template_names = list(position_metrics.keys())
