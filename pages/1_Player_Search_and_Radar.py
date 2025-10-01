@@ -642,30 +642,40 @@ else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
 
-# ---------- Minutes filter ----------
-minutes_col = "Minutes played"
-if minutes_col not in df.columns:
-    df[minutes_col] = np.nan
+# ---------- Minutes + Age filters (side by side) ----------
+c1, c2 = st.columns(2)
 
-min_minutes = st.number_input("Minimum minutes to include", min_value=0, value=1000, step=50)
-df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
-df = df[df["_minutes_numeric"] >= min_minutes].copy()
-if df.empty:
-    st.warning("No players meet the minutes threshold. Lower the minimum.")
-    st.stop()
+with c1:
+    min_minutes = st.number_input(
+        "Minimum minutes to include",
+        min_value=0,
+        value=1000,
+        step=50
+    )
+    df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+    df = df[df["_minutes_numeric"] >= min_minutes].copy()
+    if df.empty:
+        st.warning("No players meet the minutes threshold. Lower the minimum.")
+        st.stop()
 
-# ---------- Age slider filter ----------
-if "Age" in df.columns:
-    df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
-    if df["_age_numeric"].notna().any():
-        age_min = int(np.nanmin(df["_age_numeric"]))
-        age_max = int(np.nanmax(df["_age_numeric"]))
-        sel_min, sel_max = st.slider("Age range to include", min_value=age_min, max_value=age_max, value=(age_min, age_max), step=1)
-        df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
+with c2:
+    if "Age" in df.columns:
+        df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
+        if df["_age_numeric"].notna().any():
+            age_min = int(np.nanmin(df["_age_numeric"]))
+            age_max = int(np.nanmax(df["_age_numeric"]))
+            sel_min, sel_max = st.slider(
+                "Age range to include",
+                min_value=age_min,
+                max_value=age_max,
+                value=(age_min, age_max),
+                step=1
+            )
+            df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
+        else:
+            st.info("Age column has no numeric values, age filter skipped.")
     else:
-        st.info("Age column has no numeric values, age filter skipped.")
-else:
-    st.info("No Age column found, age filter skipped.")
+        st.info("No Age column found, age filter skipped.")
 
 st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
 
