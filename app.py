@@ -54,9 +54,6 @@ if pwd != PASSWORD:
     st.warning("Please enter the correct password to access the app.")
     st.stop()
 
-# If we get here, password is correct
-st.sidebar.success("Logged in!")
-
 # ---------- Fixed group colours ----------
 group_colors = {
     "Attacking":   "crimson",
