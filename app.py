@@ -51,12 +51,6 @@ with right:
     if logo:
         st.image(logo, use_container_width=True)
 
-# Ask for password
-pwd = st.text_input("Enter password:", type="password")
-if pwd != PASSWORD:
-    st.warning("Please enter the correct password to access the app.")
-    st.stop()
-
 # ---------- Fixed group colours ----------
 group_colors = {
     "Attacking":   "crimson",
