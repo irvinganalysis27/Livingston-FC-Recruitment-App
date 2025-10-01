@@ -861,6 +861,10 @@ if not players:
     st.warning("No players available after filters.")
     st.stop()
 
+# --- Initialise session state if missing ---
+if "selected_player" not in st.session_state:
+    st.session_state.selected_player = None
+
 if st.session_state.selected_player not in players:
     st.session_state.selected_player = players[0]
 
