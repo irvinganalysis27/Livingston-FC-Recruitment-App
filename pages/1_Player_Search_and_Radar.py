@@ -626,11 +626,12 @@ with b2:
         st.session_state.league_selection = []
 
 selected_leagues = st.multiselect(
+    "Leagues",   # dummy label, won’t be shown
     options=all_leagues,
     default=st.session_state.league_selection,
     key="league_selection",
+    label_visibility="collapsed"
 )
-
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
