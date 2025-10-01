@@ -669,9 +669,21 @@ else:
 
 st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
 
-# ---------- Group filter ----------
-available_groups = [g for g in SIX_GROUPS if "Six-Group Position" in df.columns and g in df["Six-Group Position"].unique()]
-selected_groups = st.multiselect("Include groups", options=available_groups, default=[], label_visibility="collapsed")
+# ---------- Position Group Section ----------
+st.markdown("### 🟡 Select Position Group")
+
+available_groups = [
+    g for g in SIX_GROUPS
+    if "Six-Group Position" in df.columns and g in df["Six-Group Position"].unique()
+]
+
+selected_groups = st.multiselect(
+    "Position Groups",
+    options=available_groups,
+    default=[],
+    label_visibility="collapsed"
+)
+
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
@@ -680,56 +692,43 @@ if selected_groups:
 
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
-# ---------- Session state ----------
-if "selected_player" not in st.session_state:
-    st.session_state.selected_player = None
-if "ec_rows" not in st.session_state:
-    st.session_state.ec_rows = 1
+# ---------- Session state setup ----------
 if "template_select" not in st.session_state:
     st.session_state.template_select = list(position_metrics.keys())[0]
 if "last_template_choice" not in st.session_state:
     st.session_state.last_template_choice = st.session_state.template_select
 if "manual_override" not in st.session_state:
     st.session_state.manual_override = False
-if "auto_just_applied" not in st.session_state:
-    st.session_state.auto_just_applied = False
-if "last_player_for_auto" not in st.session_state:
-    st.session_state.last_player_for_auto = None
 if "last_groups_tuple" not in st.session_state:
-    st.session_state.last_groups_tuple = tuple(selected_groups)
+    st.session_state.last_groups_tuple = tuple()
 
+# ---------- Auto-sync template with group ----------
 if tuple(selected_groups) != st.session_state.last_groups_tuple:
     if len(selected_groups) == 1:
-        st.session_state.manual_override = False
+        pos = selected_groups[0]
+        if pos in position_metrics:
+            st.session_state.template_select = pos
+            st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# ---------- Auto-sync radar template with selected group ----------
-if len(selected_groups) == 1:  
-    pos = selected_groups[0]
-    if pos in position_metrics and not st.session_state.get("manual_override", False):
-        st.session_state.template_select = pos
+# ---------- Template Section ----------
+st.markdown("### 📊 Choose Radar Template")
 
-# ---------- Template select ----------
 template_names = list(position_metrics.keys())
-
-if "template_select" not in st.session_state or st.session_state.template_select not in template_names:
+if st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
 selected_position_template = st.selectbox(
-    "Choose a position template for the chart",
+    "Radar Template",
     template_names,
     index=template_names.index(st.session_state.template_select),
     key="template_select",
 )
 
-# Handle manual vs auto updates
-if st.session_state.auto_just_applied:
+# Handle manual override
+if st.session_state.template_select != st.session_state.last_template_choice:
+    st.session_state.manual_override = True
     st.session_state.last_template_choice = st.session_state.template_select
-    st.session_state.auto_just_applied = False
-else:
-    if st.session_state.template_select != st.session_state.last_template_choice:
-        st.session_state.manual_override = True
-        st.session_state.last_template_choice = st.session_state.template_select
 
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
