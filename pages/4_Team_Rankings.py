@@ -16,26 +16,23 @@ show_branding()
 # ---------- Page Title ----------
 st.title("Team Rankings Page")
 
+# ---------- Load your data ----------
+ROOT_DIR = Path(__file__).parent.parent
+DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
+
 if DATA_PATH.exists():
     st.write(f"File found: {DATA_PATH}")
     st.write(f"File size: {DATA_PATH.stat().st_size} bytes")
 else:
     st.error("File not found.")
-
-# ---------- Load your data ----------
-ROOT_DIR = Path(__file__).parent.parent
-DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
-if not DATA_PATH.exists():
-    st.error(f"Data file not found at {DATA_PATH}. Please upload or move it.")
     st.stop()
 
 @st.cache_data
 def load_data(path: Path) -> pd.DataFrame:
     if path.suffix.lower() == ".csv":
-        df = pd.read_csv(path)
+        return pd.read_csv(path)
     else:
-        df = pd.read_excel(path)
-    return df
+        return pd.read_excel(path)
 
 # ---------- Position mapping helpers ----------
 def _clean_pos_token(tok: str) -> str:
@@ -91,7 +88,6 @@ def plot_team_433(df, club_name):
         "ST": ["Striker"],
     }
 
-    # Best players per role
     team_players = {}
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
@@ -105,7 +101,6 @@ def plot_team_433(df, club_name):
         else:
             team_players[pos] = ["-"]
 
-    # --- Pitch
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("green")
     ax.set_xlim(0, 100)
@@ -113,7 +108,6 @@ def plot_team_433(df, club_name):
     ax.axis("off")
     ax.set_title(f"{club_name} – Best XI (4-3-3)", color="white", fontsize=16, weight="bold")
 
-    # Position coords
     coords = {
         "GK": (50, 5),
         "LB": (20, 20), "LCB": (40, 20), "RCB": (60, 20), "RB": (80, 20),
@@ -122,7 +116,6 @@ def plot_team_433(df, club_name):
         "LW": (20, 75), "ST": (50, 80), "RW": (80, 75),
     }
 
-    # Plot each role
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
         ax.scatter(x, y, s=1200, c="white", edgecolors="black", zorder=3)
@@ -143,18 +136,15 @@ try:
     else:
         df_all["Six-Group Position"] = None
 
-    # League filter
     league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
     league_options = sorted(df_all[league_col].dropna().unique())
     selected_league = st.selectbox("Select League", league_options)
 
-    # Club filter
     club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
     selected_club = st.selectbox("Select Club", club_options)
 
     st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
 
-    # Filter to club + plot formation
     df_club = df_all[df_all["Team"] == selected_club].copy()
     plot_team_433(df_club, selected_club)
 
