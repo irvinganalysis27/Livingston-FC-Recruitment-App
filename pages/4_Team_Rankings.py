@@ -5,7 +5,7 @@ from pathlib import Path
 
 from auth import check_password
 from branding import show_branding
-from data_loader import load_and_preprocess   # <- new unified loader
+from data_loader import load_and_preprocess   # <- use only this
 
 # ---------- Protect page ----------
 if not check_password():
@@ -22,9 +22,7 @@ APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
-df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
-df_all = preprocess_df(df_all_raw)
-
+# Use unified loader
 df_all = load_and_preprocess(DATA_PATH)
 
 # ---------- League & Club Filters ----------
