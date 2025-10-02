@@ -88,10 +88,11 @@ def plot_team_433(df, club_name):
 
     coords = {
         "GK": (50, 5),
-        "LB": (20, 20), "LCB": (40, 20), "RCB": (60, 20), "RB": (80, 20),
+        # Defenders pushed wider
+        "LB": (12, 20), "LCB": (32, 20), "RCB": (68, 20), "RB": (88, 20),
         "CDM": (50, 40),
-        "LCM": (30, 50), "RCM": (70, 50),
-        "LW": (20, 75), "ST": (50, 80), "RW": (80, 75),
+        "LCM": (30, 55), "RCM": (70, 55),
+        "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
     }
 
     for pos, (x, y) in coords.items():
