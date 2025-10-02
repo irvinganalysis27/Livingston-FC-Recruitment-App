@@ -73,10 +73,14 @@ def plot_team_433(df, club_name, league_name):
             subset = subset.sort_values("Rank", ascending=True)
 
         if not subset.empty:
-            players = [
-                f"{r['Player']} ({int(round(r.get(score_col, 0)))})"
-                for _, r in subset.iterrows()
-            ]
+            players = []
+            for _, r in subset.iterrows():
+                raw_val = r.get(score_col, 0)
+                try:
+                    score_val = int(round(float(raw_val)))
+                except (TypeError, ValueError):
+                    score_val = 0
+                players.append(f"{r['Player']} ({score_val})")
             team_players[pos] = players
         else:
             team_players[pos] = ["-"]
@@ -91,7 +95,6 @@ def plot_team_433(df, club_name, league_name):
 
     coords = {
         "GK": (50, 5),
-        # Fullbacks pushed wider, CBs stay centred
         "LB": (10, 20), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 20),
         "CDM": (50, 40),
         "LCM": (30, 55), "RCM": (70, 55),
@@ -100,10 +103,8 @@ def plot_team_433(df, club_name, league_name):
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Main starter
         ax.text(x, y, players[0], ha="center", va="center",
                 fontsize=9, color="black", weight="bold", wrap=True)
-        # Bench under starter
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
             ax.text(x, y - 3, text_block, ha="center", va="top",
