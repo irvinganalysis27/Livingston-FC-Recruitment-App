@@ -7,70 +7,71 @@ import matplotlib.pyplot as plt
 import re
 from pathlib import Path
 from datetime import datetime
+from PIL import Image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 from auth import check_password
 from branding import show_branding
 
-# ---------- Protect page ----------
+# ============================================================
+# Protect page
+# ============================================================
 if not check_password():
     st.stop()
 
-# ---------- Branding ----------
 show_branding()
 st.title("Team Rankings Page")
 
-# ---------- Data path ----------
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 # ============================================================
-# Position metrics (shared with Radar Page)
+# Position mapping + metrics (same as radar page)
 # ============================================================
 
+RAW_TO_SIX = {
+    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
+    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    "CENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
+    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    "RIGHTWING": "Winger", "LEFTWING": "Winger",
+    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+    "GOALKEEPER": "Goalkeeper",
+}
+
+def _clean_pos_token(tok: str) -> str:
+    if pd.isna(tok):
+        return ""
+    t = str(tok).upper().strip()
+    t = re.sub(r"[.\-_/]", " ", t)
+    t = re.sub(r"\s+", "", t)
+    return t
+
+def map_first_position_to_group(primary_pos_cell) -> str:
+    tok = _clean_pos_token(primary_pos_cell)
+    return RAW_TO_SIX.get(tok, None)
+
+# Position metrics from radar page
 position_metrics = {
-    "Centre Back": {"metrics": [
-        "NP Goals", "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
-        "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-        "Defensive Actions", "Aggressive Actions", "Fouls",
-        "Aerial Wins", "Aerial Win%"
-    ]},
-    "Full Back": {"metrics": [
-        "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
-        "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-        "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-        "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
-    ]},
-    "Number 6": {"metrics": [
-        "xGBuildup", "xG Assisted",
-        "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-        "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-        "Aggressive Actions", "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains"
-    ]},
-    "Number 8": {"metrics": [
-        "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
-        "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
-        "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90",
-        "Aggressive Actions"
-    ]},
-    "Winger": {"metrics": [
-        "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
-        "OP Passes Into Box", "Successful Box Cross%", "Passing%",
-        "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
-        "Player Season Fhalf Pressures 90"
-    ]},
-    "Striker": {"metrics": [
-        "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
-        "Goal Conversion%", "Touches In Box", "xG Assisted",
-        "Fouls Won", "Deep Completions", "OP Key Passes",
-        "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90"
-    ]}
+    "Centre Back": {"metrics": ["NP Goals","Passing%","Pass OBV","Pr. Long Balls","UPr. Long Balls","OBV","Pr. Pass% Dif.","PAdj Interceptions","PAdj Tackles","Dribbles Stopped%","Defensive Actions","Aggressive Actions","Fouls","Aerial Wins","Aerial Win%"]},
+    "Full Back": {"metrics": ["Passing%","Pr. Pass% Dif.","Successful Crosses","Crossing%","Deep Progressions","Successful Dribbles","Turnovers","OBV","Pass OBV","Defensive Actions","Aerial Win%","PAdj Pressures","PAdj Tack&Int","Dribbles Stopped%","Aggressive Actions","Player Season Ball Recoveries 90"]},
+    "Number 6": {"metrics": ["xGBuildup","xG Assisted","Passing%","Deep Progressions","Turnovers","OBV","Pass OBV","Pr. Pass% Dif.","PAdj Interceptions","PAdj Tackles","Dribbles Stopped%","Aggressive Actions","Aerial Win%","Player Season Ball Recoveries 90","Pressure Regains"]},
+    "Number 8": {"metrics": ["xGBuildup","xG Assisted","Shots","xG","NP Goals","Passing%","Deep Progressions","OP Passes Into Box","Pass OBV","OBV","Deep Completions","Pressure Regains","PAdj Pressures","Player Season Fhalf Ball Recoveries 90","Aggressive Actions"]},
+    "Winger": {"metrics": ["xG","Shots","xG/Shot","Touches In Box","OP xG Assisted","NP Goals","OP Passes Into Box","Successful Box Cross%","Passing%","Successful Dribbles","Turnovers","OBV","D&C OBV","Fouls Won","Deep Progressions","Player Season Fhalf Pressures 90"]},
+    "Striker": {"metrics": ["Aggressive Actions","NP Goals","xG","Shots","xG/Shot","Goal Conversion%","Touches In Box","xG Assisted","Fouls Won","Deep Completions","OP Key Passes","Aerial Win%","Aerial Wins","Player Season Fhalf Pressures 90"]},
+    "Goalkeeper": {"metrics": []},  # keep for completeness
 }
 
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
 # ============================================================
-# Data loader
+# Data loading + preprocessing
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
@@ -96,66 +97,30 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
         )
     return df
 
-# ============================================================
-# Position mapping (copied from Radar Page)
-# ============================================================
-
-def _clean_pos_token(tok: str) -> str:
-    if pd.isna(tok):
-        return ""
-    t = str(tok).upper().strip()
-    t = re.sub(r"[.\-_/]", " ", t)
-    t = re.sub(r"\s+", "", t)
-    return t
-
-RAW_TO_SIX = {
-    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
-    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    "CENTREMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8", "10": "Number 8",
-    "RIGHTWING": "Winger", "LEFTWING": "Winger", "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper"
-}
-
-def parse_first_position(cell) -> str:
-    if pd.isna(cell):
-        return ""
-    return _clean_pos_token(str(cell))
-
-def map_first_position_to_group(primary_pos_cell) -> str:
-    tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)
-
-def apply_position_mapping(df: pd.DataFrame) -> pd.DataFrame:
-    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-    cm_mask = df["Six-Group Position"] == "Centre Midfield"
-    if cm_mask.any():
-        cm_rows = df.loc[cm_mask].copy()
-        cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
-        cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
-        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-    return df
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
+    r = series.rank(pct=True, ascending=True)
+    if lower_is_better:
+        p = 1.0 - r
+    else:
+        p = r
+    return (p * 100.0).round(1)
 
 # ============================================================
-# Ranking logic (from Radar Page)
+# Compute rankings (same as radar page)
 # ============================================================
 
-def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFrame:
+def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # Collect all metrics
+    # Collect metrics
     all_metrics = set()
     for v in position_metrics.values():
         all_metrics.update(v["metrics"])
     all_metrics = list(all_metrics)
 
-    # Ensure numeric
     for m in all_metrics:
         if m not in df_all.columns:
             df_all[m] = 0
@@ -171,14 +136,11 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFra
             z_per_group *= -1
         raw_z_all[m] = z_per_group.fillna(0)
 
-    # Average Z
     df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 
-    # Multiplier
     if "Multiplier" not in df_all.columns:
         df_all["Multiplier"] = 1.0
     df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
-
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
     # Scale to 0–100
@@ -187,9 +149,7 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFra
         eligible = df_all.copy()
 
     anchor_minmax = (
-        eligible.groupby(pos_col)["Weighted Z Score"]
-        .agg(_scale_min="min", _scale_max="max")
-        .fillna(0)
+        eligible.groupby(pos_col)["Weighted Z Score"].agg(_scale_min="min", _scale_max="max").fillna(0)
     )
     df_all = df_all.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
@@ -203,9 +163,10 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFra
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
-
-    # Clean up
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
+
+    # Rank
+    df_all["Rank"] = df_all["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
     return df_all
 
@@ -216,15 +177,10 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFra
 def plot_team_433(df, club_name, league_name):
     formation_roles = {
         "GK": ["Goalkeeper"],
-        "LB": ["Full Back"],
-        "LCB": ["Centre Back"],
-        "RCB": ["Centre Back"],
-        "RB": ["Full Back"],
+        "LB": ["Full Back"], "LCB": ["Centre Back"], "RCB": ["Centre Back"], "RB": ["Full Back"],
         "CDM": ["Number 6"],
-        "LCM": ["Number 8"],
-        "RCM": ["Number 8"],
-        "LW": ["Winger"],
-        "RW": ["Winger"],
+        "LCM": ["Number 8"], "RCM": ["Number 8"],
+        "LW": ["Winger"], "RW": ["Winger"],
         "ST": ["Striker"],
     }
 
@@ -234,10 +190,7 @@ def plot_team_433(df, club_name, league_name):
         if "Score (0–100)" in subset.columns:
             subset = subset.sort_values("Score (0–100)", ascending=False)
         if not subset.empty:
-            players = [
-                f"{r['Player']} ({r['Score (0–100)']:.0f})"
-                for _, r in subset.iterrows()
-            ]
+            players = [f"{r['Player']} ({r['Score (0–100)']:.0f})" for _, r in subset.iterrows()]
             team_players[pos] = players
         else:
             team_players[pos] = ["-"]
@@ -263,8 +216,7 @@ def plot_team_433(df, club_name, league_name):
                 fontsize=9, color="black", weight="bold", wrap=True)
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
-            ax.text(x, y - 3, text_block, ha="center", va="top",
-                    fontsize=7, color="black")
+            ax.text(x, y - 3, text_block, ha="center", va="top", fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
@@ -276,7 +228,7 @@ try:
     df_all_raw = load_statsbomb(DATA_PATH)
     df_all_raw = add_age_column(df_all_raw)
 
-    # Preprocess + renames
+    # Preprocess
     df_all = df_all_raw.copy()
     if "Name" in df_all.columns:
         df_all.rename(columns={"Name": "Player"}, inplace=True)
@@ -285,8 +237,8 @@ try:
     if "Minutes" in df_all.columns:
         df_all.rename(columns={"Minutes": "Minutes played"}, inplace=True)
 
-    # Position mapping
-    df_all = apply_position_mapping(df_all)
+    # Map positions
+    df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
 
     # Compute rankings
     df_all = compute_rankings(df_all)
