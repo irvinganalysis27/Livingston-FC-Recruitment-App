@@ -20,7 +20,7 @@ if not check_password():
 # Show branding header
 show_branding()
 
-st.title("Player Radar Page")
+st.title("Player Radar")
 
 APP_DIR = Path(__file__).parent          # pages/
 ROOT_DIR = APP_DIR.parent                # repo root
