@@ -115,9 +115,13 @@ def load_one_file(p: Path) -> pd.DataFrame:
 
     df = None
     if p.suffix.lower() in {".xlsx", ".xls"}:
-        df = try_excel() or try_csv()
+        df = try_excel()
+        if df is None:
+            df = try_csv()
     else:
-        df = try_csv() or try_excel()
+        df = try_csv()
+        if df is None:
+            df = try_excel()
 
     if df is None:
         raise ValueError(f"Unsupported or unreadable file: {p.name}")
