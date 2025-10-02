@@ -132,7 +132,7 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
         p = r
     return (p * 100.0).round(1)
 
-def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
+def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 400) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
@@ -240,7 +240,7 @@ def plot_team_433(df, club_name, league_name):
 
     coords = {
         "GK": (50, 5),
-        "LB": (10, 20), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 20),
+        "LB": (10, 25), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 25),
         "CDM": (50, 40),
         "LCM": (30, 55), "RCM": (70, 55),
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
