@@ -54,8 +54,12 @@ for m in scoring_metrics:
     raw_z_all[m] = z_per_group.fillna(0)
 
 df_all["Avg Z Score"] = raw_z_all.mean(axis=1)
-df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0),
-                                     errors="coerce").fillna(1.0)
+
+# ✅ Fix: always create a Series for Multiplier
+if "Multiplier" not in df_all.columns:
+    df_all["Multiplier"] = 1.0
+df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
+
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
 # Scale Weighted Z into 0–100 per position
