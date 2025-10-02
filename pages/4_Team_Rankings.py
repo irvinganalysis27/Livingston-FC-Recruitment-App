@@ -103,7 +103,7 @@ def plot_team_433(df, club_name):
         # Bench / backups below
         if len(players) > 1:
             text_block = "\n".join(players[1:4])  # show up to 3 more
-            ax.text(x, y - 7, text_block, ha="center", va="top",
+            ax.text(x, y - 3, text_block, ha="center", va="top",
                     fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
