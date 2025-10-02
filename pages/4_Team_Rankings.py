@@ -5,7 +5,7 @@ from pathlib import Path
 
 from auth import check_password
 from branding import show_branding
-from data_loader import load_statsbomb, _data_signature, preprocess_df
+from data_loader import load_and_preprocess   # <- new unified loader
 
 # ---------- Protect page ----------
 if not check_password():
@@ -21,8 +21,7 @@ st.title("Team Rankings Page")
 ROOT_DIR = Path(__file__).parent.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
-df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
-df_all = preprocess_df(df_all_raw)
+df_all = load_and_preprocess(DATA_PATH)
 
 # ---------- League & Club Filters ----------
 league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
@@ -63,6 +62,7 @@ def plot_team_433(df, club_name):
         else:
             team_players[pos] = ["-"]
 
+    # --- Draw pitch ---
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("green")
     ax.set_xlim(0, 100)
@@ -80,8 +80,10 @@ def plot_team_433(df, club_name):
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
+        # Best player shown inside circle
         ax.scatter(x, y, s=1200, c="white", edgecolors="black", zorder=3)
         ax.text(x, y, players[0].split("(")[0], ha="center", va="center", fontsize=8, wrap=True)
+        # List extra players underneath
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
             ax.text(x, y - 7, text_block, ha="center", va="top", fontsize=6, color="yellow")
