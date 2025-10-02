@@ -70,10 +70,21 @@ def map_first_position_to_group(pos: str) -> str:
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    if p.suffix.lower() in {".xlsx",".xls"}:
-        return pd.read_excel(p)
+    if p.suffix.lower() in {".xlsx", ".xls"}:
+        try:
+            return pd.read_excel(p, engine="openpyxl")
+        except Exception:
+            return pd.read_excel(p)  # fallback
     else:
-        return pd.read_csv(p)
+        # Robust CSV loader with fallbacks
+        for kwargs in [dict(sep=None, engine="python"), {}, dict(encoding="latin1")]:
+            try:
+                df = pd.read_csv(p, **kwargs)
+                if not df.empty:
+                    return df
+            except Exception:
+                continue
+    raise ValueError(f"Unsupported or unreadable file: {p.name}")
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
     if path.is_file():
