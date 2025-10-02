@@ -16,6 +16,12 @@ show_branding()
 # ---------- Page Title ----------
 st.title("Team Rankings Page")
 
+if DATA_PATH.exists():
+    st.write(f"File found: {DATA_PATH}")
+    st.write(f"File size: {DATA_PATH.stat().st_size} bytes")
+else:
+    st.error("File not found.")
+
 # ---------- Load your data ----------
 ROOT_DIR = Path(__file__).parent.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
