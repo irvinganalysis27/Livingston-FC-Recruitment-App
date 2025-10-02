@@ -86,13 +86,77 @@ def map_first_position_to_group(primary_pos_cell) -> str:
     return RAW_TO_EIGHT.get(tok, None)
 
 # Position metrics from radar page
+# ============================================================
+# Position metrics (expanded to 8 groups)
+# ============================================================
+
 position_metrics = {
-    "Centre Back": {"metrics": ["NP Goals","Passing%","Pass OBV","Pr. Long Balls","UPr. Long Balls","OBV","Pr. Pass% Dif.","PAdj Interceptions","PAdj Tackles","Dribbles Stopped%","Defensive Actions","Aggressive Actions","Fouls","Aerial Wins","Aerial Win%"]},
-    "Full Back": {"metrics": ["Passing%","Pr. Pass% Dif.","Successful Crosses","Crossing%","Deep Progressions","Successful Dribbles","Turnovers","OBV","Pass OBV","Defensive Actions","Aerial Win%","PAdj Pressures","PAdj Tack&Int","Dribbles Stopped%","Aggressive Actions","Player Season Ball Recoveries 90"]},
-    "Number 6": {"metrics": ["xGBuildup","xG Assisted","Passing%","Deep Progressions","Turnovers","OBV","Pass OBV","Pr. Pass% Dif.","PAdj Interceptions","PAdj Tackles","Dribbles Stopped%","Aggressive Actions","Aerial Win%","Player Season Ball Recoveries 90","Pressure Regains"]},
-    "Number 8": {"metrics": ["xGBuildup","xG Assisted","Shots","xG","NP Goals","Passing%","Deep Progressions","OP Passes Into Box","Pass OBV","OBV","Deep Completions","Pressure Regains","PAdj Pressures","Player Season Fhalf Ball Recoveries 90","Aggressive Actions"]},
-    "Winger": {"metrics": ["xG","Shots","xG/Shot","Touches In Box","OP xG Assisted","NP Goals","OP Passes Into Box","Successful Box Cross%","Passing%","Successful Dribbles","Turnovers","OBV","D&C OBV","Fouls Won","Deep Progressions","Player Season Fhalf Pressures 90"]},
-    "Striker": {"metrics": ["Aggressive Actions","NP Goals","xG","Shots","xG/Shot","Goal Conversion%","Touches In Box","xG Assisted","Fouls Won","Deep Completions","OP Key Passes","Aerial Win%","Aerial Wins","Player Season Fhalf Pressures 90"]},
+    "Centre Back": {
+        "metrics": [
+            "NP Goals", "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls",
+            "OBV", "Pr. Pass% Dif.", "PAdj Interceptions", "PAdj Tackles",
+            "Dribbles Stopped%", "Defensive Actions", "Aggressive Actions",
+            "Fouls", "Aerial Wins", "Aerial Win%"
+        ]
+    },
+    "Left Back": {
+        "metrics": [
+            "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%",
+            "Deep Progressions", "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions",
+            "Player Season Ball Recoveries 90"
+        ]
+    },
+    "Right Back": {
+        "metrics": [
+            "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%",
+            "Deep Progressions", "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions",
+            "Player Season Ball Recoveries 90"
+        ]
+    },
+    "Number 6": {
+        "metrics": [
+            "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers",
+            "OBV", "Pass OBV", "Pr. Pass% Dif.", "PAdj Interceptions",
+            "PAdj Tackles", "Dribbles Stopped%", "Aggressive Actions",
+            "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains"
+        ]
+    },
+    "Number 8": {
+        "metrics": [
+            "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
+            "Passing%", "Deep Progressions", "OP Passes Into Box",
+            "Pass OBV", "OBV", "Deep Completions", "Pressure Regains",
+            "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90",
+            "Aggressive Actions"
+        ]
+    },
+    "Left Wing": {
+        "metrics": [
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
+            "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
+            "Fouls Won", "Deep Progressions", "Player Season Fhalf Pressures 90"
+        ]
+    },
+    "Right Wing": {
+        "metrics": [
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
+            "Successful Dribbles", "Turnovers", "OBV", "D&C OBV",
+            "Fouls Won", "Deep Progressions", "Player Season Fhalf Pressures 90"
+        ]
+    },
+    "Striker": {
+        "metrics": [
+            "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot", "Goal Conversion%",
+            "Touches In Box", "xG Assisted", "Fouls Won", "Deep Completions",
+            "OP Key Passes", "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90"
+        ]
+    },
     "Goalkeeper": {"metrics": []},  # keep for completeness
 }
 
@@ -135,7 +199,7 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
     return (p * 100.0).round(1)
 
 # ============================================================
-# Compute rankings (same as radar page)
+# Compute rankings (same logic, works with 8 groups)
 # ============================================================
 
 def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
@@ -143,18 +207,15 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # Collect metrics
-    all_metrics = set()
-    for v in position_metrics.values():
-        all_metrics.update(v["metrics"])
-    all_metrics = list(all_metrics)
+    # Collect all metrics across positions
+    all_metrics = [m for v in position_metrics.values() for m in v["metrics"]]
 
     for m in all_metrics:
         if m not in df_all.columns:
             df_all[m] = 0
         df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
 
-    # Z-scores
+    # Z-scores by position group
     raw_z_all = pd.DataFrame(index=df_all.index, columns=all_metrics, dtype=float)
     for m in all_metrics:
         z_per_group = df_all.groupby(pos_col)[m].transform(
@@ -164,65 +225,82 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
             z_per_group *= -1
         raw_z_all[m] = z_per_group.fillna(0)
 
+    # Average Z-score
     df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 
+    # Weighting with multipliers
     if "Multiplier" not in df_all.columns:
         df_all["Multiplier"] = 1.0
     df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-    # Scale to 0–100
-    eligible = df_all[pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0) >= min_minutes].copy()
+    # Scale Weighted Z to 0–100 within each position group
+    mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
+    eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
 
-    anchor_minmax = (
-        eligible.groupby(pos_col)["Weighted Z Score"].agg(_scale_min="min", _scale_max="max").fillna(0)
-    )
+    anchor_minmax = eligible.groupby(pos_col)["Weighted Z Score"].agg(
+        _scale_min="min", _scale_max="max"
+    ).fillna(0)
+
     df_all = df_all.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
-    def _minmax_score(val, lo, hi):
-        if pd.isna(val) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
+    def _minmax_score(v, lo, hi):
+        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
-        return np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df_all["Score (0–100)"] = [
         _minmax_score(v, lo, hi)
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
-    df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
-    df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
+    df_all["Score (0–100)"] = df_all["Score (0–100)"].round(1).fillna(0)
 
-    # Rank
+    # Ranking across all players
     df_all["Rank"] = df_all["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+    # Clean temp cols
+    df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
 
     return df_all
 
 # ============================================================
-# Formation plotting
+# Formation plotting (4-3-3 with 8 groups)
 # ============================================================
 
 def plot_team_433(df, club_name, league_name):
     formation_roles = {
         "GK": ["Goalkeeper"],
-        "LB": ["Full Back"], "LCB": ["Centre Back"], "RCB": ["Centre Back"], "RB": ["Full Back"],
+        "LB": ["Left Back"],
+        "LCB": ["Centre Back"],
+        "RCB": ["Centre Back"],
+        "RB": ["Right Back"],
         "CDM": ["Number 6"],
-        "LCM": ["Number 8"], "RCM": ["Number 8"],
-        "LW": ["Winger"], "RW": ["Winger"],
+        "LCM": ["Number 8"],
+        "RCM": ["Number 8"],
+        "LW": ["Left Wing"],
+        "RW": ["Right Wing"],
         "ST": ["Striker"],
     }
 
+    used_players = set()
     team_players = {}
+
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
         if "Score (0–100)" in subset.columns:
             subset = subset.sort_values("Score (0–100)", ascending=False)
-        if not subset.empty:
-            players = [f"{r['Player']} ({r['Score (0–100)']:.0f})" for _, r in subset.iterrows()]
-            team_players[pos] = players
-        else:
-            team_players[pos] = ["-"]
+        players = []
+        for _, r in subset.iterrows():
+            if r["Player"] not in used_players:
+                players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
+                used_players.add(r["Player"])
+            if len(players) >= 1:
+                break
+        team_players[pos] = players if players else ["-"]
 
+    # --- Pitch layout ---
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("white")
     ax.set_xlim(0, 100)
@@ -232,19 +310,25 @@ def plot_team_433(df, club_name, league_name):
 
     coords = {
         "GK": (50, 5),
-        "LB": (10, 25), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 25),
+        "LB": (15, 25),
+        "LCB": (35, 20),
+        "RCB": (65, 20),
+        "RB": (85, 25),
         "CDM": (50, 40),
-        "LCM": (30, 55), "RCM": (70, 55),
-        "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
+        "LCM": (30, 55),
+        "RCM": (70, 55),
+        "LW": (20, 75),
+        "ST": (50, 82),
+        "RW": (80, 75),
     }
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        ax.text(x, y, players[0], ha="center", va="center",
-                fontsize=9, color="black", weight="bold", wrap=True)
-        if len(players) > 1:
-            text_block = "\n".join(players[1:4])
-            ax.text(x, y - 3, text_block, ha="center", va="top", fontsize=7, color="black")
+        ax.text(
+            x, y, players[0],
+            ha="center", va="center",
+            fontsize=9, color="black", weight="bold", wrap=True
+        )
 
     st.pyplot(fig, use_container_width=True)
 
