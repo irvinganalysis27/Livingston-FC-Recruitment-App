@@ -175,32 +175,30 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 # ============================================================
 
 def plot_team_433(df, club_name, league_name):
-    formation_roles = {
-        "GK": ["Goalkeeper"],
-        "LB": ["Full Back"], "LCB": ["Centre Back"], "RCB": ["Centre Back"], "RB": ["Full Back"],
-        "CDM": ["Number 6"],
-        "LCM": ["Number 8"], "RCM": ["Number 8"],
-        "LW": ["Winger"], "RW": ["Winger"],
-        "ST": ["Striker"],
+    # Mapping from Primary Position -> 4-3-3 role
+    pos_map = {
+        "Goalkeeper": "GK",
+
+        "Left Back": "LB", "Left Wing Back": "LB",
+        "Right Back": "RB", "Right Wing Back": "RB",
+
+        "Left Centre Back": "LCB",
+        "Right Centre Back": "RCB",
+        "Centre Back": "CB",  # will assign to LCB/RCB if needed
+
+        "Centre Defensive Midfielder": "CDM",
+        "Left Defensive Midfielder": "CDM", "Right Defensive Midfielder": "CDM",
+
+        "Left Centre Midfielder": "LCM",
+        "Right Centre Midfielder": "RCM",
+        "Centre Attacking Midfielder": "LCM", "Right Attacking Midfielder": "RCM",
+        "Left Attacking Midfielder": "LCM",
+
+        "Left Wing": "LW", "Left Midfielder": "LW",
+        "Right Wing": "RW", "Right Midfielder": "RW",
+
+        "Centre Forward": "ST", "Left Centre Forward": "ST", "Right Centre Forward": "ST",
     }
-
-    team_players = {}
-    for pos, roles in formation_roles.items():
-        subset = df[df["Six-Group Position"].isin(roles)].copy()
-        if "Score (0–100)" in subset.columns:
-            subset = subset.sort_values("Score (0–100)", ascending=False)
-        if not subset.empty:
-            players = [f"{r['Player']} ({r['Score (0–100)']:.0f})" for _, r in subset.iterrows()]
-            team_players[pos] = players
-        else:
-            team_players[pos] = ["-"]
-
-    fig, ax = plt.subplots(figsize=(8, 10))
-    ax.set_facecolor("white")
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    ax.axis("off")
-    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
 
     coords = {
         "GK": (50, 5),
@@ -210,13 +208,55 @@ def plot_team_433(df, club_name, league_name):
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
     }
 
+    used_players = set()
+    team_players = {pos: ["-"] for pos in coords}
+
+    # Assign players based on mapping + Score
+    df = df.copy()
+    if "Score (0–100)" in df.columns:
+        df = df.sort_values("Score (0–100)", ascending=False)
+
+    for _, row in df.iterrows():
+        player = row["Player"]
+        score = row.get("Score (0–100)", 0)
+        pos = row.get("Position") or row.get("Primary Position")
+        if pd.isna(pos):
+            continue
+
+        mapped = pos_map.get(pos, None)
+        if not mapped:
+            continue
+
+        if player in used_players:
+            continue
+
+        # Handle shared roles (e.g. "CB" could be LCB or RCB)
+        if mapped == "CB":
+            if team_players["LCB"] == ["-"]:
+                slot = "LCB"
+            elif team_players["RCB"] == ["-"]:
+                slot = "RCB"
+            else:
+                continue
+        else:
+            slot = mapped
+
+        if team_players[slot] == ["-"]:
+            team_players[slot] = [f"{player} ({score:.0f})"]
+            used_players.add(player)
+
+    # --- Plot ---
+    fig, ax = plt.subplots(figsize=(8, 10))
+    ax.set_facecolor("white")
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    ax.axis("off")
+    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
+
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
         ax.text(x, y, players[0], ha="center", va="center",
                 fontsize=9, color="black", weight="bold", wrap=True)
-        if len(players) > 1:
-            text_block = "\n".join(players[1:4])
-            ax.text(x, y - 3, text_block, ha="center", va="top", fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
