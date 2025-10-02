@@ -236,7 +236,7 @@ def plot_team_433(df, club_name, league_name):
     used_players = set()
     team_players = {}
 
-        for pos, roles in formation_roles.items():
+    for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
         subset = subset.sort_values("Score (0–100)", ascending=False)
 
@@ -274,6 +274,7 @@ def plot_team_433(df, club_name, league_name):
             if pos not in team_players:
                 team_players[pos] = ["-"]
 
+    # Plotting
     fig, ax = plt.subplots(figsize=(8, 7.5))
     ax.set_facecolor("white")
     ax.set_xlim(0, 100)
