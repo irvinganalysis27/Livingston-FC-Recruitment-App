@@ -271,7 +271,7 @@ def plot_team_433(df, club_name, league_name):
                 fontsize=9, color="black", weight="bold", wrap=True)
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
-            ax.text(x, y - 3, text_block, ha="center", va="top", fontsize=7, color="black")
+            ax.text(x, y - 4, text_block, ha="center", va="top", fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
