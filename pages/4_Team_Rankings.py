@@ -60,7 +60,11 @@ for m in sel_metrics:
 df_all["Avg Z Score"] = raw_z_all.mean(axis=1)
 
 # Weighted Z with multipliers
-df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+if "Multiplier" in df_all.columns:
+    df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
+else:
+    df_all["Multiplier"] = 1.0
+
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
 # Scale Weighted Z to 0–100 within each position group
