@@ -152,7 +152,6 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     # Z-scores
     raw_z_all = pd.DataFrame(index=df_all.index, columns=all_metrics, dtype=float)
     for m in all_metrics:
-        group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
         z_per_group = df_all.groupby(pos_col)[m].transform(
             lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
         )
@@ -161,16 +160,16 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
         raw_z_all[m] = z_per_group.fillna(0)
 
     # Average Z
-    df_all["Avg Z Score"] = raw_z_all.mean(axis=1)
+    df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 
-    # Multiplier (default 1 if missing)
+    # Multiplier
     if "Multiplier" not in df_all.columns:
         df_all["Multiplier"] = 1.0
     df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
 
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-    # Scale to 0-100 per position
+    # Scale to 0–100
     eligible = df_all[pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0) >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
@@ -183,11 +182,7 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     df_all = df_all.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
     def _minmax_score(val, lo, hi):
-        try:
-            val, lo, hi = float(val), float(lo), float(hi)
-        except Exception:
-            return 50.0
-        if hi <= lo:
+        if pd.isna(val) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
         return np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
@@ -197,9 +192,9 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     ]
     df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
 
-    df_all["Rank"] = df_all.groupby(pos_col)["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-
+    # Clean up
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
+
     return df_all
 
 # ============================================================
