@@ -92,10 +92,38 @@ LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
+    print(f"[DEBUG] Trying to load file at: {p.resolve()}")
+
+    def try_excel() -> pd.DataFrame | None:
+        try:
+            import openpyxl
+            return pd.read_excel(p, engine="openpyxl")
+        except Exception:
+            return None
+
+    def try_csv() -> pd.DataFrame | None:
+        for kwargs in [
+            dict(sep=None, engine="python"),
+            dict(),
+            dict(encoding="latin1"),
+        ]:
+            try:
+                return pd.read_csv(p, **kwargs)
+            except Exception:
+                continue
+        return None
+
+    df = None
     if p.suffix.lower() in {".xlsx", ".xls"}:
-        return pd.read_excel(p)
+        df = try_excel() or try_csv()
     else:
-        return pd.read_csv(p)
+        df = try_csv() or try_excel()
+
+    if df is None:
+        raise ValueError(f"Unsupported or unreadable file: {p.name}")
+
+    print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
+    return df
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
     if path.is_file():
