@@ -46,6 +46,13 @@ try:
 
     st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
 
+    # ---------- Formation output ----------
+    df_club = df_all[df_all["Team"] == selected_club].copy()
+    plot_team_433(df_club, selected_club)
+
+except Exception as e:
+    st.error(f"Could not load data. Error: {e}")
+
         # ---------- Placeholder for formation ----------
     def plot_team_433(df, club_name):
         """
