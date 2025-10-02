@@ -15,7 +15,6 @@ show_branding()
 
 # ---------- Page Title ----------
 st.title("Team Rankings Page")
-st.write("This page will show a team’s best XI by ranking and allow comparison of league-only vs whole dataset.")
 
 # ---------- Load your data ----------
 ROOT_DIR = Path(__file__).parent.parent
