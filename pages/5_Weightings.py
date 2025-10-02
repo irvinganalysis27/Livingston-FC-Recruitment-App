@@ -9,7 +9,7 @@ if not check_password():
 
 # ---------- Branding ----------
 show_branding()
-st.title("Player Comparison Page")
+st.title("Player Comparison")
 
 # ---------- Define weightings ----------
 weightings_data = {
