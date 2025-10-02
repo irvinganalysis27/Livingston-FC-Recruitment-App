@@ -10,5 +10,5 @@ if not check_password():
 # Show branding header
 show_branding()
 
-st.title("Benchmarks Page")
+st.title("Benchmarks")
 st.write("This page will show benchmarks such as average, 75th percentile, and 90th percentile for each position.")
