@@ -184,24 +184,6 @@ def plot_team_433(df, club_name, league_name):
         "ST": ["Striker"],
     }
 
-    team_players = {}
-    for pos, roles in formation_roles.items():
-        subset = df[df["Six-Group Position"].isin(roles)].copy()
-        if "Score (0–100)" in subset.columns:
-            subset = subset.sort_values("Score (0–100)", ascending=False)
-        if not subset.empty:
-            players = [f"{r['Player']} ({r['Score (0–100)']:.0f})" for _, r in subset.iterrows()]
-            team_players[pos] = players
-        else:
-            team_players[pos] = ["-"]
-
-    fig, ax = plt.subplots(figsize=(8, 10))
-    ax.set_facecolor("white")
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    ax.axis("off")
-    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
-
     coords = {
         "GK": (50, 5),
         "LB": (10, 25), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 25),
@@ -210,10 +192,48 @@ def plot_team_433(df, club_name, league_name):
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
     }
 
+    used_players = set()
+    team_players = {}
+
+    for pos, roles in formation_roles.items():
+        # Base filter
+        subset = df[df["Six-Group Position"].isin(roles)].copy()
+
+        # Left vs Right refinement
+        if pos in ["LB", "LW"]:
+            subset = subset[subset["Position"].str.upper().str.contains("LEFT", na=False)]
+        elif pos in ["RB", "RW"]:
+            subset = subset[subset["Position"].str.upper().str.contains("RIGHT", na=False)]
+        elif pos in ["LCB"]:
+            subset = subset[subset["Position"].str.upper().str.contains("LEFT", na=False)]
+        elif pos in ["RCB"]:
+            subset = subset[subset["Position"].str.upper().str.contains("RIGHT", na=False)]
+
+        # Sort by score
+        if "Score (0–100)" in subset.columns:
+            subset = subset.sort_values("Score (0–100)", ascending=False)
+
+        # Remove duplicates
+        players = []
+        for _, r in subset.iterrows():
+            if r["Player"] not in used_players:
+                players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
+                used_players.add(r["Player"])
+        if not players:
+            players = ["-"]
+        team_players[pos] = players
+
+    # --- Plot ---
+    fig, ax = plt.subplots(figsize=(8, 10))
+    ax.set_facecolor("white")
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    ax.axis("off")
+    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
+
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        ax.text(x, y, players[0], ha="center", va="center",
-                fontsize=9, color="black", weight="bold", wrap=True)
+        ax.text(x, y, players[0], ha="center", va="center", fontsize=9, color="black", weight="bold", wrap=True)
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
             ax.text(x, y - 3, text_block, ha="center", va="top", fontsize=7, color="black")
