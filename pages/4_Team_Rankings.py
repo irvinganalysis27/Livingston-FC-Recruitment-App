@@ -250,7 +250,7 @@ def plot_team_433(df, club_name, league_name):
 
         team_players[pos] = players if players else ["-"]
 
-    fig, ax = plt.subplots(figsize=(8, 10))
+    fig, ax = plt.subplots(figsize=(8, 7.5))
     ax.set_facecolor("white")
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
