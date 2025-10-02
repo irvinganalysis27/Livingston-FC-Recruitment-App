@@ -35,10 +35,6 @@ st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}"
 
 # ---------- Formation plotting ----------
 def plot_team_433(df, club_name):
-    """
-    Plot a 4-3-3 formation with ranked players for each position.
-    df should already be filtered to the selected club.
-    """
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Full Back"],
@@ -53,16 +49,29 @@ def plot_team_433(df, club_name):
         "ST": ["Striker"],
     }
 
+    # --- Normalise score column name ---
+    score_col = None
+    for c in df.columns:
+        if "Score" in c:   # catch "Score (0–100)" with en-dash
+            score_col = c
+            break
+    if score_col is None:
+        st.error("No Score column found in dataframe.")
+        return
+
     team_players = {}
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
-        if "Score (0–100)" in subset.columns:
-            subset = subset.sort_values("Score (0–100)", ascending=False)
+        if score_col in subset.columns:
+            subset = subset.sort_values(score_col, ascending=False)
         elif "Rank" in subset.columns:
             subset = subset.sort_values("Rank", ascending=True)
+
         if not subset.empty:
-            # Keep name + score in display
-            players = [f"{r['Player']} ({r.get('Score (0–100)', '')})" for _, r in subset.iterrows()]
+            players = [
+                f"{r['Player']} ({round(r.get(score_col, 0), 1)})"
+                for _, r in subset.iterrows()
+            ]
             team_players[pos] = players
         else:
             team_players[pos] = ["-"]
@@ -83,15 +92,16 @@ def plot_team_433(df, club_name):
         "LW": (20, 75), "ST": (50, 80), "RW": (80, 75),
     }
 
-    # Plot each role
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
         # Main player with score
-        ax.text(x, y, players[0], ha="center", va="center", fontsize=9, color="black", weight="bold", wrap=True)
-        # Remaining players with scores too
+        ax.text(x, y, players[0], ha="center", va="center",
+                fontsize=9, color="black", weight="bold", wrap=True)
+        # Subs below
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
-            ax.text(x, y - 7, text_block, ha="center", va="top", fontsize=7, color="black")
+            ax.text(x, y - 7, text_block, ha="center", va="top",
+                    fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
