@@ -114,13 +114,13 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     if minutes_col not in df_all.columns: df_all[minutes_col] = np.nan
     if "Multiplier" not in df_all.columns: df_all["Multiplier"] = 1.0
 
-    # All metrics
-    all_metrics = {m for role in position_metrics.values() for m in role["metrics"]}
+    # All metrics (ensure list, not set, so column order is stable)
+    all_metrics = [m for role in position_metrics.values() for m in role["metrics"]]
     df_all = df_all.copy()
     for m in all_metrics:
         if m not in df_all.columns:
             df_all[m] = 0
-        df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+        raw_z_all = pd.DataFrame(index=df_all.index, columns=all_metrics, dtype=float)
 
     # Z-scores
     raw_z_all = pd.DataFrame(index=df_all.index, columns=all_metrics, dtype=float)
