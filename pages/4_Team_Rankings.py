@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import matplotlib.pyplot as plt
+import re
 from auth import check_password
 from branding import show_branding
-import matplotlib.pyplot as plt
 
 # ---------- Protect page ----------
 if not check_password():
@@ -24,15 +25,13 @@ if not DATA_PATH.exists():
 
 @st.cache_data
 def load_data(path: Path) -> pd.DataFrame:
-    if path.suffix.lower() in [".csv"]:
+    if path.suffix.lower() == ".csv":
         df = pd.read_csv(path)
     else:
         df = pd.read_excel(path)
     return df
 
 # ---------- Position mapping helpers ----------
-import re
-
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
@@ -42,17 +41,23 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
+    # Full backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    # Centre backs
     "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    # Midfielders
     "CENTREMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
     "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
     "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    # Wingers
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+    # Goalkeeper
     "GOALKEEPER": "Goalkeeper",
 }
 
@@ -60,19 +65,12 @@ def map_first_position_to_group(primary_pos_cell) -> str:
     tok = _clean_pos_token(primary_pos_cell)
     return RAW_TO_SIX.get(tok, None)
 
-# ---------- After loading df_all ----------
-if "Position" in df_all.columns:
-    df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
-else:
-    df_all["Six-Group Position"] = None
-
-# ---------- Formation plotting function ----------
+# ---------- Formation plotting ----------
 def plot_team_433(df, club_name):
     """
     Plot a 4-3-3 formation with ranked players for each position.
     df should already be filtered to the selected club.
     """
-    # Define roles we want in formation
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Full Back"],
@@ -87,7 +85,7 @@ def plot_team_433(df, club_name):
         "ST": ["Striker"],
     }
 
-    # Grab best players in each role
+    # Best players per role
     team_players = {}
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
@@ -101,7 +99,7 @@ def plot_team_433(df, club_name):
         else:
             team_players[pos] = ["-"]
 
-    # --- Plot pitch (basic)
+    # --- Pitch
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("green")
     ax.set_xlim(0, 100)
@@ -109,7 +107,7 @@ def plot_team_433(df, club_name):
     ax.axis("off")
     ax.set_title(f"{club_name} – Best XI (4-3-3)", color="white", fontsize=16, weight="bold")
 
-    # Position coordinates
+    # Position coords
     coords = {
         "GK": (50, 5),
         "LB": (20, 20), "LCB": (40, 20), "RCB": (60, 20), "RB": (80, 20),
@@ -133,17 +131,24 @@ def plot_team_433(df, club_name):
 try:
     df_all = load_data(DATA_PATH)
 
-    league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
+    # Ensure Six-Group Position exists
+    if "Position" in df_all.columns:
+        df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
+    else:
+        df_all["Six-Group Position"] = None
 
+    # League filter
+    league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
     league_options = sorted(df_all[league_col].dropna().unique())
     selected_league = st.selectbox("Select League", league_options)
 
+    # Club filter
     club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
     selected_club = st.selectbox("Select Club", club_options)
 
     st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
 
-    # Filter and plot
+    # Filter to club + plot formation
     df_club = df_all[df_all["Team"] == selected_club].copy()
     plot_team_433(df_club, selected_club)
 
