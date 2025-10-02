@@ -11,15 +11,63 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+import sqlite3
+from pathlib import Path
 
-# Protect page
+# --- Database setup ---
+DB_PATH = Path(__file__).parent / "favourites.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS favourites (
+            player TEXT PRIMARY KEY,
+            team TEXT,
+            league TEXT,
+            position TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()  # ensure DB exists on startup
+
+# --- Favourite helper functions ---
+def add_favourite(player, team=None, league=None, position=None):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO favourites (player, team, league, position)
+        VALUES (?, ?, ?, ?)
+    """, (player, team, league, position))
+    conn.commit()
+    conn.close()
+
+def remove_favourite(player):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM favourites WHERE player=?", (player,))
+    conn.commit()
+    conn.close()
+
+def get_favourites():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT player, team, league, position FROM favourites ORDER BY timestamp DESC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+# --- Password protection ---
 from auth import check_password
+from branding import show_branding
+
 if not check_password():
     st.stop()
 
-# Show branding header
 show_branding()
-
 st.title("Player Radar")
 
 APP_DIR = Path(__file__).parent          # pages/
@@ -1233,7 +1281,7 @@ if st.session_state.selected_player:
         group_colors
     )
 
-# ---------- Ranking table ----------
+# ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
 # Include Score (0–100) so we can sort by it and display it
@@ -1242,7 +1290,6 @@ cols_for_table = [
     "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
 ]
 
-# Ensure the columns exist (defensive)
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
@@ -1253,18 +1300,36 @@ z_ranking = (
     .reset_index(drop=True)
 )
 
-# Nice display tweaks
+# Clean up
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-# 1-based row index
+z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
-# Format Minutes played to integer (no decimals)
-if "Minutes played" in z_ranking.columns:
-    z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+# ---- Favourites column from DB ----
+favs_in_db = {row[0] for row in get_favourites()}   # get player names from DB
+z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-st.dataframe(z_ranking, use_container_width=True)
+# ---- Editable table ----
+edited_df = st.data_editor(
+    z_ranking,
+    column_config={
+        "⭐ Favourite": st.column_config.CheckboxColumn(
+            "⭐ Favourite", help="Mark as favourite", default=False
+        )
+    },
+    hide_index=False,
+    use_container_width=True,
+)
+
+# ---- Sync changes back to DB ----
+for _, row in edited_df.iterrows():
+    player = row["Player"]
+    if row["⭐ Favourite"] and player not in favs_in_db:
+        add_favourite(player, row.get("Team"), row.get("League"), row.get("Positions played"))
+    elif not row["⭐ Favourite"] and player in favs_in_db:
+        remove_favourite(player)
