@@ -236,43 +236,43 @@ def plot_team_433(df, club_name, league_name):
     used_players = set()
     team_players = {}
 
-    for pos, roles in formation_roles.items():
-    subset = df[df["Six-Group Position"].isin(roles)].copy()
-    subset = subset.sort_values("Score (0–100)", ascending=False)
+        for pos, roles in formation_roles.items():
+        subset = df[df["Six-Group Position"].isin(roles)].copy()
+        subset = subset.sort_values("Score (0–100)", ascending=False)
 
-    players = []
+        players = []
 
-    # Special case: Centre Backs (two spots, LCB + RCB)
-    if pos in ["LCB", "RCB"] and "Centre Back" in roles:
-        for _, r in subset.head(2).iterrows():
-            if r["Player"] not in used_players:
-                players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
-                used_players.add(r["Player"])
-        if players:
-            team_players[pos] = [players.pop(0)]
+        # Special case: Centre Backs (two spots, LCB + RCB)
+        if pos in ["LCB", "RCB"] and "Centre Back" in roles:
+            for _, r in subset.head(2).iterrows():
+                if r["Player"] not in used_players:
+                    players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
+                    used_players.add(r["Player"])
+            if players:
+                team_players[pos] = [players.pop(0)]
+            else:
+                team_players[pos] = ["-"]
+
+        # Special case: Number 8s (two spots, LCM + RCM)
+        elif pos in ["LCM", "RCM"] and "Number 8" in roles:
+            for _, r in subset.head(2).iterrows():
+                if r["Player"] not in used_players:
+                    players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
+                    used_players.add(r["Player"])
+            if players:
+                team_players[pos] = [players.pop(0)]
+            else:
+                team_players[pos] = ["-"]
+
+        # Normal case (all other positions)
         else:
-            team_players[pos] = ["-"]
-
-    # Special case: Number 8s (two spots, LCM + RCM)
-    elif pos in ["LCM", "RCM"] and "Number 8" in roles:
-        for _, r in subset.head(2).iterrows():
-            if r["Player"] not in used_players:
-                players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
-                used_players.add(r["Player"])
-        if players:
-            team_players[pos] = [players.pop(0)]
-        else:
-            team_players[pos] = ["-"]
-
-    # Normal case (all other positions)
-    else:
-        for _, r in subset.iterrows():
-            if r["Player"] not in used_players:
-                team_players[pos] = [f"{r['Player']} ({r['Score (0–100)']:.0f})"]
-                used_players.add(r["Player"])
-                break
-        if pos not in team_players:
-            team_players[pos] = ["-"]
+            for _, r in subset.iterrows():
+                if r["Player"] not in used_players:
+                    team_players[pos] = [f"{r['Player']} ({r['Score (0–100)']:.0f})"]
+                    used_players.add(r["Player"])
+                    break
+            if pos not in team_players:
+                team_players[pos] = ["-"]
 
     fig, ax = plt.subplots(figsize=(8, 7.5))
     ax.set_facecolor("white")
