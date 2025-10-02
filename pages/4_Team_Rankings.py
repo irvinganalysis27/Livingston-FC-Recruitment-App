@@ -18,7 +18,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("Team Rankings Page")
+st.title("Team Rankings")
 
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
