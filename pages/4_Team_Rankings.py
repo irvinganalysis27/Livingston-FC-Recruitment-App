@@ -25,7 +25,7 @@ ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 # ============================================================
-# Position mapping (split to 8 roles)
+# Position mapping (split into 8 roles)
 # ============================================================
 
 RAW_TO_EIGHT = {
@@ -75,14 +75,16 @@ def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
     t = str(tok).upper().strip()
-    t = re.sub(r"[.\-_/]", "", t)
+    # keep same as working 6-role version
+    t = re.sub(r"[.\-_/]", " ", t)
+    t = re.sub(r"\s+", "", t)
     return t
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     return RAW_TO_EIGHT.get(_clean_pos_token(primary_pos_cell), None)
 
 # ============================================================
-# Position metrics (pulled from radar page)
+# Position metrics (from radar page)
 # ============================================================
 
 position_metrics = {
@@ -127,7 +129,6 @@ LOWER_IS_BETTER = {"Turnovers","Fouls","Pr. Long Balls","UPr. Long Balls"}
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    print(f"[DEBUG] Loading {p}")
     if p.suffix.lower() in {".xlsx", ".xls"}:
         return pd.read_excel(p, engine="openpyxl")
     else:
