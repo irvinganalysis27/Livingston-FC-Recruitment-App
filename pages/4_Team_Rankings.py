@@ -70,21 +70,50 @@ def map_first_position_to_group(pos: str) -> str:
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
-    if p.suffix.lower() in {".xlsx", ".xls"}:
+    print(f"[DEBUG] Trying to load file at: {p.resolve()}")
+
+    def try_excel() -> pd.DataFrame | None:
         try:
+            import openpyxl
             return pd.read_excel(p, engine="openpyxl")
-        except Exception:
-            return pd.read_excel(p)  # fallback
-    else:
-        # Robust CSV loader with fallbacks
-        for kwargs in [dict(sep=None, engine="python"), {}, dict(encoding="latin1")]:
+        except ImportError:
+            print("[DEBUG] openpyxl not available, trying CSV reader next.")
+            return None
+        except Exception as e:
+            print(f"[DEBUG] Excel read failed: {e}. Trying CSV instead.")
+            return None
+
+    def try_csv() -> pd.DataFrame | None:
+        # Try multiple CSV parsing strategies
+        for kwargs in [
+            dict(sep=None, engine="python"),  # auto-detect delimiter
+            dict(),                           # default
+            dict(encoding="latin1"),          # fallback encoding
+        ]:
             try:
                 df = pd.read_csv(p, **kwargs)
-                if not df.empty:
+                if not df.empty and len(df.columns) > 1:
                     return df
             except Exception:
                 continue
-    raise ValueError(f"Unsupported or unreadable file: {p.name}")
+        return None
+
+    # Choose reader
+    df = None
+    if p.suffix.lower() in {".xlsx", ".xls"}:
+        df = try_excel()
+        if df is None:
+            df = try_csv()
+    else:
+        df = try_csv()
+        if df is None:
+            df = try_excel()
+
+    if df is None:
+        raise ValueError(f"Unsupported or unreadable file: {p.name}")
+
+    print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
+    return df
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
     if path.is_file():
