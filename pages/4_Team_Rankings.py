@@ -270,14 +270,15 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 # ============================================================
 
 def plot_team_433(df, club_name, league_name):
+    # Define formation roles
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Left Back"],
-        "LCB": ["Centre Back"],
-        "RCB": ["Centre Back"],
         "RB": ["Right Back"],
+        "LCB": ["Centre Back"],  # will pull best 2 CBs
+        "RCB": ["Centre Back"],
         "CDM": ["Number 6"],
-        "LCM": ["Number 8"],
+        "LCM": ["Number 8"],     # will pull best 2 8s
         "RCM": ["Number 8"],
         "LW": ["Left Wing"],
         "RW": ["Right Wing"],
@@ -287,7 +288,47 @@ def plot_team_433(df, club_name, league_name):
     used_players = set()
     team_players = {}
 
+    # Special handling for CBs (split into LCB + RCB)
+    cb_subset = df[df["Six-Group Position"] == "Centre Back"].copy()
+    cb_subset = cb_subset.sort_values("Score (0–100)", ascending=False)
+    cb_players = cb_subset["Player"].tolist()
+    cb_scores = cb_subset["Score (0–100)"].tolist()
+
+    if len(cb_players) > 0:
+        team_players["LCB"] = [f"{cb_players[0]} ({cb_scores[0]:.0f})"]
+        used_players.add(cb_players[0])
+    else:
+        team_players["LCB"] = ["-"]
+
+    if len(cb_players) > 1:
+        team_players["RCB"] = [f"{cb_players[1]} ({cb_scores[1]:.0f})"]
+        used_players.add(cb_players[1])
+    else:
+        team_players["RCB"] = ["-"]
+
+    # Special handling for CMs (split into LCM + RCM)
+    cm_subset = df[df["Six-Group Position"] == "Number 8"].copy()
+    cm_subset = cm_subset.sort_values("Score (0–100)", ascending=False)
+    cm_players = cm_subset["Player"].tolist()
+    cm_scores = cm_subset["Score (0–100)"].tolist()
+
+    if len(cm_players) > 0:
+        team_players["LCM"] = [f"{cm_players[0]} ({cm_scores[0]:.0f})"]
+        used_players.add(cm_players[0])
+    else:
+        team_players["LCM"] = ["-"]
+
+    if len(cm_players) > 1:
+        team_players["RCM"] = [f"{cm_players[1]} ({cm_scores[1]:.0f})"]
+        used_players.add(cm_players[1])
+    else:
+        team_players["RCM"] = ["-"]
+
+    # Fill other roles normally
     for pos, roles in formation_roles.items():
+        if pos in ["LCB", "RCB", "LCM", "RCM"]:  # already handled
+            continue
+
         subset = df[df["Six-Group Position"].isin(roles)].copy()
         subset = subset.sort_values("Score (0–100)", ascending=False)
 
@@ -296,12 +337,12 @@ def plot_team_433(df, club_name, league_name):
             if r["Player"] not in used_players:
                 players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
                 used_players.add(r["Player"])
-            if len(players) >= 3:   # show up to 3 players per position
+            if len(players) >= 3:   # starter + 2 backups
                 break
 
         team_players[pos] = players if players else ["-"]
 
-    # --- Pitch layout ---
+    # Pitch plotting
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("white")
     ax.set_xlim(0, 100)
@@ -309,29 +350,25 @@ def plot_team_433(df, club_name, league_name):
     ax.axis("off")
     ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
 
+    # Coordinates for a 4-3-3
     coords = {
         "GK": (50, 5),
-        "LB": (15, 25),
-        "LCB": (35, 20),
-        "RCB": (65, 20),
-        "RB": (85, 25),
+        "LB": (15, 25), "LCB": (35, 20), "RCB": (65, 20), "RB": (85, 25),
         "CDM": (50, 40),
-        "LCM": (30, 55),
-        "RCM": (70, 55),
-        "LW": (20, 75),
-        "ST": (50, 82),
-        "RW": (80, 75),
+        "LCM": (30, 55), "RCM": (70, 55),
+        "LW": (20, 75), "ST": (50, 82), "RW": (80, 75),
     }
 
+    # Place players neatly
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Starter
+        # Starter bold at exact spot
         ax.text(x, y, players[0], ha="center", va="center",
                 fontsize=9, color="black", weight="bold", wrap=True)
-        # Backups
+        # Backups stacked neatly below
         if len(players) > 1:
-            text_block = "\n".join(players[1:])
-            ax.text(x, y - 5, text_block, ha="center", va="top",
+            backup_text = "\n".join(players[1:])
+            ax.text(x, y - 5, backup_text, ha="center", va="top",
                     fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
