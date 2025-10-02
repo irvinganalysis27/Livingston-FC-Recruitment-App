@@ -30,18 +30,46 @@ DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 # Position mapping + metrics (same as radar page)
 # ============================================================
 
-RAW_TO_SIX = {
-    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
-    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    "CENTREMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8", "10": "Number 8",
-    "RIGHTWING": "Winger", "LEFTWING": "Winger",
-    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+RAW_TO_EIGHT = {
+    # Full backs
+    "LEFTBACK": "Left Back", "LEFTWINGBACK": "Left Back",
+    "RIGHTBACK": "Right Back", "RIGHTWINGBACK": "Right Back",
+
+    # Centre backs
+    "CENTREBACK": "Centre Back",
+    "LEFTCENTREBACK": "Centre Back",
+    "RIGHTCENTREBACK": "Centre Back",
+
+    # Defensive mids (Number 6)
+    "DEFENSIVEMIDFIELDER": "Number 6",
+    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+
+    # Central mids (Number 8)
+    "CENTREMIDFIELDER": "Number 8",
+    "LEFTCENTREMIDFIELDER": "Number 8",
+    "RIGHTCENTREMIDFIELDER": "Number 8",
+
+    # Attacking mids (Number 8)
+    "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8",
+    "10": "Number 8",
+
+    # Wingers
+    "LEFTWING": "Left Wing",
+    "LEFTMIDFIELDER": "Left Wing",
+    "RIGHTWING": "Right Wing",
+    "RIGHTMIDFIELDER": "Right Wing",
+
+    # Strikers
+    "CENTREFORWARD": "Striker",
+    "LEFTCENTREFORWARD": "Striker",
+    "RIGHTCENTREFORWARD": "Striker",
+
+    # Goalkeeper
     "GOALKEEPER": "Goalkeeper",
 }
 
@@ -55,7 +83,7 @@ def _clean_pos_token(tok: str) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = _clean_pos_token(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)
+    return RAW_TO_EIGHT.get(tok, None)
 
 # Position metrics from radar page
 position_metrics = {
