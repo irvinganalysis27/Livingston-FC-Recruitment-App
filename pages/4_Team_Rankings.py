@@ -29,45 +29,17 @@ DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 # ============================================================
 
 RAW_TO_EIGHT = {
-    # Full backs
     "LEFTBACK": "Left Back", "LEFTWINGBACK": "Left Back",
     "RIGHTBACK": "Right Back", "RIGHTWINGBACK": "Right Back",
-
-    # Centre backs
-    "CENTREBACK": "Centre Back",
-    "LEFTCENTREBACK": "Centre Back",
-    "RIGHTCENTREBACK": "Centre Back",
-
-    # Defensive mids (Number 6)
-    "DEFENSIVEMIDFIELDER": "Number 6",
-    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-
-    # Central mids (Number 8)
-    "CENTREMIDFIELDER": "Number 8",
-    "LEFTCENTREMIDFIELDER": "Number 8",
-    "RIGHTCENTREMIDFIELDER": "Number 8",
-
-    # Attacking mids (Number 8)
-    "CENTREATTACKINGMIDFIELDER": "Number 8",
-    "LEFTATTACKINGMIDFIELDER": "Number 8",
-    "RIGHTATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8",
-    "10": "Number 8",
-
-    # Wingers
-    "LEFTWING": "Left Wing",
-    "LEFTMIDFIELDER": "Left Wing",
-    "RIGHTWING": "Right Wing",
-    "RIGHTMIDFIELDER": "Right Wing",
-
-    # Strikers
-    "CENTREFORWARD": "Striker",
-    "LEFTCENTREFORWARD": "Striker",
-    "RIGHTCENTREFORWARD": "Striker",
-
-    # Goalkeeper
+    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
+    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    "LEFTWING": "Left Wing", "LEFTMIDFIELDER": "Left Wing",
+    "RIGHTWING": "Right Wing", "RIGHTMIDFIELDER": "Right Wing",
+    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
     "GOALKEEPER": "Goalkeeper",
 }
 
@@ -220,10 +192,10 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     return df_all
 
 # ============================================================
-# Formation plotting (updated to 8 groups)
+# Formation plotting (updated with minutes filter)
 # ============================================================
 
-def plot_team_433(df, club_name, league_name):
+def plot_team_433(df, club_name, league_name, min_minutes_selection):
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Left Back"], "LCB": ["Centre Back"], "RCB": ["Centre Back"], "RB": ["Right Back"],
@@ -232,6 +204,10 @@ def plot_team_433(df, club_name, league_name):
         "LW": ["Left Wing"], "RW": ["Right Wing"],
         "ST": ["Striker"],
     }
+
+    # Apply squad minutes filter
+    df["_minutes_numeric"] = pd.to_numeric(df["Minutes played"], errors="coerce").fillna(0)
+    df = df[df["_minutes_numeric"] >= min_minutes_selection].copy()
 
     used_players = set()
     team_players = {}
@@ -299,9 +275,12 @@ try:
     club_options = sorted(df_all.loc[df_all[league_col]==selected_league,"Team"].dropna().unique())
     selected_club = st.selectbox("Select Club", club_options)
 
+    # NEW: minutes filter for squad selection
+    min_minutes_selection = st.number_input("Minimum minutes for squad selection", value=1000, step=100)
+
     st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
     df_club = df_all[df_all["Team"]==selected_club].copy()
-    plot_team_433(df_club, selected_club, selected_league)
+    plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
 
 except Exception as e:
     st.error(f"Could not load data. Error: {e}")
