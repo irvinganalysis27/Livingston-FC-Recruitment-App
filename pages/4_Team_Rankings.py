@@ -248,9 +248,8 @@ def plot_team_433(df, club_name, league_name):
             if r["Player"] not in used_players:
                 players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
                 used_players.add(r["Player"])
-        # Ensure both LCB and RCB get one player each
         if players:
-            team_players[pos] = [players.pop(0)] if players else ["-"]
+            team_players[pos] = [players.pop(0)]
         else:
             team_players[pos] = ["-"]
 
@@ -261,7 +260,7 @@ def plot_team_433(df, club_name, league_name):
                 players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
                 used_players.add(r["Player"])
         if players:
-            team_players[pos] = [players.pop(0)] if players else ["-"]
+            team_players[pos] = [players.pop(0)]
         else:
             team_players[pos] = ["-"]
 
