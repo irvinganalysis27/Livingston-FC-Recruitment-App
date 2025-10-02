@@ -30,6 +30,42 @@ def load_data(path: Path) -> pd.DataFrame:
         df = pd.read_excel(path)
     return df
 
+# ---------- Position mapping helpers ----------
+import re
+
+def _clean_pos_token(tok: str) -> str:
+    if pd.isna(tok):
+        return ""
+    t = str(tok).upper().strip()
+    t = re.sub(r"[.\-_/]", " ", t)
+    t = re.sub(r"\s+", "", t)
+    return t
+
+RAW_TO_SIX = {
+    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
+    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    "CENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
+    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    "RIGHTWING": "Winger", "LEFTWING": "Winger",
+    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+    "GOALKEEPER": "Goalkeeper",
+}
+
+def map_first_position_to_group(primary_pos_cell) -> str:
+    tok = _clean_pos_token(primary_pos_cell)
+    return RAW_TO_SIX.get(tok, None)
+
+# ---------- After loading df_all ----------
+if "Position" in df_all.columns:
+    df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
+else:
+    df_all["Six-Group Position"] = None
+
 # ---------- Formation plotting function ----------
 def plot_team_433(df, club_name):
     """
