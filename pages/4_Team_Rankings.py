@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-import re
 from datetime import datetime
 
 from auth import check_password
@@ -18,7 +17,6 @@ if not check_password():
 
 # ---------- Branding ----------
 show_branding()
-
 st.title("Team Rankings Page")
 
 # ---------- Load your data ----------
@@ -27,28 +25,52 @@ ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.strip()
+    .str.replace(u"\xa0", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+)
+
+# Add Age if Birth Date exists
+if "Birth Date" in df_all_raw.columns:
+    today = datetime.today()
+    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
+        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if pd.notna(dob) else np.nan
+    )
+
 df_all = preprocess_df(df_all_raw)
 
-# ---------- Ranking logic (copied from radar page) ----------
-pos_col = "Six-Group Position"
-minutes_col = "Minutes played"
-
-# Ensure numeric Minutes
-if minutes_col not in df_all.columns:
-    df_all[minutes_col] = np.nan
-df_all[minutes_col] = pd.to_numeric(df_all[minutes_col], errors="coerce")
-
-# Pick metrics for ranking = all numeric cols except identifiers
-exclude_cols = {"Player", "Team", "Competition", "Competition_norm",
-                "Six-Group Position", "Positions played", "Birth Date"}
-sel_metrics = [c for c in df_all.columns if c not in exclude_cols and pd.api.types.is_numeric_dtype(df_all[c])]
-
+# ---------- Ranking logic (same as radar page) ----------
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
+pos_col = "Six-Group Position"
 
-# Raw Z-scores per metric per position
-raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
+    r = series.rank(pct=True, ascending=True)
+    if lower_is_better:
+        return (1.0 - r) * 100.0
+    else:
+        return r * 100.0
+
+# Collect metrics across all positions
+metrics_all = []
+from pages.1_Player_Radar import position_metrics  # <-- if your radar metrics dict lives there
+for pos in position_metrics:
+    metrics_all.extend(position_metrics[pos]["metrics"])
+metrics_all = list(set(metrics_all))
+
+# Ensure numeric
+for m in metrics_all:
+    if m not in df_all.columns:
+        df_all[m] = 0
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+
+# Z-scores
+raw_z_all = pd.DataFrame(index=df_all.index, columns=metrics_all, dtype=float)
+for m in metrics_all:
+    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
     z_per_group = df_all.groupby(pos_col)[m].transform(
         lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
     )
@@ -56,20 +78,13 @@ for m in sel_metrics:
         z_per_group *= -1
     raw_z_all[m] = z_per_group.fillna(0)
 
-# Average Z
 df_all["Avg Z Score"] = raw_z_all.mean(axis=1)
-
-# Weighted Z with multipliers
-if "Multiplier" in df_all.columns:
-    df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
-else:
-    df_all["Multiplier"] = 1.0
-
+df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-# Scale Weighted Z to 0–100 within each position group
-anchor_minutes_floor = 600
-eligible = df_all[df_all[minutes_col] >= anchor_minutes_floor].copy()
+# Anchors (per position)
+_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
+eligible = df_all[_mins_all >= 600].copy()
 if eligible.empty:
     eligible = df_all.copy()
 
@@ -82,12 +97,7 @@ anchor_minmax = (
 df_all = df_all.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
 def _minmax_score(val, lo, hi):
-    try:
-        val, lo, hi = float(val), float(lo), float(hi)
-    except Exception:
-        return 0.0
-    if hi <= lo:
-        return 50.0
+    if hi <= lo: return 50.0
     return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
 
 df_all["Score (0–100)"] = [
@@ -95,8 +105,6 @@ df_all["Score (0–100)"] = [
     for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
 ]
 df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
-
-# Rank players within dataset
 df_all["Rank"] = df_all["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
 # ---------- League & Club Filters ----------
@@ -129,21 +137,16 @@ def plot_team_433(df, club_name, league_name):
     team_players = {}
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
-        if score_col in subset.columns:
-            subset = subset.sort_values(score_col, ascending=False)
-        elif "Rank" in subset.columns:
-            subset = subset.sort_values("Rank", ascending=True)
-
+        subset = subset.sort_values(score_col, ascending=False)
         if not subset.empty:
             players = [
-                f"{r['Player']} ({int(round(r.get(score_col, 0)))})"
+                f"{r['Player']} ({int(r[score_col])})"
                 for _, r in subset.iterrows()
             ]
             team_players[pos] = players
         else:
             team_players[pos] = ["-"]
 
-    # --- Pitch
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.set_facecolor("white")
     ax.set_xlim(0, 100)
