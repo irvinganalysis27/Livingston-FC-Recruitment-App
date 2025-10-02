@@ -22,11 +22,28 @@ def get_favourites():
     conn.close()
     return rows
 
+def remove_favourite(player):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM favourites WHERE player=?", (player,))
+    conn.commit()
+    conn.close()
+
 # Fetch and display favourites
 favs = get_favourites()
 
 if favs:
     st.markdown("### Your Favourites")
-    st.table(favs)   # or st.dataframe if you want sorting/filtering
+
+    for player, team, league, position, ts in favs:
+        col1, col2 = st.columns([5,1])
+        with col1:
+            st.write(f"**{player}** | {team} | {league} | {position}")
+        with col2:
+            if st.button("❌ Remove", key=f"remove_{player}"):
+                remove_favourite(player)
+                st.success(f"Removed {player} from favourites")
+                st.experimental_rerun()
+
 else:
     st.info("No favourites have been added yet.")
