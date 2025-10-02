@@ -84,7 +84,7 @@ def plot_team_433(df, club_name):
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
-    ax.set_title(f"{club_name}", color="black", fontsize=16, weight="bold")
+    ax.set_title(f"{club_name} ({selected_league})", color="black", fontsize=16, weight="bold")
 
     coords = {
         "GK": (50, 5),
