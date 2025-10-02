@@ -20,6 +20,10 @@ st.write("This page will show a team’s best XI by ranking and allow comparison
 ROOT_DIR = Path(__file__).parent.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
+if not DATA_PATH.exists():
+    st.error(f"Data file not found at {DATA_PATH}. Please upload or move it.")
+    st.stop()
+
 @st.cache_data
 def load_data(path: Path) -> pd.DataFrame:
     if path.suffix.lower() in [".csv"]:
