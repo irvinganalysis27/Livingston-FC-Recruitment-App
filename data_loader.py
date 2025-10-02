@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import re
+import streamlit as st
 
 # ---------- League name normalisation ----------
 LEAGUE_SYNONYMS = {
@@ -112,14 +113,28 @@ def load_one_file(p: Path) -> pd.DataFrame:
                 continue
     raise ValueError(f"Unsupported or unreadable file: {p.name}")
 
-def load_statsbomb(path: Path) -> pd.DataFrame:
+def _data_signature(path: Path):
+    """Create a signature for Streamlit caching (prevents stale cache)."""
     if path.is_file():
-        df = load_one_file(path)
+        s = path.stat()
+        return ("file", str(path.resolve()), s.st_size, int(s.st_mtime))
+    else:
+        sigs = []
+        for f in sorted(path.iterdir()):
+            if f.is_file():
+                s = f.stat()
+                sigs.append((str(f.resolve()), s.st_size, int(s.st_mtime)))
+        return ("dir", str(path.resolve()), tuple(sigs))
+
+@st.cache_data(show_spinner=False)
+def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
+    """Load CSV/XLSX file(s) into a dataframe with Streamlit cache support."""
+    if path.is_file():
+        return load_one_file(path)
     else:
         files = sorted([f for f in path.iterdir() if f.is_file()])
         frames = [load_one_file(f) for f in files]
-        df = pd.concat(frames, ignore_index=True, sort=False)
-    return df
+        return pd.concat(frames, ignore_index=True, sort=False)
 
 # ---------- Preprocessing ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
@@ -175,5 +190,5 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Combined loader + preprocess ----------
 def load_and_preprocess(path: Path) -> pd.DataFrame:
-    raw = load_statsbomb(path)
+    raw = load_statsbomb(path, _sig=_data_signature(path))
     return preprocess_df(raw)
