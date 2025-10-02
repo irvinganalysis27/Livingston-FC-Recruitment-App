@@ -89,7 +89,7 @@ def plot_team_433(df, club_name):
     coords = {
         "GK": (50, 5),
         # Fullbacks pushed wider, centre-backs stay same
-        "LB": (10, 20), "LCB": (40, 20), "RCB": (60, 20), "RB": (90, 20),
+        "LB": (10, 20), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 20),
         "CDM": (50, 40),
         "LCM": (30, 55), "RCM": (70, 55),
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
