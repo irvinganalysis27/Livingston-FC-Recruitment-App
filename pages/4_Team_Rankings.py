@@ -1,5 +1,4 @@
 # pages/4_Team_Rankings.py
-
 import streamlit as st
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -36,7 +35,7 @@ selected_club = st.selectbox("Select Club", club_options)
 st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
 
 # ---------- Formation plotting ----------
-def plot_team_433(df, club_name):
+def plot_team_433(df, club_name, league_name):
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Full Back"],
@@ -53,14 +52,18 @@ def plot_team_433(df, club_name):
 
     # Detect score column dynamically
     score_col = None
-    for c in df.columns:
-        if "Score" in c:   # catch "Score (0–100)" etc
-            score_col = c
-            break
+    if "Score (0–100)" in df.columns:
+        score_col = "Score (0–100)"
+    else:
+        for c in df.columns:
+            if "Score" in c:
+                score_col = c
+                break
     if score_col is None:
         st.error("No Score column found in dataframe.")
         return
 
+    # Build player lists per role
     team_players = {}
     for pos, roles in formation_roles.items():
         subset = df[df["Six-Group Position"].isin(roles)].copy()
@@ -71,7 +74,7 @@ def plot_team_433(df, club_name):
 
         if not subset.empty:
             players = [
-                f"{r['Player']} ({round(r.get(score_col, 0), 1)})"
+                f"{r['Player']} ({int(round(r.get(score_col, 0)))})"
                 for _, r in subset.iterrows()
             ]
             team_players[pos] = players
@@ -84,25 +87,25 @@ def plot_team_433(df, club_name):
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
-    ax.set_title(f"{club_name} ({selected_league})", color="black", fontsize=16, weight="bold")
+    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold")
 
     coords = {
         "GK": (50, 5),
-        # Fullbacks pushed wider, centre-backs stay same
+        # Fullbacks pushed wider, CBs stay centred
         "LB": (10, 20), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 20),
         "CDM": (50, 40),
         "LCM": (30, 55), "RCM": (70, 55),
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
-}
+    }
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Main player with score shown
+        # Main starter
         ax.text(x, y, players[0], ha="center", va="center",
                 fontsize=9, color="black", weight="bold", wrap=True)
-        # Bench / backups below
+        # Bench under starter
         if len(players) > 1:
-            text_block = "\n".join(players[1:4])  # show up to 3 more
+            text_block = "\n".join(players[1:4])
             ax.text(x, y - 3, text_block, ha="center", va="top",
                     fontsize=7, color="black")
 
@@ -110,4 +113,4 @@ def plot_team_433(df, club_name):
 
 # ---------- Filter + plot ----------
 df_club = df_all[df_all["Team"] == selected_club].copy()
-plot_team_433(df_club, selected_club)
+plot_team_433(df_club, selected_club, selected_league)
