@@ -35,6 +35,10 @@ st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}"
 
 # ---------- Formation plotting ----------
 def plot_team_433(df, club_name):
+    """
+    Plot a 4-3-3 formation with ranked players for each position.
+    df should already be filtered to the selected club.
+    """
     formation_roles = {
         "GK": ["Goalkeeper"],
         "LB": ["Full Back"],
@@ -62,13 +66,13 @@ def plot_team_433(df, club_name):
         else:
             team_players[pos] = ["-"]
 
-    # --- Draw pitch ---
+    # --- Pitch ---
     fig, ax = plt.subplots(figsize=(8, 10))
-    ax.set_facecolor("green")
+    ax.set_facecolor("white")   # cleaner background
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
-    ax.set_title(f"{club_name} – Best XI (4-3-3)", color="white", fontsize=16, weight="bold")
+    ax.set_title(f"{club_name} – Best XI (4-3-3)", color="black", fontsize=16, weight="bold")
 
     coords = {
         "GK": (50, 5),
@@ -78,15 +82,15 @@ def plot_team_433(df, club_name):
         "LW": (20, 75), "ST": (50, 80), "RW": (80, 75),
     }
 
+    # Plot each role
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Best player shown inside circle
-        ax.scatter(x, y, s=1200, c="white", edgecolors="black", zorder=3)
-        ax.text(x, y, players[0].split("(")[0], ha="center", va="center", fontsize=8, wrap=True)
-        # List extra players underneath
+        # Best player (main name)
+        ax.text(x, y, players[0].split("(")[0], ha="center", va="center", fontsize=9, color="black", weight="bold", wrap=True)
+        # Remaining players underneath
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
-            ax.text(x, y - 7, text_block, ha="center", va="top", fontsize=6, color="yellow")
+            ax.text(x, y - 7, text_block, ha="center", va="top", fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
