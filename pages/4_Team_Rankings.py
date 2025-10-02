@@ -1,11 +1,12 @@
 # pages/4_Team_Rankings.py
+
 import streamlit as st
 import matplotlib.pyplot as plt
 from pathlib import Path
 
 from auth import check_password
 from branding import show_branding
-from data_loader import load_and_preprocess   # <- use only this
+from data_loader import load_and_preprocess   # unified loader
 
 # ---------- Protect page ----------
 if not check_password():
@@ -22,7 +23,6 @@ APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
-# Use unified loader
 df_all = load_and_preprocess(DATA_PATH)
 
 # ---------- League & Club Filters ----------
@@ -51,10 +51,10 @@ def plot_team_433(df, club_name):
         "ST": ["Striker"],
     }
 
-    # --- Normalise score column name ---
+    # Detect score column dynamically
     score_col = None
     for c in df.columns:
-        if "Score" in c:   # catch "Score (0–100)" with en-dash
+        if "Score" in c:   # catch "Score (0–100)" etc
             score_col = c
             break
     if score_col is None:
@@ -96,12 +96,12 @@ def plot_team_433(df, club_name):
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Main player with score
+        # Main player with score shown
         ax.text(x, y, players[0], ha="center", va="center",
                 fontsize=9, color="black", weight="bold", wrap=True)
-        # Subs below
+        # Bench / backups below
         if len(players) > 1:
-            text_block = "\n".join(players[1:4])
+            text_block = "\n".join(players[1:4])  # show up to 3 more
             ax.text(x, y - 7, text_block, ha="center", va="top",
                     fontsize=7, color="black")
 
