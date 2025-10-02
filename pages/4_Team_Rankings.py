@@ -42,21 +42,45 @@ if "Birth Date" in df_all_raw.columns:
 
 df_all = preprocess_df(df_all_raw)
 
-# ---------- Ranking logic (same as radar page) ----------
+# ---------- Position metrics (copied from radar page) ----------
+position_metrics = {
+    "Centre Back": {"metrics": ["NP Goals", "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls",
+                                "OBV", "Pr. Pass% Dif.", "PAdj Interceptions", "PAdj Tackles",
+                                "Dribbles Stopped%", "Defensive Actions", "Aggressive Actions",
+                                "Fouls", "Aerial Wins", "Aerial Win%"]},
+    "Full Back": {"metrics": ["Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%",
+                              "Deep Progressions", "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+                              "Defensive Actions", "Aerial Win%", "PAdj Pressures", "PAdj Tack&Int",
+                              "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"]},
+    "Number 6": {"metrics": ["xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers",
+                             "OBV", "Pass OBV", "Pr. Pass% Dif.", "PAdj Interceptions", "PAdj Tackles",
+                             "Dribbles Stopped%", "Aggressive Actions", "Aerial Win%",
+                             "Player Season Ball Recoveries 90", "Pressure Regains"]},
+    "Number 8": {"metrics": ["xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals", "Passing%",
+                             "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
+                             "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90",
+                             "Aggressive Actions"]},
+    "Winger": {"metrics": ["xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
+                           "OP Passes Into Box", "Successful Box Cross%", "Passing%", "Successful Dribbles",
+                           "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
+                           "Player Season Fhalf Pressures 90"]},
+    "Striker": {"metrics": ["Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
+                            "Goal Conversion%", "Touches In Box", "xG Assisted", "Fouls Won",
+                            "Deep Completions", "OP Key Passes", "Aerial Win%", "Aerial Wins",
+                            "Player Season Fhalf Pressures 90"]},
+}
+
+# ---------- Ranking logic ----------
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 pos_col = "Six-Group Position"
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
     series = pd.to_numeric(series, errors="coerce").fillna(0)
     r = series.rank(pct=True, ascending=True)
-    if lower_is_better:
-        return (1.0 - r) * 100.0
-    else:
-        return r * 100.0
+    return (1.0 - r) * 100.0 if lower_is_better else r * 100.0
 
-# Collect metrics across all positions
+# Collect all metrics
 metrics_all = []
-from pages.1_Player_Radar import position_metrics  # <-- if your radar metrics dict lives there
 for pos in position_metrics:
     metrics_all.extend(position_metrics[pos]["metrics"])
 metrics_all = list(set(metrics_all))
@@ -70,7 +94,6 @@ for m in metrics_all:
 # Z-scores
 raw_z_all = pd.DataFrame(index=df_all.index, columns=metrics_all, dtype=float)
 for m in metrics_all:
-    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
     z_per_group = df_all.groupby(pos_col)[m].transform(
         lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
     )
@@ -82,17 +105,12 @@ df_all["Avg Z Score"] = raw_z_all.mean(axis=1)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-# Anchors (per position)
+# Anchors
 _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
 eligible = df_all[_mins_all >= 600].copy()
 if eligible.empty:
     eligible = df_all.copy()
-
-anchor_minmax = (
-    eligible.groupby(pos_col)["Weighted Z Score"]
-            .agg(_scale_min="min", _scale_max="max")
-            .fillna(0)
-)
+anchor_minmax = eligible.groupby(pos_col)["Weighted Z Score"].agg(_scale_min="min", _scale_max="max").fillna(0)
 
 df_all = df_all.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
 
@@ -111,10 +129,8 @@ df_all["Rank"] = df_all["Score (0–100)"].rank(ascending=False, method="min").a
 league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
 league_options = sorted(df_all[league_col].dropna().unique())
 selected_league = st.selectbox("Select League", league_options)
-
 club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
 selected_club = st.selectbox("Select Club", club_options)
-
 st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
 
 # ---------- Formation plotting ----------
@@ -156,7 +172,7 @@ def plot_team_433(df, club_name, league_name):
 
     coords = {
         "GK": (50, 5),
-        "LB": (10, 25), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 25),
+        "LB": (10, 20), "LCB": (37, 20), "RCB": (63, 20), "RB": (90, 20),
         "CDM": (50, 40),
         "LCM": (30, 55), "RCM": (70, 55),
         "LW": (15, 75), "ST": (50, 82), "RW": (85, 75),
