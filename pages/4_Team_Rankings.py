@@ -296,22 +296,10 @@ def plot_team_433(df, club_name, league_name):
             if r["Player"] not in used_players:
                 players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
                 used_players.add(r["Player"])
-            if len(players) >= 3:   # show up to 3 players per position (starter + 2 backups)
+            if len(players) >= 3:   # show up to 3 players per position
                 break
 
         team_players[pos] = players if players else ["-"]
-
-    # ... plotting section ...
-    for pos, (x, y) in coords.items():
-        players = team_players.get(pos, ["-"])
-        # starter (bold)
-        ax.text(x, y, players[0], ha="center", va="center",
-                fontsize=9, color="black", weight="bold", wrap=True)
-        # backups below
-        if len(players) > 1:
-            text_block = "\n".join(players[1:])
-            ax.text(x, y - 5, text_block, ha="center", va="top",
-                    fontsize=7, color="black")
 
     # --- Pitch layout ---
     fig, ax = plt.subplots(figsize=(8, 10))
@@ -337,11 +325,14 @@ def plot_team_433(df, club_name, league_name):
 
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        ax.text(
-            x, y, players[0],
-            ha="center", va="center",
-            fontsize=9, color="black", weight="bold", wrap=True
-        )
+        # Starter
+        ax.text(x, y, players[0], ha="center", va="center",
+                fontsize=9, color="black", weight="bold", wrap=True)
+        # Backups
+        if len(players) > 1:
+            text_block = "\n".join(players[1:])
+            ax.text(x, y - 5, text_block, ha="center", va="top",
+                    fontsize=7, color="black")
 
     st.pyplot(fig, use_container_width=True)
 
