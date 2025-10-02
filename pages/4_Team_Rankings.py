@@ -61,14 +61,15 @@ def plot_team_433(df, club_name):
         elif "Rank" in subset.columns:
             subset = subset.sort_values("Rank", ascending=True)
         if not subset.empty:
+            # Keep name + score in display
             players = [f"{r['Player']} ({r.get('Score (0–100)', '')})" for _, r in subset.iterrows()]
             team_players[pos] = players
         else:
             team_players[pos] = ["-"]
 
-    # --- Pitch ---
+    # --- Pitch
     fig, ax = plt.subplots(figsize=(8, 10))
-    ax.set_facecolor("white")   # cleaner background
+    ax.set_facecolor("white")
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
@@ -85,9 +86,9 @@ def plot_team_433(df, club_name):
     # Plot each role
     for pos, (x, y) in coords.items():
         players = team_players.get(pos, ["-"])
-        # Best player (main name)
-        ax.text(x, y, players[0].split("(")[0], ha="center", va="center", fontsize=9, color="black", weight="bold", wrap=True)
-        # Remaining players underneath
+        # Main player with score
+        ax.text(x, y, players[0], ha="center", va="center", fontsize=9, color="black", weight="bold", wrap=True)
+        # Remaining players with scores too
         if len(players) > 1:
             text_block = "\n".join(players[1:4])
             ax.text(x, y - 7, text_block, ha="center", va="top", fontsize=7, color="black")
