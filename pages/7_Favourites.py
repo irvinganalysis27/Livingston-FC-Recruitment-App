@@ -119,16 +119,16 @@ def remove_favourite(player):
 # Helper: Colour tags
 # ============================================================
 COLOUR_OPTIONS = {
-    "Green": "🟢 Green",
-    "Yellow": "🟡 Yellow",
-    "Red": "🔴 Red"
+    "Green": "🟢 Go",
+    "Yellow": "🟡 Monitor",
+    "Red": "🔴 No Further Interest"
 }
 
 def colour_tag(colour: str) -> str:
     mapping = {
-        "Green": '<span style="color:green; font-weight:bold;">🟢 Green</span>',
-        "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Yellow</span>',
-        "Red": '<span style="color:red; font-weight:bold;">🔴 Red</span>'
+        "Go": '<span style="color:green; font-weight:bold;">🟢 Green</span>',
+        "Monitor": '<span style="color:orange; font-weight:bold;">🟡 Yellow</span>',
+        "No Further Interest": '<span style="color:red; font-weight:bold;">🔴 Red</span>'
     }
     return mapping.get(colour, colour)
 
