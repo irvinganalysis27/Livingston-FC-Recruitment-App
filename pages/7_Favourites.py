@@ -20,13 +20,15 @@ show_branding()
 st.title("⭐ Favourite Players")
 
 # ============================================================
-# Database setup
+# Database setup (with migration)
 # ============================================================
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # Create table if not exists
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
@@ -38,6 +40,17 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Migration: ensure new columns exist
+    existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
+
+    if "colour" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT 'Yellow'")
+    if "comment" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN comment TEXT")
+    if "timestamp" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN timestamp DATETIME DEFAULT CURRENT_TIMESTAMP")
+
     conn.commit()
     conn.close()
 
@@ -49,8 +62,7 @@ init_db()
 def init_sheet():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
     client = gspread.authorize(creds)
-    # Replace with the actual sheet name you created
-    sheet = client.open("Livingston_Favourites_Log").sheet1
+    sheet = client.open("Livingston_Favourites_Log").sheet1  # ✅ match your sheet name
     return sheet
 
 def log_to_sheet(player, team, league, position, colour, comment, action):
@@ -108,12 +120,12 @@ if favs:
             col1, col2, col3 = st.columns([4, 2, 1])
             with col1:
                 st.write(f"**{player}** | {team} | {league} | {position}")
-                new_comment = st.text_input(f"Comment for {player}", value=comment, key=f"comment_{player}")
+                new_comment = st.text_input(f"Comment for {player}", value=comment if comment else "", key=f"comment_{player}")
             with col2:
                 new_colour = st.selectbox(
                     "Status",
                     ["Green", "Yellow", "Red"],
-                    index=["Green","Yellow","Red"].index(colour if colour in ["Green","Yellow","Red"] else "Yellow"),
+                    index=["Green", "Yellow", "Red"].index(colour if colour in ["Green","Yellow","Red"] else "Yellow"),
                     key=f"colour_{player}"
                 )
             with col3:
@@ -122,8 +134,8 @@ if favs:
                     st.success(f"Removed {player} from favourites")
                     st.experimental_rerun()
 
-            # Update if comment or colour changes
-            if new_comment != comment or new_colour != colour:
+            # Save updates if anything changed
+            if new_comment != (comment or "") or new_colour != (colour or "Yellow"):
                 add_or_update_favourite(player, team, league, position, new_colour, new_comment)
                 st.experimental_rerun()
 
