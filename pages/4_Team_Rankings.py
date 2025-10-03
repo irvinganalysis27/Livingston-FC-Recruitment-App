@@ -271,45 +271,45 @@ try:
     df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
     df_all = compute_rankings(df_all)
 
-    # --- League filter (persistent, same logic as Radar page) ---
-    league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
-    league_options = sorted(df_all[league_col].dropna().unique())
+    # --- League filter (persistent like Radar page) ---
+league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
+league_options = sorted(df_all[league_col].dropna().unique())
 
-    if "league_selection" not in st.session_state:
-        st.session_state.league_selection = league_options[0] if league_options else None
+if "league_selection" not in st.session_state:
+    st.session_state.league_selection = league_options[0] if league_options else None
 
-    selected_league = st.selectbox(
-        "Select League",
-        league_options,
-        key="league_selection"
-    )
+selected_league = st.selectbox(
+    "Select League",
+    league_options,
+    key="league_selection"   # binds directly to session_state
+)
 
-    # --- Club filter (persistent) ---
-    club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
-    if "club_selection" not in st.session_state:
-        st.session_state.club_selection = club_options[0] if club_options else None
+# --- Club filter (persistent like Radar page) ---
+club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
+if "club_selection" not in st.session_state:
+    st.session_state.club_selection = club_options[0] if club_options else None
 
-    selected_club = st.selectbox(
-        "Select Club",
-        club_options,
-        key="club_selection"
-    )
+selected_club = st.selectbox(
+    "Select Club",
+    club_options,
+    key="club_selection"
+)
 
-    # --- Squad minutes filter (persistent) ---
-    if "squad_min_minutes" not in st.session_state:
-        st.session_state.squad_min_minutes = 1000
+# --- Squad minutes filter (persistent like Radar page) ---
+if "squad_min_minutes" not in st.session_state:
+    st.session_state.squad_min_minutes = 1000
 
-    min_minutes_selection = st.number_input(
-        "Minimum minutes for squad selection",
-        min_value=0,
-        step=100,
-        key="squad_min_minutes"
-    )
+min_minutes_selection = st.number_input(
+    "Minimum minutes for squad selection",
+    min_value=0,
+    step=100,
+    key="squad_min_minutes"
+)
 
-    # --- Show team ranking ---
-    st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
-    df_club = df_all[df_all["Team"] == selected_club].copy()
-    plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
+# --- Show rankings ---
+st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
+df_club = df_all[df_all["Team"] == selected_club].copy()
+plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
 
 except Exception as e:
     st.error(f"Could not load data. Error: {e}")
