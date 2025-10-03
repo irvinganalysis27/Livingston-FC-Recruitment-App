@@ -59,7 +59,10 @@ init_db()
 # ============================================================
 # Google Sheets setup
 # ============================================================
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
 def init_sheet():
     creds = Credentials.from_service_account_info(
@@ -112,6 +115,16 @@ def remove_favourite(player):
     if row:
         team, league, position, colour, comment = row
         log_to_sheet(player, team, league, position, colour, comment, "Removed")
+
+# ============================================================
+# Test Google Sheets connection
+# ============================================================
+if st.button("🔄 Test Google Sheets Connection"):
+    try:
+        sheet = init_sheet()
+        st.success(f"✅ Connected to Google Sheet: {sheet.title}")
+    except Exception as e:
+        st.error(f"❌ Could not connect: {e}")
 
 # ============================================================
 # UI
