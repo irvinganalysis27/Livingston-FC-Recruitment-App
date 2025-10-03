@@ -142,32 +142,39 @@ if favs:
 
     for player, team, league, position, colour, comment, ts in favs:
         with st.container():
-            col1, col2, col3 = st.columns([4, 2, 1])
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+
             with col1:
-                st.markdown(
-                    f"**{player}** | {team} | {league} | {position} | {colour_tag(colour)}",
-                    unsafe_allow_html=True
+                st.write(f"**{player}** | {team} | {league} | {position}")
+                new_comment = st.text_input(
+                    f"Comment for {player}",
+                    value=comment if comment else "",
+                    key=f"comment_{player}"
                 )
-                new_comment = st.text_input(f"Comment for {player}", value=comment if comment else "", key=f"comment_{player}")
+
             with col2:
-                new_colour_label = st.selectbox(
+                new_colour = st.selectbox(
                     "Status",
-                    list(COLOUR_OPTIONS.values()),
-                    index=list(COLOUR_OPTIONS.keys()).index(colour if colour in COLOUR_OPTIONS else "Yellow"),
+                    ["Go", "Monitor", "No Further Interest"],
+                    index=["Go", "Monitor", "No Further Interest"].index(
+                        colour if colour in ["Go", "Monitor", "No Further Interest"] else "Monitor"
+                    ),
                     key=f"colour_{player}"
                 )
-                # Map back to plain database value
-                new_colour = [k for k, v in COLOUR_OPTIONS.items() if v == new_colour_label][0]
+
             with col3:
+                if st.button(f"💾 Save Changes", key=f"save_{player}"):
+                    add_or_update_favourite(
+                        player, team, league, position, new_colour, new_comment
+                    )
+                    st.success(f"✅ Saved updates for {player}")
+                    st.rerun()
+
+            with col4:
                 if st.button("❌ Remove", key=f"remove_{player}"):
                     remove_favourite(player)
                     st.success(f"Removed {player} from favourites")
                     st.rerun()
-
-            # Save updates if anything changed
-            if new_comment != (comment or "") or new_colour != (colour or "Yellow"):
-                add_or_update_favourite(player, team, league, position, new_colour, new_comment)
-                st.rerun()
 
 else:
     st.info("No favourites have been added yet.")
