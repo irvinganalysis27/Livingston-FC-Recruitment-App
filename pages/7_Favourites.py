@@ -78,7 +78,6 @@ def log_to_sheet(player, team, league, position, colour, comment, action):
         sheet = init_sheet()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         sheet.append_row([player, team, league, position, colour, comment, action, now])
-        st.success(f"✅ Logged {player} → Google Sheet")
     except Exception as e:
         st.error(f"❌ Failed to log to Google Sheet: {e}")
 
@@ -117,6 +116,23 @@ def remove_favourite(player):
         log_to_sheet(player, team, league, position, colour, comment, "Removed")
 
 # ============================================================
+# Helper: Colour tags
+# ============================================================
+COLOUR_OPTIONS = {
+    "Green": "🟢 Green",
+    "Yellow": "🟡 Yellow",
+    "Red": "🔴 Red"
+}
+
+def colour_tag(colour: str) -> str:
+    mapping = {
+        "Green": '<span style="color:green; font-weight:bold;">🟢 Green</span>',
+        "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Yellow</span>',
+        "Red": '<span style="color:red; font-weight:bold;">🔴 Red</span>'
+    }
+    return mapping.get(colour, colour)
+
+# ============================================================
 # Test Google Sheets connection
 # ============================================================
 if st.button("🔄 Test Google Sheets Connection"):
@@ -138,15 +154,20 @@ if favs:
         with st.container():
             col1, col2, col3 = st.columns([4, 2, 1])
             with col1:
-                st.write(f"**{player}** | {team} | {league} | {position}")
+                st.markdown(
+                    f"**{player}** | {team} | {league} | {position} | {colour_tag(colour)}",
+                    unsafe_allow_html=True
+                )
                 new_comment = st.text_input(f"Comment for {player}", value=comment if comment else "", key=f"comment_{player}")
             with col2:
-                new_colour = st.selectbox(
+                new_colour_label = st.selectbox(
                     "Status",
-                    ["Green", "Yellow", "Red"],
-                    index=["Green", "Yellow", "Red"].index(colour if colour in ["Green","Yellow","Red"] else "Yellow"),
+                    list(COLOUR_OPTIONS.values()),
+                    index=list(COLOUR_OPTIONS.keys()).index(colour if colour in COLOUR_OPTIONS else "Yellow"),
                     key=f"colour_{player}"
                 )
+                # Map back to plain value
+                new_colour = [k for k, v in COLOUR_OPTIONS.items() if v == new_colour_label][0]
             with col3:
                 if st.button("❌ Remove", key=f"remove_{player}"):
                     remove_favourite(player)
