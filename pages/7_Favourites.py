@@ -1,48 +1,130 @@
+# pages/7_Favourites.py
+
 import streamlit as st
 import sqlite3
 from pathlib import Path
 from auth import check_password
 from branding import show_branding
+from datetime import datetime
 
+import gspread
+from google.oauth2.service_account import Credentials
+
+# ============================================================
 # Protect page
+# ============================================================
 if not check_password():
     st.stop()
 
 show_branding()
 st.title("⭐ Favourite Players")
 
-# Path to DB
+# ============================================================
+# Database setup
+# ============================================================
 DB_PATH = Path(__file__).parent / "favourites.db"
 
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS favourites (
+            player TEXT PRIMARY KEY,
+            team TEXT,
+            league TEXT,
+            position TEXT,
+            colour TEXT DEFAULT 'Yellow',
+            comment TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ============================================================
+# Google Sheets setup
+# ============================================================
+def init_sheet():
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+    client = gspread.authorize(creds)
+    # Replace with the actual sheet name you created
+    sheet = client.open("Livingston_Favourites_Log").sheet1
+    return sheet
+
+def log_to_sheet(player, team, league, position, colour, comment, action):
+    try:
+        sheet = init_sheet()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sheet.append_row([player, team, league, position, colour, comment, action, now])
+    except Exception as e:
+        st.error(f"Failed to log to Google Sheet: {e}")
+
+# ============================================================
+# Database functions
+# ============================================================
 def get_favourites():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT player, team, league, position, timestamp FROM favourites ORDER BY timestamp DESC")
+    c.execute("SELECT player, team, league, position, colour, comment, timestamp FROM favourites ORDER BY timestamp DESC")
     rows = c.fetchall()
     conn.close()
     return rows
 
+def add_or_update_favourite(player, team, league, position, colour="Yellow", comment=""):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO favourites (player, team, league, position, colour, comment, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (player, team, league, position, colour, comment))
+    conn.commit()
+    conn.close()
+    log_to_sheet(player, team, league, position, colour, comment, "Added/Updated")
+
 def remove_favourite(player):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    c.execute("SELECT team, league, position, colour, comment FROM favourites WHERE player=?", (player,))
+    row = c.fetchone()
     c.execute("DELETE FROM favourites WHERE player=?", (player,))
     conn.commit()
     conn.close()
+    if row:
+        team, league, position, colour, comment = row
+        log_to_sheet(player, team, league, position, colour, comment, "Removed")
 
-# Fetch and display favourites
+# ============================================================
+# UI
+# ============================================================
 favs = get_favourites()
 
 if favs:
     st.markdown("### Your Favourites")
 
-    for player, team, league, position, ts in favs:
-        col1, col2 = st.columns([5,1])
-        with col1:
-            st.write(f"**{player}** | {team} | {league} | {position}")
-        with col2:
-            if st.button("❌ Remove", key=f"remove_{player}"):
-                remove_favourite(player)
-                st.success(f"Removed {player} from favourites")
+    for player, team, league, position, colour, comment, ts in favs:
+        with st.container():
+            col1, col2, col3 = st.columns([4, 2, 1])
+            with col1:
+                st.write(f"**{player}** | {team} | {league} | {position}")
+                new_comment = st.text_input(f"Comment for {player}", value=comment, key=f"comment_{player}")
+            with col2:
+                new_colour = st.selectbox(
+                    "Status",
+                    ["Green", "Yellow", "Red"],
+                    index=["Green","Yellow","Red"].index(colour if colour in ["Green","Yellow","Red"] else "Yellow"),
+                    key=f"colour_{player}"
+                )
+            with col3:
+                if st.button("❌ Remove", key=f"remove_{player}"):
+                    remove_favourite(player)
+                    st.success(f"Removed {player} from favourites")
+                    st.experimental_rerun()
+
+            # Update if comment or colour changes
+            if new_comment != comment or new_colour != colour:
+                add_or_update_favourite(player, team, league, position, new_colour, new_comment)
                 st.experimental_rerun()
 
 else:
