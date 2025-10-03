@@ -3,3 +3,5 @@ pandas
 matplotlib
 numpy
 openpyxl
+gspread
+google-auth
