@@ -266,50 +266,47 @@ try:
     if "Minutes" in df_all.columns: df_all.rename(columns={"Minutes": "Minutes played"}, inplace=True)
 
     df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
-    df_all = compute_rankings(df_all)
+        df_all = compute_rankings(df_all)
 
     # --- League filter (persistent) ---
-league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
-league_options = sorted(df_all[league_col].dropna().unique())
+    league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
+    league_options = sorted(df_all[league_col].dropna().unique())
 
-if "selected_league" not in st.session_state:
-    st.session_state.selected_league = league_options[0] if league_options else None
+    if "selected_league" not in st.session_state:
+        st.session_state.selected_league = league_options[0] if league_options else None
 
-selected_league = st.selectbox(
-    "Select League",
-    league_options,
-    index=league_options.index(st.session_state.selected_league)
-    if st.session_state.selected_league in league_options else 0,
-    key="selected_league"
-)
+    selected_league = st.selectbox(
+        "Select League",
+        league_options,
+        index=league_options.index(st.session_state.selected_league)
+        if st.session_state.selected_league in league_options else 0,
+        key="selected_league"
+    )
 
-# --- Club filter (persistent) ---
-club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
-if "selected_club" not in st.session_state:
-    st.session_state.selected_club = club_options[0] if club_options else None
+    # --- Club filter (persistent) ---
+    club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
+    if "selected_club" not in st.session_state:
+        st.session_state.selected_club = club_options[0] if club_options else None
 
-selected_club = st.selectbox(
-    "Select Club",
-    club_options,
-    index=club_options.index(st.session_state.selected_club)
-    if st.session_state.selected_club in club_options else 0,
-    key="selected_club"
-)
+    selected_club = st.selectbox(
+        "Select Club",
+        club_options,
+        index=club_options.index(st.session_state.selected_club)
+        if st.session_state.selected_club in club_options else 0,
+        key="selected_club"
+    )
 
-# --- Squad minutes filter (persistent) ---
-if "squad_min_minutes" not in st.session_state:
-    st.session_state.squad_min_minutes = 1000
+    # --- Squad minutes filter (persistent) ---
+    if "squad_min_minutes" not in st.session_state:
+        st.session_state.squad_min_minutes = 1000
 
-min_minutes_selection = st.number_input(
-    "Minimum minutes for squad selection",
-    value=st.session_state.squad_min_minutes,
-    step=100,
-    key="squad_min_minutes"
-)
+    min_minutes_selection = st.number_input(
+        "Minimum minutes for squad selection",
+        value=st.session_state.squad_min_minutes,
+        step=100,
+        key="squad_min_minutes"
+    )
 
-st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
-df_club = df_all[df_all["Team"] == selected_club].copy()
-plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
-
-except Exception as e:
-    st.error(f"Could not load data. Error: {e}")
+    st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
+    df_club = df_all[df_all["Team"] == selected_club].copy()
+    plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
