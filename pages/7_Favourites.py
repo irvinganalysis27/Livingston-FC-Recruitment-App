@@ -119,28 +119,18 @@ def remove_favourite(player):
 # Helper: Colour tags
 # ============================================================
 COLOUR_OPTIONS = {
-    "Green": "🟢 Go",
+    "Green": "🟢 Go for the Green",
     "Yellow": "🟡 Monitor",
     "Red": "🔴 No Further Interest"
 }
 
 def colour_tag(colour: str) -> str:
     mapping = {
-        "Go": '<span style="color:green; font-weight:bold;">🟢 Green</span>',
-        "Monitor": '<span style="color:orange; font-weight:bold;">🟡 Yellow</span>',
-        "No Further Interest": '<span style="color:red; font-weight:bold;">🔴 Red</span>'
+        "Green": '<span style="color:green; font-weight:bold;">🟢 Go for the Green</span>',
+        "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Monitor</span>',
+        "Red": '<span style="color:red; font-weight:bold;">🔴 No Further Interest</span>'
     }
     return mapping.get(colour, colour)
-
-# ============================================================
-# Test Google Sheets connection
-# ============================================================
-if st.button("🔄 Test Google Sheets Connection"):
-    try:
-        sheet = init_sheet()
-        st.success(f"✅ Connected to Google Sheet: {sheet.title}")
-    except Exception as e:
-        st.error(f"❌ Could not connect: {e}")
 
 # ============================================================
 # UI
@@ -166,7 +156,7 @@ if favs:
                     index=list(COLOUR_OPTIONS.keys()).index(colour if colour in COLOUR_OPTIONS else "Yellow"),
                     key=f"colour_{player}"
                 )
-                # Map back to plain value
+                # Map back to plain database value
                 new_colour = [k for k, v in COLOUR_OPTIONS.items() if v == new_colour_label][0]
             with col3:
                 if st.button("❌ Remove", key=f"remove_{player}"):
