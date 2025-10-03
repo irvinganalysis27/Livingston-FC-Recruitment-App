@@ -271,28 +271,28 @@ try:
     df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
     df_all = compute_rankings(df_all)
 
-    # --- League filter (persistent) ---
+    # --- League filter (persistent, same logic as Radar page) ---
     league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
     league_options = sorted(df_all[league_col].dropna().unique())
 
-    if "selected_league" not in st.session_state and league_options:
-        st.session_state.selected_league = league_options[0]
+    if "league_selection" not in st.session_state:
+        st.session_state.league_selection = league_options[0] if league_options else None
 
     selected_league = st.selectbox(
         "Select League",
         league_options,
-        key="selected_league"
+        key="league_selection"
     )
 
     # --- Club filter (persistent) ---
     club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
-    if "selected_club" not in st.session_state and club_options:
-        st.session_state.selected_club = club_options[0]
+    if "club_selection" not in st.session_state:
+        st.session_state.club_selection = club_options[0] if club_options else None
 
     selected_club = st.selectbox(
         "Select Club",
         club_options,
-        key="selected_club"
+        key="club_selection"
     )
 
     # --- Squad minutes filter (persistent) ---
