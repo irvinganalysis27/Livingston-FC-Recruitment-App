@@ -1294,25 +1294,29 @@ for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-z_ranking = (
-    plot_data[cols_for_table]
-    .sort_values(by="Score (0–100)", ascending=False)
-)
-
-# ---- Deduplicate by Player, keeping best Score ----
-z_ranking = (
-    z_ranking.sort_values("Score (0–100)", ascending=False)
-             .groupby("Player", as_index=False)
-             .first()
-)
+z_ranking = plot_data[cols_for_table].copy()
 
 # Clean up
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-
 z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+
+# Deduplicate by player, keeping best score
+z_ranking = (
+    z_ranking.sort_values("Score (0–100)", ascending=False)
+             .groupby("Player", as_index=False)
+             .first()
+)
+
+# Recalculate proper Rank
+z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+# Sort by Rank (best → worst)
+z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
+
+# Reset row index for display
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
