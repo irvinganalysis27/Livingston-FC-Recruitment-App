@@ -1290,10 +1290,12 @@ cols_for_table = [
     "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
 ]
 
+# Ensure all required columns exist
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
+# Build ranking DataFrame
 z_ranking = (
     plot_data[cols_for_table]
     .sort_values(by="Score (0–100)", ascending=False)
@@ -1303,10 +1305,14 @@ z_ranking = (
 # Clean up
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+z_ranking["Minutes played"] = pd.to_numeric(
+    z_ranking["Minutes played"], errors="coerce"
+).fillna(0).astype(int)
+
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
@@ -1322,7 +1328,7 @@ edited_df = st.data_editor(
             "⭐ Favourite", help="Mark as favourite", default=False
         )
     },
-    hide_index=False,
+    hide_index=True,  # cleaner look (no Row numbers repeated)
     use_container_width=True,
 )
 
