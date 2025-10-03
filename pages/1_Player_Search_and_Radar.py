@@ -1297,7 +1297,13 @@ for c in cols_for_table:
 z_ranking = (
     plot_data[cols_for_table]
     .sort_values(by="Score (0–100)", ascending=False)
-    .reset_index(drop=True)
+)
+
+# ---- Deduplicate by Player, keeping best Score ----
+z_ranking = (
+    z_ranking.sort_values("Score (0–100)", ascending=False)
+             .groupby("Player", as_index=False)
+             .first()
 )
 
 # Clean up
@@ -1311,7 +1317,7 @@ z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
 # ---- Favourites column from DB ----
-favs_in_db = {row[0] for row in get_favourites()}   # get player names from DB
+favs_in_db = {row[0] for row in get_favourites()}   # player names from DB
 z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
 # ---- Editable table ----
