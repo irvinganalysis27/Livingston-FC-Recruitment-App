@@ -67,7 +67,6 @@ def init_sheet():
         scopes=SCOPES
     )
     client = gspread.authorize(creds)
-    # Make sure this matches your actual Google Sheet name
     sheet = client.open("Livingston_Favourites_Log").sheet1
     return sheet
 
