@@ -266,7 +266,7 @@ try:
     if "Minutes" in df_all.columns: df_all.rename(columns={"Minutes": "Minutes played"}, inplace=True)
 
     df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
-        df_all = compute_rankings(df_all)
+    df_all = compute_rankings(df_all)
 
     # --- League filter (persistent) ---
     league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
