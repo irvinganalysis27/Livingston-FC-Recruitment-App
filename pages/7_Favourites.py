@@ -153,14 +153,25 @@ if favs:
                 )
 
             with col2:
-                new_colour = st.selectbox(
+                # Options with emoji indicators
+                status_options = {
+                    "Go": "🟢 Go",
+                    "Monitor": "🟡 Monitor",
+                    "No Further Interest": "🔴 No Further Interest"
+                }
+
+                # Current stored value mapped back to dropdown label
+                current_label = status_options.get(colour, "🟡 Monitor")
+
+                new_label = st.selectbox(
                     "Status",
-                    ["Go", "Monitor", "No Further Interest"],
-                    index=["Go", "Monitor", "No Further Interest"].index(
-                        colour if colour in ["Go", "Monitor", "No Further Interest"] else "Monitor"
-                    ),
+                    list(status_options.values()),
+                    index=list(status_options.values()).index(current_label),
                     key=f"colour_{player}"
                 )
+
+                # Reverse-map the emoji label back to the database value
+                new_colour = [k for k, v in status_options.items() if v == new_label][0]
 
             with col3:
                 if st.button(f"💾 Save Changes", key=f"save_{player}"):
