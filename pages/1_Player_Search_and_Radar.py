@@ -698,60 +698,89 @@ if minutes_col not in df.columns:
 c1, c2 = st.columns(2)
 
 with c1:
-    min_minutes = st.number_input(
+    # Initialise in session_state if not already set
+    if "min_minutes" not in st.session_state:
+        st.session_state.min_minutes = 1000
+
+    # Persist value in session_state
+    st.session_state.min_minutes = st.number_input(
         "Minimum minutes to include",
         min_value=0,
-        value=1000,
-        step=50
+        value=st.session_state.min_minutes,
+        step=50,
+        key="min_minutes_input"
     )
+
+    min_minutes = st.session_state.min_minutes
+
+    # Apply filter
     df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
     df = df[df["_minutes_numeric"] >= min_minutes].copy()
+
     if df.empty:
         st.warning("No players meet the minutes threshold. Lower the minimum.")
         st.stop()
 
+
 with c2:
     if "Age" in df.columns:
         df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
+
         if df["_age_numeric"].notna().any():
             age_min = int(np.nanmin(df["_age_numeric"]))
             age_max = int(np.nanmax(df["_age_numeric"]))
-            sel_min, sel_max = st.slider(
+
+            # Use session_state to persist age range
+            if "age_range" not in st.session_state:
+                st.session_state.age_range = (age_min, age_max)
+
+            st.session_state.age_range = st.slider(
                 "Age range to include",
                 min_value=age_min,
                 max_value=age_max,
-                value=(age_min, age_max),
-                step=1
+                value=st.session_state.age_range,
+                step=1,
+                key="age_range_slider"
             )
+
+            sel_min, sel_max = st.session_state.age_range
             df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
+
         else:
             st.info("Age column has no numeric values, age filter skipped.")
     else:
         st.info("No Age column found, age filter skipped.")
 
-st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
+st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining: {len(df)}")
 
 # ---------- Position Group Section ----------
 st.markdown("#### 🟡 Select Position Group")
 
-available_groups = [
-    g for g in SIX_GROUPS
-    if "Six-Group Position" in df.columns and g in df["Six-Group Position"].unique()
-]
+# Build list of available groups from data
+available_groups = []
+if "Six-Group Position" in df.columns:
+    available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
+
+# Use session_state to persist the last selection
+if "selected_groups" not in st.session_state:
+    st.session_state.selected_groups = []
 
 selected_groups = st.multiselect(
     "Position Groups",
     options=available_groups,
-    default=[],
-    label_visibility="collapsed"
+    default=st.session_state.selected_groups,
+    label_visibility="collapsed",
+    key="pos_group_multiselect"
 )
 
+# Apply filter if groups selected
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
         st.warning("No players after group filter. Clear filters or choose different groups.")
         st.stop()
 
+# Track currently selected group if only one is chosen
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
 # ---------- Session state setup ----------
