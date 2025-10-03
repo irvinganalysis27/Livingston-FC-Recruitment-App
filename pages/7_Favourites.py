@@ -17,7 +17,8 @@ DB_PATH = Path(__file__).parent / "favourites.db"
 def get_favourites():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT player, team, league, position, minutes played, timestamp FROM favourites ORDER BY timestamp DESC")
+    # Make sure "minutes" column exists in your DB schema
+    c.execute("SELECT player, team, league, position, minutes, timestamp FROM favourites ORDER BY timestamp DESC")
     rows = c.fetchall()
     conn.close()
     return rows
@@ -35,10 +36,10 @@ favs = get_favourites()
 if favs:
     st.markdown("### Your Favourites")
 
-    for player, team, league, position, ts in favs:
-        col1, col2 = st.columns([5,1])
+    for player, team, league, position, minutes, ts in favs:
+        col1, col2 = st.columns([5, 1])
         with col1:
-            st.write(f"**{player}** | {team} | {league} | {position}") | {Minutes Played}" mins)
+            st.write(f"**{player}** | {team} | {league} | {position} | {minutes} mins")
         with col2:
             if st.button("❌ Remove", key=f"remove_{player}"):
                 remove_favourite(player)
