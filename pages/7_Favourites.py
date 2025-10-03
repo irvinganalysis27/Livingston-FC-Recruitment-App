@@ -59,10 +59,16 @@ init_db()
 # ============================================================
 # Google Sheets setup
 # ============================================================
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
 def init_sheet():
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=SCOPES
+    )
     client = gspread.authorize(creds)
-    sheet = client.open("Livingston_Favourites_Log").sheet1  # ✅ match your sheet name
+    # Make sure this matches your actual Google Sheet name
+    sheet = client.open("Livingston_Favourites_Log").sheet1
     return sheet
 
 def log_to_sheet(player, team, league, position, colour, comment, action):
@@ -70,8 +76,9 @@ def log_to_sheet(player, team, league, position, colour, comment, action):
         sheet = init_sheet()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         sheet.append_row([player, team, league, position, colour, comment, action, now])
+        st.success(f"✅ Logged {player} → Google Sheet")
     except Exception as e:
-        st.error(f"Failed to log to Google Sheet: {e}")
+        st.error(f"❌ Failed to log to Google Sheet: {e}")
 
 # ============================================================
 # Database functions
@@ -132,12 +139,12 @@ if favs:
                 if st.button("❌ Remove", key=f"remove_{player}"):
                     remove_favourite(player)
                     st.success(f"Removed {player} from favourites")
-                    st.experimental_rerun()
+                    st.rerun()
 
             # Save updates if anything changed
             if new_comment != (comment or "") or new_colour != (colour or "Yellow"):
                 add_or_update_favourite(player, team, league, position, new_colour, new_comment)
-                st.experimental_rerun()
+                st.rerun()
 
 else:
     st.info("No favourites have been added yet.")
