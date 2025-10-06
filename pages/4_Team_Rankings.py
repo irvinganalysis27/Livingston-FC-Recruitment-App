@@ -3,10 +3,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt  # (optional, for any visual additions)
-import re                         # ✅ <-- add this line
+import re
 from pathlib import Path
 from datetime import datetime
+import sqlite3
 
 from auth import check_password
 from branding import show_branding
@@ -23,11 +23,40 @@ st.title("🏆 Team Player Rankings")
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
+DB_PATH = APP_DIR / "favourites.db"
+
+# ============================================================
+# Database functions
+# ============================================================
+def get_favourites():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("CREATE TABLE IF NOT EXISTS favourites (player TEXT PRIMARY KEY, team TEXT, league TEXT, position TEXT)")
+    c.execute("SELECT player, team, league, position FROM favourites ORDER BY player ASC")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def add_favourite(player, team=None, league=None, position=None):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO favourites (player, team, league, position)
+        VALUES (?, ?, ?, ?)
+    """, (player, team, league, position))
+    conn.commit()
+    conn.close()
+
+def remove_favourite(player):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM favourites WHERE player=?", (player,))
+    conn.commit()
+    conn.close()
 
 # ============================================================
 # Utility functions
 # ============================================================
-
 def load_one_file(p: Path) -> pd.DataFrame:
     if p.suffix.lower() in {".xlsx", ".xls"}:
         return pd.read_excel(p)
@@ -54,7 +83,6 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 # Position & metric mapping
 # ============================================================
-
 RAW_TO_GROUP = {
     "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
     "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
@@ -62,7 +90,8 @@ RAW_TO_GROUP = {
     "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
     "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8",
+    "LEFTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
     "LEFTWING": "Winger", "LEFTMIDFIELDER": "Winger",
     "RIGHTWING": "Winger", "RIGHTMIDFIELDER": "Winger",
     "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
@@ -81,18 +110,17 @@ def map_first_position_to_group(primary_pos_cell) -> str:
     tok = _clean_pos_token(primary_pos_cell)
     return RAW_TO_GROUP.get(tok, None)
 
-LOWER_IS_BETTER = {"Turnovers","Fouls","Pr. Long Balls","UPr. Long Balls"}
+LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
 # ============================================================
 # Compute player rankings
 # ============================================================
-
 def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # Collect numeric metrics (simplified detection)
+    # Collect numeric metrics
     numeric_cols = [c for c in df_all.columns if pd.api.types.is_numeric_dtype(df_all[c])]
     raw_z_all = pd.DataFrame(index=df_all.index, columns=numeric_cols, dtype=float)
 
@@ -106,7 +134,7 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 
     df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 
-    # Apply league multiplier if exists
+    # Apply multiplier if missing
     if "Multiplier" not in df_all.columns:
         df_all["Multiplier"] = 1.0
     df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
@@ -139,7 +167,6 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 # ============================================================
 # Main UI
 # ============================================================
-
 try:
     df_all_raw = load_statsbomb(DATA_PATH)
     df_all_raw = add_age_column(df_all_raw)
@@ -158,7 +185,6 @@ try:
     # --- League filter ---
     league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
     leagues = sorted(df_all[league_col].dropna().unique())
-
     selected_league = st.selectbox("Select League", leagues)
 
     # --- Club filter ---
@@ -172,27 +198,62 @@ try:
         st.warning("No players found for this team.")
         st.stop()
 
-    # --- Sort by Score ---
+    # --- Sort and rank within team ---
     df_team = df_team.sort_values("Score (0–100)", ascending=False).reset_index(drop=True)
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-    # --- Display table ---
-    display_cols = ["Rank in Team", "Player", "Six-Group Position", "Score (0–100)",
-                    "Age", "Minutes played", "Weighted Z Score"]
-    for c in display_cols:
+    # ---------- Ranking table ----------
+    st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
+
+    cols_for_table = [
+        "Player", "Six-Group Position", "Positions played",
+        "Team", "Competition_norm", "Multiplier",
+        "Score (0–100)", "Age", "Minutes played", "Rank in Team"
+    ]
+
+    for c in cols_for_table:
         if c not in df_team.columns:
             df_team[c] = np.nan
 
-    st.markdown(f"### {selected_club} ({selected_league}) — Player Rankings")
-    st.data_editor(
-        df_team[display_cols],
-        hide_index=True,
-        width="stretch",
+    z_ranking = df_team[cols_for_table].copy()
+    z_ranking.rename(columns={
+        "Competition_norm": "League",
+        "Six-Group Position": "Position"
+    }, inplace=True)
+
+    z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+    z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0).fillna(0).astype(int)
+    z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+    z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
+
+    # ---- Favourites column from DB ----
+    favs_in_db = {row[0] for row in get_favourites()}
+    z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
+
+    # ---- Editable table ----
+    edited_df = st.data_editor(
+        z_ranking,
         column_config={
-            "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
-            "Weighted Z Score": st.column_config.NumberColumn("Weighted Z", format="%.2f"),
+            "⭐ Favourite": st.column_config.CheckboxColumn(
+                "⭐ Favourite", help="Mark as favourite", default=False
+            ),
+            "Multiplier": st.column_config.NumberColumn(
+                "League Weight", help="League weighting applied in ranking", format="%.3f"
+            ),
+            "Position": st.column_config.TextColumn("Position"),
+            "Rank in Team": st.column_config.NumberColumn("Rank in Team"),
         },
+        hide_index=False,
+        width="stretch",
     )
+
+    # ---- Sync favourites ----
+    for _, row in edited_df.iterrows():
+        player = row["Player"]
+        if row["⭐ Favourite"] and player not in favs_in_db:
+            add_favourite(player, row.get("Team"), row.get("League"), row.get("Positions played"))
+        elif not row["⭐ Favourite"] and player in favs_in_db:
+            remove_favourite(player)
 
 except Exception as e:
     st.error(f"❌ Could not load data: {e}")
