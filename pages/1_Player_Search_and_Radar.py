@@ -265,7 +265,7 @@ position_metrics = {
     # ---------- Full Back ----------
     "Full Back": {
         "metrics": [
-            "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
+            "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Crossing%", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
             "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
@@ -273,7 +273,7 @@ position_metrics = {
         "groups": {
             "Passing%": "Possession",
             "Pr. Pass% Dif.": "Possession",
-            "Successful Crosses": "Possession",
+            "Successful Box Cross%": "Possession",
             "Crossing%": "Possession",
             "Deep Progressions": "Possession",
             "Successful Dribbles": "Possession",
