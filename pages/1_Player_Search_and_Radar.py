@@ -1329,8 +1329,9 @@ st.markdown("### Players Ranked by Score (0–100)")
 
 # Include Score (0–100) and Multiplier for quick reference
 cols_for_table = [
-    "Player", "Positions played", "Competition_norm",
-    "Score (0–100)", "Age", "Team", "Minutes played", "Rank", "Multiplier"
+    "Player", "Positions played",
+    "Team", "Competition_norm", "Multiplier",  # grouped together
+    "Score (0–100)", "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
@@ -1386,7 +1387,7 @@ edited_df = st.data_editor(
         ),
         "Multiplier": st.column_config.NumberColumn(
             "League Weight", help="League weighting applied in ranking", format="%.3f"
-        )
+        ),
     },
     hide_index=False,
     width="stretch",  # replaces deprecated use_container_width
