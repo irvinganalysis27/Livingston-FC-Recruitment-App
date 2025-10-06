@@ -78,10 +78,20 @@ def log_to_sheet(player, team, league, position, colour, comment, user, action):
 # Database helpers
 # ============================================================
 def get_latest_entries():
-    """Fetch the most recent comment per player."""
+    """Fetch the most recent comment per player safely."""
     conn = sqlite3.connect(DB_PATH)
-    query = """
-        SELECT f1.player, f1.team, f1.league, f1.position, f1.colour, f1.comment, f1.user, f1.timestamp
+
+    # Check if the 'user' column exists
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(favourites);").fetchall()]
+    has_user_col = "user" in [c.lower() for c in cols]
+
+    # Build dynamic query depending on columns
+    select_cols = "player, team, league, position, colour, comment, timestamp"
+    if has_user_col:
+        select_cols = "player, team, league, position, colour, comment, user, timestamp"
+
+    query = f"""
+        SELECT {select_cols}
         FROM favourites f1
         INNER JOIN (
             SELECT player, MAX(timestamp) AS latest
@@ -91,8 +101,15 @@ def get_latest_entries():
         ON f1.player = f2.player AND f1.timestamp = f2.latest
         ORDER BY f1.timestamp DESC
     """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+
+    try:
+        df = pd.read_sql_query(query, conn)
+    except Exception as e:
+        st.warning(f"⚠️ Could not read favourites table: {e}")
+        df = pd.DataFrame()
+    finally:
+        conn.close()
+
     return df
 
 def get_player_history(player):
