@@ -516,10 +516,7 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     df = add_age_column(df)
     return df
 
-print([c for c in df_all_raw.columns if "cross" in c.lower()])
-
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
-    import re
     df = df_in.copy()
 
     # --- Normalise Competition name ---
@@ -538,9 +535,10 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
             if missing_mult:
                 print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
+                st.warning(f"Some leagues did not match multipliers: {missing_mult}")
             df["Multiplier"] = df["Multiplier"].fillna(1.0)
         else:
-            print("[DEBUG] Invalid multipliers sheet, using default 1.0")
+            st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
             df["Multiplier"] = 1.0
     except Exception as e:
         print(f"[DEBUG] Failed to load multipliers: {e}")
@@ -552,41 +550,43 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
     if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
 
+    # --- Metric renames / fixes ---
     rename_map.update({
+        # Successful Box Cross variants
         "Successful Box Cross %": "Successful Box Cross%",
         "Player Season Box Cross Ratio": "Successful Box Cross%",
+
+        # Pass% under pressure
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
+
+        # Build-up involvement
         "Player Season Xgbuildup 90": "xGBuildup",
+
+        # Pressures in attacking 3rd
         "Player Season F3 Pressures 90": "Pressures in Final 1/3",
+
+        # Long balls
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
+
     df.rename(columns=rename_map, inplace=True)
 
-    # --- Derive Successful Crosses (robust detection) ---
-    cross_cols = [c for c in df.columns if re.search(r'Crosses', c, re.IGNORECASE)]
-    cross_rate_cols = [c for c in df.columns if re.search(r'Crossing', c, re.IGNORECASE)]
-
-    if cross_cols and cross_rate_cols:
-        cross_col = cross_cols[0]
-        cross_rate_col = cross_rate_cols[0]
+    # --- Derive Successful Crosses ---
+    if "Crosses" in df.columns and "Crossing%" in df.columns:
         df["Successful Crosses"] = (
-            pd.to_numeric(df[cross_col], errors="coerce").fillna(0)
-            * (pd.to_numeric(df[cross_rate_col], errors="coerce").fillna(0) / 100.0)
+            pd.to_numeric(df["Crosses"], errors="coerce") *
+            (pd.to_numeric(df["Crossing%"], errors="coerce") / 100.0)
         )
-        print(f"[DEBUG] Derived Successful Crosses using {cross_col} × {cross_rate_col}")
-    else:
-        df["Successful Crosses"] = 0
-        print("[DEBUG] No valid cross columns found, defaulting to 0")
 
     # --- Derive Successful Dribbles ---
     if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
         df["Successful Dribbles"] = (
             pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
             - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
-        )
+    )
 
-    # --- Combine positions (Primary + Secondary) ---
+    # --- Build "Positions played" ---
     if "Position" in df.columns:
         if "Secondary Position" in df.columns:
             df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
