@@ -572,18 +572,20 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns=rename_map, inplace=True)
 
-    # --- Derive Successful Crosses (robust check) ---
-cross_cols = [c for c in df.columns if "crosses" in c.lower()]
-crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
+        # --- Derive Successful Crosses (robust check) ---
+    cross_cols = [c for c in df.columns if "crosses" in c.lower()]
+    crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
 
-if cross_cols and crossperc_cols:
-    c1 = cross_cols[0]
-    c2 = crossperc_cols[0]
-    df["Successful Crosses"] = (
-        pd.to_numeric(df[c1], errors="coerce") *
-        (pd.to_numeric(df[c2], errors="coerce") / 100.0)
-    )
-    print(f"[DEBUG] Created 'Successful Crosses' from {c1} and {c2}")
+    if cross_cols and crossperc_cols:
+        c1 = cross_cols[0]
+        c2 = crossperc_cols[0]
+        df["Successful Crosses"] = (
+            pd.to_numeric(df[c1], errors="coerce") *
+            (pd.to_numeric(df[c2], errors="coerce") / 100.0)
+        )
+        print(f"[DEBUG] Created 'Successful Crosses' from {c1} and {c2}")
+    else:
+        print("[DEBUG] Could not find both 'Crosses' and 'Crossing%' columns.")
 
     # --- Derive Successful Dribbles ---
     if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
