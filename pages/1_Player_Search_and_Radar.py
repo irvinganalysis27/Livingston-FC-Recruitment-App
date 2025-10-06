@@ -1327,10 +1327,10 @@ if st.session_state.selected_player:
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Include Score (0–100) so we can sort by it and display it
+# Include Score (0–100) and Multiplier for quick reference
 cols_for_table = [
     "Player", "Positions played", "Competition_norm",
-    "Score (0–100)", "Age", "Team", "Minutes played", "Rank"
+    "Score (0–100)", "Age", "Team", "Minutes played", "Rank", "Multiplier"
 ]
 
 for c in cols_for_table:
@@ -1342,9 +1342,17 @@ z_ranking = plot_data[cols_for_table].copy()
 # Clean up
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+
+z_ranking["Minutes played"] = pd.to_numeric(
+    z_ranking["Minutes played"], errors="coerce"
+).fillna(0).astype(int)
+
+z_ranking["Multiplier"] = pd.to_numeric(
+    z_ranking["Multiplier"], errors="coerce"
+).fillna(1.0).round(3)
 
 # Deduplicate by player, keeping best score
 z_ranking = (
@@ -1354,7 +1362,9 @@ z_ranking = (
 )
 
 # Recalculate proper Rank
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(
+    ascending=False, method="min"
+).astype(int)
 
 # Sort by Rank (best → worst)
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
@@ -1373,10 +1383,13 @@ edited_df = st.data_editor(
     column_config={
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite", help="Mark as favourite", default=False
+        ),
+        "Multiplier": st.column_config.NumberColumn(
+            "League Weight", help="League weighting applied in ranking", format="%.3f"
         )
     },
     hide_index=False,
-    use_container_width=True,
+    width="stretch",  # replaces deprecated use_container_width
 )
 
 # ---- Sync changes back to DB ----
