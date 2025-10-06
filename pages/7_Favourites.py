@@ -81,10 +81,15 @@ def get_latest_entries():
     """Fetch the most recent comment per player."""
     conn = sqlite3.connect(DB_PATH)
     query = """
-        SELECT player, team, league, position, colour, comment, user, MAX(timestamp)
-        FROM favourites
-        GROUP BY player
-        ORDER BY MAX(timestamp) DESC
+        SELECT f1.player, f1.team, f1.league, f1.position, f1.colour, f1.comment, f1.user, f1.timestamp
+        FROM favourites f1
+        INNER JOIN (
+            SELECT player, MAX(timestamp) AS latest
+            FROM favourites
+            GROUP BY player
+        ) f2
+        ON f1.player = f2.player AND f1.timestamp = f2.latest
+        ORDER BY f1.timestamp DESC
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
