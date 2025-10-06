@@ -1260,149 +1260,51 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             ncol=min(len(patches), 4), frameon=False
         )
 
-    # ---------- Chart ----------
-def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
-    import matplotlib.patches as mpatches
-    from matplotlib import colormaps as mcm  # modern colormap API
+    # ---------- Player info ----------
+    if "Weighted Z Score" in row.columns and pd.notnull(row["Weighted Z Score"].values[0]):
+        weighted_z = float(row["Weighted Z Score"].values[0])
+    else:
+        weighted_z = 0.0
 
-    if not isinstance(group_colors, dict) or len(group_colors) == 0:
-        group_colors = {
-            "Attacking": "crimson",
-            "Possession": "seagreen",
-            "Defensive": "royalblue",
-        }
+    score_100 = None
+    if "Score (0–100)" in row.columns and pd.notnull(row["Score (0–100)"].values[0]):
+        score_100 = float(row["Score (0–100)"].values[0])
 
-    row = plot_data.loc[plot_data["Player"] == player_name]
-    if row.empty:
-        st.error(f"No player named '{player_name}' found.")
-        return
-    # work with a 1D series
-    row = row.iloc[0]
+    age      = row["Age"].values[0] if "Age" in row.columns else np.nan
+    height   = row["Height"].values[0] if "Height" in row.columns else np.nan
+    team     = row["Team within selected timeframe"].values[0] if "Team within selected timeframe" in row.columns else ""
+    mins     = row["Minutes played"].values[0] if "Minutes played" in row.columns else np.nan
+    role     = row["Six-Group Position"].values[0] if "Six-Group Position" in row.columns else ""
+    rank_val = int(row["Rank"].values[0]) if "Rank" in row.columns and pd.notnull(row["Rank"].values[0]) else None
 
-    # ---- Build an ordered, *valid* metric list that exists in row ----
-    group_order = ["Possession", "Defensive", "Attacking", "Off The Ball"]
-    desired_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
+    if "Competition_norm" in row.columns and pd.notnull(row["Competition_norm"].values[0]):
+        comp = row["Competition_norm"].values[0]
+    elif "Competition" in row.columns and pd.notnull(row["Competition"].values[0]):
+        comp = row["Competition"].values[0]
+    else:
+        comp = ""
 
-    # only keep metrics that exist *and* have a matching "(percentile)" column
-    metrics_ok = []
-    pct_cols_ok = []
-    for m in desired_metrics:
-        pct_col = f"{m} (percentile)"
-        if (m in plot_data.columns) and (pct_col in plot_data.columns):
-            metrics_ok.append(m)
-            pct_cols_ok.append(pct_col)
-
-    if not metrics_ok:
-        st.warning("No valid metrics available to plot for this player and template.")
-        return
-
-    # values (ensure numeric)
-    raw_vals = pd.to_numeric(row[metrics_ok], errors="coerce").fillna(0).to_numpy(dtype=float)
-    pct_vals = pd.to_numeric(row[pct_cols_ok], errors="coerce").fillna(0).to_numpy(dtype=float)
-
-    # final safety: align lengths
-    n = min(len(raw_vals), len(pct_vals), len(metrics_ok))
-    raw_vals = raw_vals[:n]
-    pct_vals = pct_vals[:n]
-    metrics_ok = metrics_ok[:n]
-
-    # groups aligned to metrics_ok
-    groups = [metric_groups.get(m, "Unknown") for m in metrics_ok]
-
-    # Colormap for bars (red → green by percentile)
-    cmap = mcm.get_cmap("RdYlGn")
-    norm = mcolors.Normalize(vmin=0, vmax=100)
-    bar_colors = [cmap(norm(val)) for val in pct_vals]
-
-    # Angles
-    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
-
-    # --- Plot setup ---
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("white")
-    ax.set_theta_offset(np.pi / 2)
-    ax.set_theta_direction(-1)
-    ax.set_ylim(0, 100)
-    ax.set_yticklabels([])
-    ax.set_xticks([])
-    ax.spines["polar"].set_visible(False)
-
-    # --- Bars ---
-    ax.bar(
-        angles, pct_vals,
-        width=2 * np.pi / n * 0.85,
-        color=bar_colors,
-        edgecolor="black",
-        linewidth=0.6,
-        alpha=0.95
-    )
-
-    # Raw numbers at radius 50
-    for ang, raw_val in zip(angles, raw_vals):
-        try:
-            txt = f"{float(raw_val):.2f}"
-        except Exception:
-            txt = "-"
-        ax.text(ang, 50, txt, ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold")
-
-    # Metric labels around the rim
-    for ang, m in zip(angles, metrics_ok):
-        label = DISPLAY_NAMES.get(m, m)
-        label = label.replace(" per 90", "").replace(", %", " (%)")
-        color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
-        ax.text(ang, 108, label, ha="center", va="center",
-                color=color, fontsize=10, fontweight="bold")
-
-    # Legend (present groups only)
-    present_groups = list(dict.fromkeys(groups))
-    patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
-    if patches:
-        fig.subplots_adjust(top=0.86, bottom=0.08)
-        ax.legend(
-            handles=patches,
-            loc="upper center", bbox_to_anchor=(0.5, -0.06),
-            ncol=min(len(patches), 4), frameon=False
-        )
-
-    # ---------- Player info (safe lookups) ----------
-    weighted_z = float(row.get("Weighted Z Score", 0) or 0)
-    score_100  = row.get("Score (0–100)", None)
-    score_100  = float(score_100) if pd.notnull(score_100) else None
-
-    age    = row.get("Age", np.nan)
-    height = row.get("Height", np.nan)
-    team   = row.get("Team within selected timeframe", "") or ""
-    mins   = row.get("Minutes played", np.nan)
-    role   = row.get("Six-Group Position", "") or ""
-    rank_v = row.get("Rank", None)
-    rank_v = int(rank_v) if pd.notnull(rank_v) else None
-
-    comp = row.get("Competition_norm", None)
-    if pd.isna(comp) or comp is None:
-        comp = row.get("Competition", "") or ""
-
-    # Title
+    # ---------- Title lines ----------
     top_parts = [player_name]
     if role: top_parts.append(role)
-    if pd.notnull(age):    top_parts.append(f"{int(age)} years old")
-    if pd.notnull(height): top_parts.append(f"{int(height)} cm")
+    if not pd.isnull(age):    top_parts.append(f"{int(age)} years old")
+    if not pd.isnull(height): top_parts.append(f"{int(height)} cm")
     line1 = " | ".join(top_parts)
 
     bottom_parts = []
     if team:                 bottom_parts.append(team)
     if comp:                 bottom_parts.append(comp)
     if pd.notnull(mins):     bottom_parts.append(f"{int(mins)} mins")
-    if rank_v is not None:   bottom_parts.append(f"Rank #{rank_v}")
+    if rank_val is not None: bottom_parts.append(f"Rank #{rank_val}")
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
+
     line2 = " | ".join(bottom_parts)
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
-    # Logo overlay (if you’ve set `logo` elsewhere)
+    # Logo overlay
     try:
         if logo is not None:
             imagebox = OffsetImage(np.array(logo), zoom=0.18)
@@ -1411,8 +1313,16 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     except Exception:
         pass
 
-    # New Streamlit API (replaces use_container_width)
-    st.pyplot(fig, width="stretch")
+    st.pyplot(fig, use_container_width=True)
+
+# ---------- Plot ----------
+if st.session_state.selected_player:
+    plot_radial_bar_grouped(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups,
+        group_colors
+    )
 
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
