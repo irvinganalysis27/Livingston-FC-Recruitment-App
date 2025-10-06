@@ -3,11 +3,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import re
 from pathlib import Path
 from datetime import datetime
-
 from auth import check_password
 from branding import show_branding
 
@@ -18,97 +15,14 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("Team Rankings")
+st.title("🏆 Team Player Rankings")
 
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
 # ============================================================
-# Position mapping (expanded to 8 groups)
-# ============================================================
-
-RAW_TO_EIGHT = {
-    "LEFTBACK": "Left Back", "LEFTWINGBACK": "Left Back",
-    "RIGHTBACK": "Right Back", "RIGHTWINGBACK": "Right Back",
-    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
-    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
-    "RIGHTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8", "10": "Number 8",
-    "LEFTWING": "Left Wing", "LEFTMIDFIELDER": "Left Wing",
-    "RIGHTWING": "Right Wing", "RIGHTMIDFIELDER": "Right Wing",
-    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper",
-}
-
-def _clean_pos_token(tok: str) -> str:
-    if pd.isna(tok):
-        return ""
-    t = str(tok).upper().strip()
-    t = re.sub(r"[.\-_/]", " ", t)
-    t = re.sub(r"\s+", "", t)
-    return t
-
-def map_first_position_to_group(primary_pos_cell) -> str:
-    tok = _clean_pos_token(primary_pos_cell)
-    return RAW_TO_EIGHT.get(tok, None)
-
-# ============================================================
-# Position metrics (expanded to 8 groups)
-# ============================================================
-
-position_metrics = {
-    "Centre Back": {"metrics": [
-        "NP Goals","Passing%","Pass OBV","Pr. Long Balls","UPr. Long Balls","OBV","Pr. Pass% Dif.",
-        "PAdj Interceptions","PAdj Tackles","Dribbles Stopped%","Defensive Actions",
-        "Aggressive Actions","Fouls","Aerial Wins","Aerial Win%"
-    ]},
-    "Left Back": {"metrics": [
-        "Passing%","Pr. Pass% Dif.","Successful Crosses","Crossing%","Deep Progressions",
-        "Successful Dribbles","Turnovers","OBV","Pass OBV","Defensive Actions","Aerial Win%",
-        "PAdj Pressures","PAdj Tack&Int","Dribbles Stopped%","Aggressive Actions",
-        "Player Season Ball Recoveries 90"
-    ]},
-    "Right Back": {"metrics": [
-        "Passing%","Pr. Pass% Dif.","Successful Crosses","Crossing%","Deep Progressions",
-        "Successful Dribbles","Turnovers","OBV","Pass OBV","Defensive Actions","Aerial Win%",
-        "PAdj Pressures","PAdj Tack&Int","Dribbles Stopped%","Aggressive Actions",
-        "Player Season Ball Recoveries 90"
-    ]},
-    "Number 6": {"metrics": [
-        "xGBuildup","xG Assisted","Passing%","Deep Progressions","Turnovers","OBV","Pass OBV",
-        "Pr. Pass% Dif.","PAdj Interceptions","PAdj Tackles","Dribbles Stopped%",
-        "Aggressive Actions","Aerial Win%","Player Season Ball Recoveries 90","Pressure Regains"
-    ]},
-    "Number 8": {"metrics": [
-        "xGBuildup","xG Assisted","Shots","xG","NP Goals","Passing%","Deep Progressions",
-        "OP Passes Into Box","Pass OBV","OBV","Deep Completions","Pressure Regains",
-        "PAdj Pressures","Player Season Fhalf Ball Recoveries 90","Aggressive Actions"
-    ]},
-    "Left Wing": {"metrics": [
-        "xG","Shots","xG/Shot","Touches In Box","OP xG Assisted","NP Goals","OP Passes Into Box",
-        "Successful Box Cross%","Passing%","Successful Dribbles","Turnovers","OBV","D&C OBV",
-        "Fouls Won","Deep Progressions","Player Season Fhalf Pressures 90"
-    ]},
-    "Right Wing": {"metrics": [
-        "xG","Shots","xG/Shot","Touches In Box","OP xG Assisted","NP Goals","OP Passes Into Box",
-        "Successful Box Cross%","Passing%","Successful Dribbles","Turnovers","OBV","D&C OBV",
-        "Fouls Won","Deep Progressions","Player Season Fhalf Pressures 90"
-    ]},
-    "Striker": {"metrics": [
-        "Aggressive Actions","NP Goals","xG","Shots","xG/Shot","Goal Conversion%","Touches In Box",
-        "xG Assisted","Fouls Won","Deep Completions","OP Key Passes","Aerial Win%","Aerial Wins",
-        "Player Season Fhalf Pressures 90"
-    ]},
-    "Goalkeeper": {"metrics": []},
-}
-
-LOWER_IS_BETTER = {"Turnovers","Fouls","Pr. Long Balls","UPr. Long Balls"}
-
-# ============================================================
-# Data loading + preprocessing
+# Utility functions
 # ============================================================
 
 def load_one_file(p: Path) -> pd.DataFrame:
@@ -135,7 +49,39 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# Compute rankings
+# Position & metric mapping
+# ============================================================
+
+RAW_TO_GROUP = {
+    "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
+    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
+    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
+    "LEFTWING": "Winger", "LEFTMIDFIELDER": "Winger",
+    "RIGHTWING": "Winger", "RIGHTMIDFIELDER": "Winger",
+    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
+    "GOALKEEPER": "Goalkeeper",
+}
+
+def _clean_pos_token(tok: str) -> str:
+    if pd.isna(tok):
+        return ""
+    t = str(tok).upper().strip()
+    t = re.sub(r"[.\-_/]", " ", t)
+    t = re.sub(r"\s+", "", t)
+    return t
+
+def map_first_position_to_group(primary_pos_cell) -> str:
+    tok = _clean_pos_token(primary_pos_cell)
+    return RAW_TO_GROUP.get(tok, None)
+
+LOWER_IS_BETTER = {"Turnovers","Fouls","Pr. Long Balls","UPr. Long Balls"}
+
+# ============================================================
+# Compute player rankings
 # ============================================================
 
 def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
@@ -143,16 +89,11 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # Collect metrics
-    all_metrics = [m for v in position_metrics.values() for m in v["metrics"]]
-    for m in all_metrics:
-        if m not in df_all.columns:
-            df_all[m] = 0
-        df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+    # Collect numeric metrics (simplified detection)
+    numeric_cols = [c for c in df_all.columns if pd.api.types.is_numeric_dtype(df_all[c])]
+    raw_z_all = pd.DataFrame(index=df_all.index, columns=numeric_cols, dtype=float)
 
-    # Z-scores
-    raw_z_all = pd.DataFrame(index=df_all.index, columns=all_metrics, dtype=float)
-    for m in all_metrics:
+    for m in numeric_cols:
         z_per_group = df_all.groupby(pos_col)[m].transform(
             lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
         )
@@ -162,6 +103,7 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 
     df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 
+    # Apply league multiplier if exists
     if "Multiplier" not in df_all.columns:
         df_all["Multiplier"] = 1.0
     df_all["Multiplier"] = pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
@@ -192,68 +134,7 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
     return df_all
 
 # ============================================================
-# Formation plotting
-# ============================================================
-
-def plot_team_433(df, club_name, league_name, min_minutes_selection):
-    formation_roles = {
-        "GK": ["Goalkeeper"],
-        "LB": ["Left Back"], "LCB": ["Centre Back"], "RCB": ["Centre Back"], "RB": ["Right Back"],
-        "CDM": ["Number 6"],
-        "LCM": ["Number 8"], "RCM": ["Number 8"],
-        "LW": ["Left Wing"], "RW": ["Right Wing"],
-        "ST": ["Striker"],
-    }
-
-    # Apply squad minutes filter
-    df["_minutes_numeric"] = pd.to_numeric(df["Minutes played"], errors="coerce").fillna(0)
-    df = df[df["_minutes_numeric"] >= min_minutes_selection].copy()
-
-    used_players = set()
-    team_players = {}
-
-    for pos, roles in formation_roles.items():
-        subset = df[df["Six-Group Position"].isin(roles)].copy()
-        subset = subset.sort_values("Score (0–100)", ascending=False)
-
-        players = []
-        for _, r in subset.iterrows():
-            if r["Player"] not in used_players:
-                players.append(f"{r['Player']} ({r['Score (0–100)']:.0f})")
-                used_players.add(r["Player"])
-            if len(players) >= 3:   # starter + 2 backups
-                break
-
-        team_players[pos] = players if players else ["-"]
-
-    fig, ax = plt.subplots(figsize=(8, 7.5))
-    ax.set_facecolor("white")
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    ax.axis("off")
-    ax.set_title(f"{club_name} ({league_name})", color="black", fontsize=16, weight="bold", pad=5)
-    plt.tight_layout(pad=1)
-
-    coords = {
-        "GK": (50, 5),
-        "LB": (15, 25), "LCB": (38, 20), "RCB": (65, 20), "RB": (85, 25),
-        "CDM": (50, 40),
-        "LCM": (30, 55), "RCM": (70, 55),
-        "LW": (20, 75), "ST": (50, 82), "RW": (80, 75),
-    }
-
-    for pos, (x, y) in coords.items():
-        players = team_players.get(pos, ["-"])
-        ax.text(x, y, players[0], ha="center", va="center",
-                fontsize=9, color="black", weight="bold", wrap=True)
-        if len(players) > 1:
-            text_block = "\n".join(players[1:4])
-            ax.text(x, y - 4, text_block, ha="center", va="top", fontsize=7, color="black")
-
-    st.pyplot(fig, use_container_width=True)
-
-# ============================================================
-# Main
+# Main UI
 # ============================================================
 
 try:
@@ -271,44 +152,44 @@ try:
     df_all["Six-Group Position"] = df_all["Position"].apply(map_first_position_to_group)
     df_all = compute_rankings(df_all)
 
-    # --- League filter (persistent like Radar page) ---
+    # --- League filter ---
     league_col = "Competition_norm" if "Competition_norm" in df_all.columns else "Competition"
-    league_options = sorted(df_all[league_col].dropna().unique())
+    leagues = sorted(df_all[league_col].dropna().unique())
 
-    if "league_selection" not in st.session_state:
-        st.session_state.league_selection = league_options[0] if league_options else None
+    selected_league = st.selectbox("Select League", leagues)
 
-    selected_league = st.selectbox(
-        "Select League",
-        league_options,
-        key="league_selection"
+    # --- Club filter ---
+    clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
+    selected_club = st.selectbox("Select Club", clubs)
+
+    # --- Filter for team ---
+    df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
+
+    if df_team.empty:
+        st.warning("No players found for this team.")
+        st.stop()
+
+    # --- Sort by Score ---
+    df_team = df_team.sort_values("Score (0–100)", ascending=False).reset_index(drop=True)
+    df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+    # --- Display table ---
+    display_cols = ["Rank in Team", "Player", "Six-Group Position", "Score (0–100)",
+                    "Age", "Minutes played", "Weighted Z Score"]
+    for c in display_cols:
+        if c not in df_team.columns:
+            df_team[c] = np.nan
+
+    st.markdown(f"### {selected_club} ({selected_league}) — Player Rankings")
+    st.data_editor(
+        df_team[display_cols],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
+            "Weighted Z Score": st.column_config.NumberColumn("Weighted Z", format="%.2f"),
+        },
     )
-
-    # --- Club filter (persistent like Radar page) ---
-    club_options = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
-    if "club_selection" not in st.session_state:
-        st.session_state.club_selection = club_options[0] if club_options else None
-
-    selected_club = st.selectbox(
-        "Select Club",
-        club_options,
-        key="club_selection"
-    )
-
-    # --- Squad minutes filter (persistent like Radar page) ---
-    if "squad_min_minutes" not in st.session_state:
-        st.session_state.squad_min_minutes = 1000
-
-    min_minutes_selection = st.number_input(
-        "Minimum minutes for squad selection",
-        min_value=0,
-        step=100,
-        key="squad_min_minutes"
-    )
-
-    st.markdown(f"### Showing rankings for **{selected_club}** in {selected_league}")
-    df_club = df_all[df_all["Team"] == selected_club].copy()
-    plot_team_433(df_club, selected_club, selected_league, min_minutes_selection)
 
 except Exception as e:
-    st.error(f"Could not load data. Error: {e}")
+    st.error(f"❌ Could not load data: {e}")
