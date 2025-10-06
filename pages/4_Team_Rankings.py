@@ -3,8 +3,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt  # (optional, for any visual additions)
+import re                         # ✅ <-- add this line
 from pathlib import Path
 from datetime import datetime
+
 from auth import check_password
 from branding import show_branding
 
