@@ -625,6 +625,12 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
 
+# ---------- Debug: list all 'cross' columns ----------
+print("[DEBUG] Columns containing 'cross':")
+for c in df_all_raw.columns:
+    if "cross" in c.lower():
+        print("   ", c)
+
 # ---------- Clean raw column headers ----------
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
