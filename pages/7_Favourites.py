@@ -3,11 +3,9 @@
 import streamlit as st
 import sqlite3
 from pathlib import Path
-from datetime import datetime
-import pandas as pd
-
 from auth import check_password
 from branding import show_branding
+from datetime import datetime
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -22,7 +20,7 @@ show_branding()
 st.title("⭐ Favourite Players")
 
 # ============================================================
-# Database setup (multi-comment tracking)
+# Database setup (with migration)
 # ============================================================
 DB_PATH = Path(__file__).parent / "favourites.db"
 
@@ -30,18 +28,28 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
+    # Create table if not exists
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT,
+            player TEXT PRIMARY KEY,
             team TEXT,
             league TEXT,
             position TEXT,
-            colour TEXT DEFAULT 'Monitor',
+            colour TEXT DEFAULT 'Yellow',
             comment TEXT,
-            user TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Migration: ensure new columns exist
+    existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
+
+    if "colour" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT 'Yellow'")
+    if "comment" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN comment TEXT")
+    if "timestamp" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN timestamp DATETIME DEFAULT CURRENT_TIMESTAMP")
 
     conn.commit()
     conn.close()
@@ -65,177 +73,119 @@ def init_sheet():
     sheet = client.open("Livingston_Favourites_Log").sheet1
     return sheet
 
-def log_to_sheet(player, team, league, position, colour, comment, user, action):
-    """Log every change to Google Sheets for audit trail."""
+def log_to_sheet(player, team, league, position, colour, comment, action):
     try:
         sheet = init_sheet()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        sheet.append_row([player, team, league, position, colour, comment, user, action, now])
+        sheet.append_row([player, team, league, position, colour, comment, action, now])
     except Exception as e:
         st.error(f"❌ Failed to log to Google Sheet: {e}")
 
 # ============================================================
-# Database helpers
+# Database functions
 # ============================================================
-def get_latest_entries():
-    """Fetch the most recent comment per player safely."""
+def get_favourites():
     conn = sqlite3.connect(DB_PATH)
-
-    # Check if the 'user' column exists
-    cols = [r[1] for r in conn.execute("PRAGMA table_info(favourites);").fetchall()]
-    has_user_col = "user" in [c.lower() for c in cols]
-
-    # Build dynamic query depending on columns
-    select_cols = "player, team, league, position, colour, comment, timestamp"
-    if has_user_col:
-        select_cols = "player, team, league, position, colour, comment, user, timestamp"
-
-    query = f"""
-        SELECT {select_cols}
-        FROM favourites f1
-        INNER JOIN (
-            SELECT player, MAX(timestamp) AS latest
-            FROM favourites
-            GROUP BY player
-        ) f2
-        ON f1.player = f2.player AND f1.timestamp = f2.latest
-        ORDER BY f1.timestamp DESC
-    """
-
-    try:
-        df = pd.read_sql_query(query, conn)
-    except Exception as e:
-        st.warning(f"⚠️ Could not read favourites table: {e}")
-        df = pd.DataFrame()
-    finally:
-        conn.close()
-
-    return df
-
-def get_player_history(player):
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT * FROM favourites WHERE player=? ORDER BY timestamp DESC",
-        conn,
-        params=(player,)
-    )
+    c = conn.cursor()
+    c.execute("SELECT player, team, league, position, colour, comment, timestamp FROM favourites ORDER BY timestamp DESC")
+    rows = c.fetchall()
     conn.close()
-    return df
+    return rows
 
-def add_comment(player, team, league, position, colour, comment, user):
+def add_or_update_favourite(player, team, league, position, colour="Yellow", comment=""):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, user)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (player, team, league, position, colour, comment, user))
+        INSERT OR REPLACE INTO favourites (player, team, league, position, colour, comment, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (player, team, league, position, colour, comment))
     conn.commit()
     conn.close()
-    log_to_sheet(player, team, league, position, colour, comment, user, "Added")
+    log_to_sheet(player, team, league, position, colour, comment, "Added/Updated")
 
-def remove_player(player):
+def remove_favourite(player):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    c.execute("SELECT team, league, position, colour, comment FROM favourites WHERE player=?", (player,))
+    row = c.fetchone()
     c.execute("DELETE FROM favourites WHERE player=?", (player,))
     conn.commit()
     conn.close()
-    log_to_sheet(player, "-", "-", "-", "-", "-", "System", "Removed")
+    if row:
+        team, league, position, colour, comment = row
+        log_to_sheet(player, team, league, position, colour, comment, "Removed")
 
 # ============================================================
-# Colour tags
+# Helper: Colour tags
 # ============================================================
 COLOUR_OPTIONS = {
-    "Go": "🟢 Go",
-    "Monitor": "🟡 Monitor",
-    "No Further Interest": "🔴 No Further Interest"
+    "Green": "🟢 Go",
+    "Yellow": "🟡 Monitor",
+    "Red": "🔴 No Further Interest"
 }
+
+def colour_tag(colour: str) -> str:
+    mapping = {
+        "Green": '<span style="color:green; font-weight:bold;">🟢 Go</span>',
+        "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Monitor</span>',
+        "Red": '<span style="color:red; font-weight:bold;">🔴 No Further Interest</span>'
+    }
+    return mapping.get(colour, colour)
 
 # ============================================================
 # UI
 # ============================================================
-user_name = st.text_input("Your name (for tracking):", key="user_name")
-if not user_name:
-    st.warning("Please enter your name before making updates.")
-    st.stop()
+favs = get_favourites()
 
-# Keep state for selected player (detail view)
-if "selected_player" not in st.session_state:
-    st.session_state.selected_player = None
-
-# --- DETAIL VIEW ---
-if st.session_state.selected_player:
-    player = st.session_state.selected_player
-    st.markdown(f"## 🧾 {player} – Comment History")
-
-    df_history = get_player_history(player)
-    if df_history.empty:
-        st.info("No comments yet for this player.")
-    else:
-        st.dataframe(df_history[["timestamp", "user", "colour", "comment"]])
-
-    st.markdown("### ➕ Add New Comment")
-    new_comment = st.text_area("Comment", key="new_comment_text")
-    new_colour = st.selectbox("Status", list(COLOUR_OPTIONS.values()), key="new_comment_colour")
-
-    if st.button("💾 Submit Comment"):
-        chosen_colour = [k for k, v in COLOUR_OPTIONS.items() if v == new_colour][0]
-        info = df_history.iloc[0] if not df_history.empty else None
-        team = info["team"] if info is not None else ""
-        league = info["league"] if info is not None else ""
-        position = info["position"] if info is not None else ""
-
-        add_comment(player, team, league, position, chosen_colour, new_comment, user_name)
-        st.success("Comment added successfully.")
-        st.session_state.new_comment_text = ""
-        st.rerun()
-
-    if st.button("⬅️ Back to Favourites"):
-        st.session_state.selected_player = None
-        st.rerun()
-
-# --- MAIN LIST VIEW ---
-else:
+if favs:
     st.markdown("### Your Favourites")
 
-    df_latest = get_latest_entries()
-    if df_latest.empty:
-        st.info("No favourites have been added yet.")
-    else:
-        for _, row in df_latest.iterrows():
-            player, team, league, position, colour, comment, user, ts = row
+    for player, team, league, position, colour, comment, ts in favs:
+        with st.container():
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
 
-            with st.container():
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+            with col1:
+                st.write(f"**{player}** | {team} | {league} | {position}")
+                new_comment = st.text_input(
+                    f"Comment for {player}",
+                    value=comment if comment else "",
+                    key=f"comment_{player}"
+                )
 
-                with col1:
-                    if st.button(f"👤 {player}", key=f"view_{player}"):
-                        st.session_state.selected_player = player
-                        st.rerun()
-                    st.caption(f"{team} | {league} | {position}")
+            with col2:
+                # Options with emoji indicators
+                status_options = {
+                    "Go": "🟢 Go",
+                    "Monitor": "🟡 Monitor",
+                    "No Further Interest": "🔴 No Further Interest"
+                }
 
-                with col2:
-                    new_colour = st.selectbox(
-                        "Status",
-                        list(COLOUR_OPTIONS.values()),
-                        index=list(COLOUR_OPTIONS.keys()).index(colour if colour in COLOUR_OPTIONS else "Monitor"),
-                        key=f"colour_{player}"
+                # Current stored value mapped back to dropdown label
+                current_label = status_options.get(colour, "🟡 Monitor")
+
+                new_label = st.selectbox(
+                    "Status",
+                    list(status_options.values()),
+                    index=list(status_options.values()).index(current_label),
+                    key=f"colour_{player}"
+                )
+
+                # Reverse-map the emoji label back to the database value
+                new_colour = [k for k, v in status_options.items() if v == new_label][0]
+
+            with col3:
+                if st.button(f"💾 Save Changes", key=f"save_{player}"):
+                    add_or_update_favourite(
+                        player, team, league, position, new_colour, new_comment
                     )
-                    chosen_colour = [k for k, v in COLOUR_OPTIONS.items() if v == new_colour][0]
+                    st.success(f"✅ Saved updates for {player}")
+                    st.rerun()
 
-                with col3:
-                    new_comment = st.text_input(
-                        f"Quick comment for {player}",
-                        value=comment if comment else "",
-                        key=f"comment_{player}"
-                    )
+            with col4:
+                if st.button("❌ Remove", key=f"remove_{player}"):
+                    remove_favourite(player)
+                    st.success(f"Removed {player} from favourites")
+                    st.rerun()
 
-                with col4:
-                    if st.button("💾 Save", key=f"save_{player}"):
-                        add_comment(player, team, league, position, chosen_colour, new_comment, user_name)
-                        st.success(f"Saved update for {player}")
-                        st.rerun()
-
-                    if st.button("❌ Remove", key=f"remove_{player}"):
-                        remove_player(player)
-                        st.warning(f"{player} removed from favourites")
-                        st.rerun()
+else:
+    st.info("No favourites have been added yet.")
