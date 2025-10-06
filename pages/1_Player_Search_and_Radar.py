@@ -516,6 +516,8 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
     df = add_age_column(df)
     return df
 
+print([c for c in df_all_raw.columns if "cross" in c.lower()])
+
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     import re
     df = df_in.copy()
