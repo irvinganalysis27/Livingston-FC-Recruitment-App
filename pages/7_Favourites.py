@@ -116,19 +116,21 @@ def remove_favourite(player):
         log_to_sheet(player, team, league, position, colour, comment, "Removed")
 
 # ============================================================
-# Helper: Colour tags
+# Helper: Colour tags (now includes purple "Needs Checked")
 # ============================================================
 COLOUR_OPTIONS = {
     "Green": "🟢 Go",
     "Yellow": "🟡 Monitor",
-    "Red": "🔴 No Further Interest"
+    "Red": "🔴 No Further Interest",
+    "Purple": "🟣 Needs Checked"
 }
 
 def colour_tag(colour: str) -> str:
     mapping = {
         "Green": '<span style="color:green; font-weight:bold;">🟢 Go</span>',
         "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Monitor</span>',
-        "Red": '<span style="color:red; font-weight:bold;">🔴 No Further Interest</span>'
+        "Red": '<span style="color:red; font-weight:bold;">🔴 No Further Interest</span>',
+        "Purple": '<span style="color:purple; font-weight:bold;">🟣 Needs Checked</span>'
     }
     return mapping.get(colour, colour)
 
@@ -153,15 +155,19 @@ if favs:
                 )
 
             with col2:
-                # Options with emoji indicators
+                # Options with emoji indicators (now includes Needs Checked)
                 status_options = {
                     "Go": "🟢 Go",
                     "Monitor": "🟡 Monitor",
+                    "Needs Checked": "🟣 Needs Checked",
                     "No Further Interest": "🔴 No Further Interest"
                 }
 
-                # Current stored value mapped back to dropdown label
-                current_label = status_options.get(colour, "🟡 Monitor")
+                # Map stored value to dropdown label
+                current_label = next(
+                    (v for k, v in status_options.items() if colour.lower() in k.lower()),
+                    "🟡 Monitor"
+                )
 
                 new_label = st.selectbox(
                     "Status",
@@ -170,7 +176,7 @@ if favs:
                     key=f"colour_{player}"
                 )
 
-                # Reverse-map the emoji label back to the database value
+                # Reverse-map the label back to database key
                 new_colour = [k for k, v in status_options.items() if v == new_label][0]
 
             with col3:
