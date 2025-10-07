@@ -12,7 +12,7 @@ from auth import check_password
 from branding import show_branding
 
 # ============================================================
-# Protect page
+# Setup & Protection
 # ============================================================
 if not check_password():
     st.stop()
@@ -26,7 +26,7 @@ DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 DB_PATH = APP_DIR / "favourites.db"
 
 # ============================================================
-# Favourites DB (same schema used elsewhere)
+# Favourites DB
 # ============================================================
 def _ensure_db():
     conn = sqlite3.connect(DB_PATH)
@@ -64,7 +64,7 @@ def remove_favourite(player):
     conn.close()
 
 # ============================================================
-# Loaders
+# Data Loading
 # ============================================================
 def load_one_file(p: Path) -> pd.DataFrame:
     return pd.read_excel(p) if p.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(p)
@@ -85,30 +85,7 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# League synonyms (same as Radar page, shortened where safe)
-# ============================================================
-LEAGUE_SYNONYMS = {
-    "Challenger Pro League": "Belgium Challenger Pro League",
-    "Belgian Pro League": "Jupiler Pro League",
-    "Belgium Pro League": "Jupiler Pro League",
-    "Belgium Jupiler Pro League": "Jupiler Pro League",
-    "Jupiler Pro League": "Jupiler Pro League",
-    "Ligue 2": "Ligue 2",
-    "France Ligue 2": "Ligue 2",
-    "Eredivisie": "Eredivisie",
-    "Netherlands Eredivisie": "Eredivisie",
-    "Eerste Divisie": "Netherlands Eerste Divisie",
-    "A-League": "Australia A-League Men",
-    "USL Championship": "USA USL Championship",
-    # Tunisia fixes
-    "Ligue 1": "Tunisia Ligue 1",
-    "Ligue 1 (TUN)": "Tunisia Ligue 1",
-    "France Ligue 1": "Tunisia Ligue 1",
-    # …(you can paste your full mapping here if you want 1:1)
-}
-
-# ============================================================
-# Position mapping (8 buckets consistent with radar’s 6)
+# Position & League Mapping
 # ============================================================
 RAW_TO_GROUP = {
     "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
@@ -136,100 +113,85 @@ def map_first_position_to_group(primary_pos_cell) -> str:
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
 # ============================================================
-# Preprocess (add Competition_norm, Multiplier, Positions played)
+# Preprocessing (League + Multiplier + Position)
 # ============================================================
-def preprocess_for_team_table(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # Standardize identifiers
     rename_map = {}
     if "Name" in df.columns: rename_map["Name"] = "Player"
     if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
     if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
     if rename_map: df.rename(columns=rename_map, inplace=True)
 
-    # Competition_norm from best available column
-    comp_src = "Competition"
-    if "Competition_norm" in df.columns:
-        df["Competition_norm"] = df["Competition_norm"].astype(str)
-    else:
-        if "Competition" not in df.columns and "Competition Name" in df.columns:
-            comp_src = "Competition Name"
-        if comp_src in df.columns:
-            df["Competition_norm"] = (
-                df[comp_src].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
-            )
-        else:
-            df["Competition_norm"] = np.nan
+    if "Competition_norm" not in df.columns and "Competition" in df.columns:
+        df["Competition_norm"] = df["Competition"].astype(str)
 
-    # Merge league multipliers
+    # merge multipliers
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
-            df = df.merge(mult[["League", "Multiplier"]],
-                          left_on="Competition_norm", right_on="League", how="left")
+            df = df.merge(mult, left_on="Competition_norm", right_on="League", how="left")
             df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
         else:
             df["Multiplier"] = 1.0
     except Exception:
         df["Multiplier"] = 1.0
 
-    # Positions played
-    if "Position" in df.columns:
-        if "Secondary Position" in df.columns:
-            df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
-                df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
-                ", " + df["Secondary Position"].astype(str),
-                ""
-            )
-        else:
-            df["Positions played"] = df["Position"].astype(str)
+    if "Secondary Position" in df.columns:
+        df["Positions played"] = df["Position"].fillna("") + np.where(
+            df["Secondary Position"].notna(), ", " + df["Secondary Position"].astype(str), ""
+        )
     else:
-        df["Positions played"] = np.nan
+        df["Positions played"] = df["Position"]
 
-    # Six-Group Position
-    df["Six-Group Position"] = df.get("Position", np.nan).apply(map_first_position_to_group)
-
+    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     return df
 
 # ============================================================
-# Ranking math (same style as your other page)
+# Position-specific ranking logic (same as radar)
 # ============================================================
-def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
+def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns: df_all[pos_col] = np.nan
 
-    # Numeric columns
-    numeric_cols = [c for c in df_all.columns if pd.api.types.is_numeric_dtype(df_all[c])]
-    raw_z_all = pd.DataFrame(index=df_all.index, columns=numeric_cols, dtype=float)
+    # Ensure numeric
+    df_num = df_all.select_dtypes(include=[np.number]).copy()
+    metric_cols = [c for c in df_num.columns if c not in ["Age", "Height", "Minutes played"]]
+    raw_z = pd.DataFrame(index=df_all.index, columns=metric_cols, dtype=float)
 
-    for m in numeric_cols:
+    for m in metric_cols:
         z = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() else 0)
         if m in LOWER_IS_BETTER:
             z *= -1
-        raw_z_all[m] = z.fillna(0)
+        raw_z[m] = z.fillna(0)
 
-    df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
+    df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
     df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
     eligible = df_all[mins >= min_minutes].copy()
-    if eligible.empty: eligible = df_all.copy()
+    if eligible.empty:
+        eligible = df_all.copy()
 
-    anchor = eligible.groupby(pos_col)["Weighted Z Score"].agg(_lo="min", _hi="max").fillna(0)
-    df_all = df_all.merge(anchor, left_on=pos_col, right_index=True, how="left")
+    anchors = (
+        eligible.groupby(pos_col)["Weighted Z Score"]
+                .agg(_scale_min="min", _scale_max="max")
+                .fillna(0)
+    )
+    df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
     def _to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo: return 50.0
-        return float(np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df_all["Score (0–100)"] = [
-        _to100(v, lo, hi) for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_lo"], df_all["_hi"])
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
-    df_all.drop(columns=["_lo", "_hi"], inplace=True, errors="ignore")
-
+    df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
     return df_all
 
 # ============================================================
@@ -238,11 +200,9 @@ def compute_rankings(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFra
 try:
     df_all_raw = load_statsbomb(DATA_PATH)
     df_all_raw = add_age_column(df_all_raw)
+    df_all = preprocess(df_all_raw)
+    df_all = compute_scores(df_all, min_minutes=600)
 
-    df_all = preprocess_for_team_table(df_all_raw)
-    df_all = compute_rankings(df_all)
-
-    # League / club pickers
     league_col = "Competition_norm"
     leagues = sorted(df_all[league_col].dropna().unique())
     selected_league = st.selectbox("Select League", leagues)
@@ -250,16 +210,14 @@ try:
     clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
     selected_club = st.selectbox("Select Club", clubs)
 
-    # Subset to team
     df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
     if df_team.empty:
         st.warning("No players found for this team.")
         st.stop()
 
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-    df_team.sort_values(["Rank in Team", "Score (0–100)"], ascending=[True, False], inplace=True)
 
-    # ---------- Table (same order/style as the other page) ----------
+    # ---------- Table ----------
     st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
 
     cols_for_table = [
@@ -277,12 +235,10 @@ try:
         "Multiplier": "League Weight"
     }, inplace=True)
 
-    # tidy types
     z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
     z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
     z_ranking["League Weight"] = pd.to_numeric(z_ranking["League Weight"], errors="coerce").fillna(1.0).round(3)
 
-    # ⭐ favourites
     favs_in_db = {row[0] for row in get_favourites()}
     z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
@@ -297,7 +253,6 @@ try:
         width="stretch",
     )
 
-    # sync favourites
     for _, r in edited.iterrows():
         p = r["Player"]
         if r["⭐ Favourite"] and p not in favs_in_db:
