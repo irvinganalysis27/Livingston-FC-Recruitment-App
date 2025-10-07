@@ -1,9 +1,12 @@
 import streamlit as st
 import sqlite3
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+import gspread
+from google.oauth2.service_account import Credentials
 
 # ============================================================
 # Protect page
@@ -22,8 +25,6 @@ DB_PATH = Path(__file__).parent / "favourites.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
-    # Base table
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
@@ -36,32 +37,53 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
-    # Migration for missing columns
+    # Migration check
     existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    if "colour" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT ''")
-    if "comment" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN comment TEXT DEFAULT ''")
-    if "visible" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN visible INTEGER DEFAULT 1")
-
+    for col, dtype in [("colour", "TEXT DEFAULT ''"), ("comment", "TEXT DEFAULT ''"), ("visible", "INTEGER DEFAULT 1")]:
+        if col not in existing_cols:
+            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
     conn.commit()
     conn.close()
 
 init_db()
 
 # ============================================================
-# Helper DB functions
+# Google Sheets Setup
+# ============================================================
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def init_sheet():
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=SCOPES
+    )
+    client = gspread.authorize(creds)
+    sheet = client.open("Livingston_Favourites_Log").sheet1
+    return sheet
+
+def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
+    """Log colour/comment changes to Google Sheet."""
+    try:
+        sheet = init_sheet()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sheet.append_row([player, team, league, position, colour, comment, action, now])
+    except Exception as e:
+        st.error(f"❌ Failed to log to Google Sheet: {e}")
+
+# ============================================================
+# DB Functions
 # ============================================================
 def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    if show_hidden:
-        c.execute("SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites ORDER BY timestamp DESC")
-    else:
-        c.execute("SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites WHERE visible=1 ORDER BY timestamp DESC")
-    rows = c.fetchall()
+    query = "SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites"
+    if not show_hidden:
+        query += " WHERE visible=1"
+    query += " ORDER BY timestamp DESC"
+    rows = c.execute(query).fetchall()
     conn.close()
     return rows
 
@@ -76,13 +98,6 @@ def update_favourite(player, colour, comment, visible):
     conn.commit()
     conn.close()
 
-def restore_favourite(player):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE favourites SET visible=1 WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
-
 # ============================================================
 # Load favourites
 # ============================================================
@@ -93,12 +108,10 @@ if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
-# Build DataFrame for display
-import pandas as pd
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 
 # ============================================================
-# Table Configuration
+# Table config
 # ============================================================
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
 
@@ -126,21 +139,29 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# Save changes automatically
+# Save + Log Changes
 # ============================================================
-for _, row in edited_df.iterrows():
+for idx, row in edited_df.iterrows():
     player = row["Player"]
-    update_favourite(
-        player,
-        row.get("Colour", ""),
-        row.get("Comment", ""),
-        int(row.get("Visible", True))
-    )
+    colour = row.get("Colour", "")
+    comment = row.get("Comment", "")
+    visible = int(row.get("Visible", True))
+
+    # Compare to stored data
+    prev = df.loc[df["Player"] == player].iloc[0]
+    colour_changed = colour != prev["Colour"]
+    comment_changed = comment != prev["Comment"]
+
+    # Update DB
+    update_favourite(player, colour, comment, visible)
+
+    # Log if colour or comment changed
+    if colour_changed or comment_changed:
+        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Updated")
 
 # ============================================================
-# Optional summary
+# Summary
 # ============================================================
 visible_count = (edited_df["Visible"] == True).sum()
 hidden_count = (edited_df["Visible"] == False).sum()
-
-st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). All changes are auto-saved.")
+st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes are auto-saved and logged.")
