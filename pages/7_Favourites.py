@@ -106,14 +106,14 @@ def delete_favourite(player):
 # ============================================================
 # Load favourites
 # ============================================================
-show_hidden = st.checkbox("Show hidden players", value=False)
+show_hidden = st.checkbox("Show removed players", value=False)
 rows = get_favourites(show_hidden=show_hidden)
 
 if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
-df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
+df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Remove?", "Timestamp"])
 
 # ============================================================
 # Editable Table
@@ -171,7 +171,9 @@ for idx, row in edited_df.iterrows():
         delete_favourite(player)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
         removed_players.append(player)
-        continue
+        # auto-refresh immediately after deletion
+        st.session_state[f"removed_{player}"] = True
+        st.rerun()
 
     update_favourite(player, colour, comment, visible)
 
