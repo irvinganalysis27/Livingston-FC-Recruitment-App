@@ -1374,7 +1374,7 @@ z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
 # ============================================================
-# Sync with favourites.db (integrated)
+# 🔄 FAVOURITES SYNC (integrated with colour + visibility)
 # ============================================================
 
 def get_favourites_with_colours():
@@ -1389,7 +1389,7 @@ def get_favourites_with_colours():
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
+def upsert_favourite(player, team, league, position, colour="🟡 Yellow", comment="", visible=1):
     """Add or update a favourite record."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -1409,18 +1409,24 @@ def upsert_favourite(player, team, league, position, colour="", comment="", visi
     conn.close()
 
 def hide_favourite(player):
-    """Soft-remove favourite (visible = 0)."""
+    """Soft-remove favourite (visible = 0 instead of delete)."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?", (player,))
     conn.commit()
     conn.close()
 
-# Load favourites
+# ============================================================
+# 🟢 LOAD FAVOURITES + BUILD DISPLAY
+# ============================================================
+
+# Load all favourites
 favs = get_favourites_with_colours()
+# Only show those still visible
 favs_visible = {k: v for k, v in favs.items() if v["visible"] == 1}
 
-# Colour tint mapping
+# Colour emoji + hex mappings
+COLOUR_EMOJI = ["🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
 COLOUR_HEX = {
     "🟢 Green": "#34a853",
     "🟡 Yellow": "#fbbc05",
@@ -1428,47 +1434,44 @@ COLOUR_HEX = {
     "🟣 Purple": "#a142f4",
 }
 
-edited_df = st.data_editor(
-    z_ranking[
-        ["Player (coloured)", "Positions played", "Team", "League", "Multiplier",
-         "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"]
-    ],
-    column_config={
-        "Player (coloured)": st.column_config.TextColumn(
-            "Player",
-            help="Coloured based on Favourites page status"
-        ),
-        "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite",
-            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
-        ),
-        "Multiplier": st.column_config.NumberColumn(
-            "League Weight",
-            help="League weighting applied in ranking",
-            format="%.3f"
-        ),
-    },
-    hide_index=False,
-    width="stretch"
-)
+# Apply colour to names
+def colourize_player_name(name):
+    colour = favs_visible.get(name, {}).get("colour", "")
+    if not colour:
+        return name
+    return f"{colour.split()[0]} {name}"  # Adds emoji only (🟢 Player)
 
-# Build coloured column
-z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
+# Add derived columns
 z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_visible.keys())
+z_ranking["Colour"] = z_ranking["Player"].apply(lambda n: favs_visible.get(n, {}).get("colour", "🟡 Yellow"))
+z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
 
 # ============================================================
-# Editable Table
+# 🧾 ENSURE TABLE COLUMNS EXIST
+# ============================================================
+required_cols = [
+    "Player (coloured)", "Colour", "Positions played", "Team", "League", "Multiplier",
+    "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"
+]
+for col in required_cols:
+    if col not in z_ranking.columns:
+        z_ranking[col] = np.nan
+
+# ============================================================
+# 📋 EDITABLE TABLE (with colour + favourite sync)
 # ============================================================
 edited_df = st.data_editor(
-    z_ranking[
-        ["Player (coloured)", "Positions played", "Team", "League", "Multiplier",
-         "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"]
-    ],
+    z_ranking[required_cols],
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player",
-            help="Coloured based on Favourites page status",
-            allow_html=True
+            help="Emoji colour shows current Favourites status"
+        ),
+        "Colour": st.column_config.SelectboxColumn(
+            "Colour",
+            help="Change player highlight colour (syncs with Favourites)",
+            options=COLOUR_EMOJI,
+            default="🟡 Yellow"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite",
@@ -1485,21 +1488,19 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# Apply favourite changes
+# 💾 APPLY CHANGES TO favourites.db
 # ============================================================
 for _, row in edited_df.iterrows():
-    # Remove HTML for database key
-    player_name = re.sub("<.*?>", "", str(row["Player (coloured)"]))
-    is_fav = row["⭐ Favourite"]
-
-    # Player metadata
+    player_name = str(row["Player"]).strip()
     team = row.get("Team", "")
     league = row.get("League", "")
     position = row.get("Positions played", "")
+    colour = row.get("Colour", "🟡 Yellow")
+    is_fav = bool(row.get("⭐ Favourite", False))
 
     if is_fav:
-        # Add/update favourite
-        upsert_favourite(player_name, team, league, position, visible=1)
+        # Add or update favourite
+        upsert_favourite(player_name, team, league, position, colour=colour, visible=1)
     else:
-        # Hide favourite (instead of delete)
+        # Hide favourite instead of deleting
         hide_favourite(player_name)
