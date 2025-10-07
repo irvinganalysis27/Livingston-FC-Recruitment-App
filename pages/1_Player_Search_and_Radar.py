@@ -1479,31 +1479,6 @@ def colourize_player_name(name: str) -> str:
     return f"{emoji} {name}" if emoji else name
 
 # ============================================================
-# 📋 EDITABLE TABLE
-# ============================================================
-edited_df = st.data_editor(
-    z_ranking,
-    column_config={
-        "Player (coloured)": st.column_config.TextColumn(
-            "Player",
-            help="Shows Favourites colour (🟢🟡🔴🟣 only if marked)"
-        ),
-        "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite",
-            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
-        ),
-        "Multiplier": st.column_config.NumberColumn(
-            "League Weight",
-            help="League weighting applied in ranking",
-            format="%.3f"
-        ),
-    },
-    hide_index=False,
-    width="stretch",
-    key="ranking_editor",  # ✅ Added unique key to stop duplicate element error
-)
-
-# ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
