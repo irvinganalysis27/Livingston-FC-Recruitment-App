@@ -1479,24 +1479,6 @@ def colourize_player_name(name: str) -> str:
     return f"{emoji} {name}" if emoji else name
 
 # ============================================================
-# 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
-# ============================================================
-# Add colourized name + favourite flag
-z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
-z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
-    lambda n: bool(favs.get(n, {}).get("visible", 0))
-)
-
-required_cols = [
-    "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
-    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
-]
-for col in required_cols:
-    if col not in z_ranking.columns:
-        z_ranking[col] = np.nan
-z_ranking = z_ranking[required_cols]
-
-# ============================================================
 # 📋 EDITABLE TABLE
 # ============================================================
 edited_df = st.data_editor(
