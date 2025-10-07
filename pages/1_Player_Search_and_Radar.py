@@ -1329,97 +1329,76 @@ if st.session_state.selected_player:
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# --- Ensure required columns exist ---
+# Include Score (0–100) and Multiplier for quick reference
 cols_for_table = [
-    "Player", "Positions played", "Team", "Competition_norm",
-    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Player", "Positions played",
+    "Team", "Competition_norm", "Multiplier",  # grouped together
+    "Score (0–100)", "Age", "Minutes played", "Rank"
 ]
+
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-# --- Prepare base ranking data ---
 z_ranking = plot_data[cols_for_table].copy()
+
+# Clean up
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
-z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
-z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
 
-# --- Deduplicate players (keep best score) ---
+if "Age" in z_ranking.columns:
+    z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
+
+z_ranking["Minutes played"] = pd.to_numeric(
+    z_ranking["Minutes played"], errors="coerce"
+).fillna(0).astype(int)
+
+z_ranking["Multiplier"] = pd.to_numeric(
+    z_ranking["Multiplier"], errors="coerce"
+).fillna(1.0).round(3)
+
+# Deduplicate by player, keeping best score
 z_ranking = (
     z_ranking.sort_values("Score (0–100)", ascending=False)
              .groupby("Player", as_index=False)
              .first()
 )
 
-# --- Recalculate rank properly ---
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+# Recalculate proper Rank
+z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(
+    ascending=False, method="min"
+).astype(int)
+
+# Sort by Rank (best → worst)
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
+
+# Reset row index for display
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
-# --- Load favourites & colours from DB ---
-def get_favourites_with_colours():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT player, colour FROM favourites")
-        rows = c.fetchall()
-        conn.close()
-        return {r[0]: r[1] for r in rows}
-    except Exception as e:
-        print(f"[DEBUG] Failed to load favourites with colours: {e}")
-        return {}
-
-favs_with_colours = get_favourites_with_colours()
-favs_in_db = set(favs_with_colours.keys())
+# ---- Favourites column from DB ----
+favs_in_db = {row[0] for row in get_favourites()}   # player names from DB
 z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-# --- Colour map ---
-COLOUR_HEX = {
-    "Green": "#34a853",   # Go
-    "Yellow": "#fbbc05",  # Monitor
-    "Red": "#ea4335",     # No further interest
-    "Purple": "#a142f4",  # Needs checked
-}
-
-# --- Format player column (colour + Transfermarkt link) ---
-def format_player_name(name):
-    colour = favs_with_colours.get(name)
-    colour_hex = COLOUR_HEX.get(colour, "#FFFFFF")
-    tm_url = f"https://www.transfermarkt.co.uk/schnellsuche/ergebnis/schnellsuche?query={name.replace(' ', '%20')}"
-    return f"<a href='{tm_url}' target='_blank' style='color:{colour_hex}; font-weight:bold; text-decoration:none'>{name}</a>"
-
-z_ranking["Player"] = z_ranking["Player"].apply(format_player_name)
-
-# --- Display table with coloured clickable names ---
-st.write(
-    z_ranking.to_html(escape=False, index=False),
-    unsafe_allow_html=True
-)
-st.caption("🟢 Go 🟡 Monitor 🟣 Needs Checked 🔴 No Further Interest (from Favourites page)")
-
-# --- Editable favourite toggle (sync to DB) ---
-edit_cols = ["Player", "⭐ Favourite"]
-edit_df = z_ranking.copy()
-edit_df["Player"] = edit_df["Player"].str.replace(r"<.*?>", "", regex=True)  # strip HTML tags for DB safety
-
-edited = st.data_editor(
-    edit_df[edit_cols],
+# ---- Editable table ----
+edited_df = st.data_editor(
+    z_ranking,
     column_config={
         "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite", help="Mark or unmark as favourite", default=False
+            "⭐ Favourite", help="Mark as favourite", default=False
+        ),
+        "Multiplier": st.column_config.NumberColumn(
+            "League Weight", help="League weighting applied in ranking", format="%.3f"
         ),
     },
-    hide_index=True,
-    key="fav_toggle_editor",
+    hide_index=False,
+    width="stretch",  # replaces deprecated use_container_width
 )
 
-# --- Sync changes back to DB ---
-for _, row in edited.iterrows():
+# ---- Sync changes back to DB ----
+for _, row in edited_df.iterrows():
     player = row["Player"]
     if row["⭐ Favourite"] and player not in favs_in_db:
-        add_favourite(player)
+        add_favourite(player, row.get("Team"), row.get("League"), row.get("Positions played"))
     elif not row["⭐ Favourite"] and player in favs_in_db:
         remove_favourite(player)
