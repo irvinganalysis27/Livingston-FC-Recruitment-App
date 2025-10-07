@@ -1,14 +1,9 @@
-# pages/7_Favourites.py
-
 import streamlit as st
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 from auth import check_password
 from branding import show_branding
-from datetime import datetime
-
-import gspread
-from google.oauth2.service_account import Credentials
 
 # ============================================================
 # Protect page
@@ -19,50 +14,37 @@ if not check_password():
 show_branding()
 st.title("⭐ Favourite Players")
 
-st.markdown(
-    """
-    <div style='text-align: center; margin-top: -10px; margin-bottom: 20px;'>
-        <a href='https://docs.google.com/spreadsheets/d/16oweZkbqNst16U5lQshnYjwjWiuCmd8ClZfPyAtoE0o/edit?gid=0#gid=0'
-           target='_blank'
-           style='font-size:16px; text-decoration:none; color:#1a73e8; font-weight:bold;'>
-           Player Database ↗
-        </a>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# ============================================================
-# Database setup (with migration)
-# ============================================================
 DB_PATH = Path(__file__).parent / "favourites.db"
 
+# ============================================================
+# Initialise + migrate DB
+# ============================================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # Create table if not exists
+    # Base table
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
             team TEXT,
             league TEXT,
             position TEXT,
-            colour TEXT DEFAULT 'Yellow',
-            comment TEXT,
+            colour TEXT DEFAULT '',
+            comment TEXT DEFAULT '',
+            visible INTEGER DEFAULT 1,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # Migration: ensure new columns exist
+    # Migration for missing columns
     existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
-
     if "colour" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT 'Yellow'")
+        c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT ''")
     if "comment" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN comment TEXT")
-    if "timestamp" not in existing_cols:
-        c.execute("ALTER TABLE favourites ADD COLUMN timestamp DATETIME DEFAULT CURRENT_TIMESTAMP")
+        c.execute("ALTER TABLE favourites ADD COLUMN comment TEXT DEFAULT ''")
+    if "visible" not in existing_cols:
+        c.execute("ALTER TABLE favourites ADD COLUMN visible INTEGER DEFAULT 1")
 
     conn.commit()
     conn.close()
@@ -70,141 +52,95 @@ def init_db():
 init_db()
 
 # ============================================================
-# Google Sheets setup
+# Helper DB functions
 # ============================================================
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def init_sheet():
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=SCOPES
-    )
-    client = gspread.authorize(creds)
-    sheet = client.open("Livingston_Favourites_Log").sheet1
-    return sheet
-
-def log_to_sheet(player, team, league, position, colour, comment, action):
-    try:
-        sheet = init_sheet()
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        sheet.append_row([player, team, league, position, colour, comment, action, now])
-    except Exception as e:
-        st.error(f"❌ Failed to log to Google Sheet: {e}")
-
-# ============================================================
-# Database functions
-# ============================================================
-def get_favourites():
+def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT player, team, league, position, colour, comment, timestamp FROM favourites ORDER BY timestamp DESC")
+    if show_hidden:
+        c.execute("SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites ORDER BY timestamp DESC")
+    else:
+        c.execute("SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites WHERE visible=1 ORDER BY timestamp DESC")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def add_or_update_favourite(player, team, league, position, colour="Yellow", comment=""):
+def update_favourite(player, colour, comment, visible):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT OR REPLACE INTO favourites (player, team, league, position, colour, comment, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    """, (player, team, league, position, colour, comment))
+        UPDATE favourites
+        SET colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
+        WHERE player=?
+    """, (colour, comment, visible, player))
     conn.commit()
     conn.close()
-    log_to_sheet(player, team, league, position, colour, comment, "Added/Updated")
 
-def remove_favourite(player):
+def restore_favourite(player):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT team, league, position, colour, comment FROM favourites WHERE player=?", (player,))
-    row = c.fetchone()
-    c.execute("DELETE FROM favourites WHERE player=?", (player,))
+    c.execute("UPDATE favourites SET visible=1 WHERE player=?", (player,))
     conn.commit()
     conn.close()
-    if row:
-        team, league, position, colour, comment = row
-        log_to_sheet(player, team, league, position, colour, comment, "Removed")
 
 # ============================================================
-# Helper: Colour tags (now includes purple "Needs Checked")
+# Load favourites
 # ============================================================
-COLOUR_OPTIONS = {
-    "Green": "🟢 Go",
-    "Yellow": "🟡 Monitor",
-    "Red": "🔴 No Further Interest",
-    "Purple": "🟣 Needs Checked"
-}
+show_hidden = st.checkbox("Show hidden players", value=False)
+rows = get_favourites(show_hidden=show_hidden)
 
-def colour_tag(colour: str) -> str:
-    mapping = {
-        "Green": '<span style="color:green; font-weight:bold;">🟢 Go</span>',
-        "Yellow": '<span style="color:orange; font-weight:bold;">🟡 Monitor</span>',
-        "Red": '<span style="color:red; font-weight:bold;">🔴 No Further Interest</span>',
-        "Purple": '<span style="color:purple; font-weight:bold;">🟣 Needs Checked</span>'
-    }
-    return mapping.get(colour, colour)
+if not rows:
+    st.info("No favourites saved yet.")
+    st.stop()
+
+# Build DataFrame for display
+import pandas as pd
+df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 
 # ============================================================
-# UI
+# Table Configuration
 # ============================================================
-favs = get_favourites()
+colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
 
-if favs:
-    st.markdown("### Your Favourites")
+edited_df = st.data_editor(
+    df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"]],
+    column_config={
+        "Colour": st.column_config.SelectboxColumn(
+            "Colour",
+            help="Set player status colour",
+            options=colour_options,
+            required=False,
+            default=""
+        ),
+        "Comment": st.column_config.TextColumn(
+            "Comment",
+            help="Add notes or scouting comments about this player"
+        ),
+        "Visible": st.column_config.CheckboxColumn(
+            "Visible",
+            help="Uncheck to hide player (instead of deleting)"
+        ),
+    },
+    hide_index=True,
+    width="stretch",
+)
 
-    for player, team, league, position, colour, comment, ts in favs:
-        with st.container():
-            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+# ============================================================
+# Save changes automatically
+# ============================================================
+for _, row in edited_df.iterrows():
+    player = row["Player"]
+    update_favourite(
+        player,
+        row.get("Colour", ""),
+        row.get("Comment", ""),
+        int(row.get("Visible", True))
+    )
 
-            with col1:
-                st.write(f"**{player}** | {team} | {league} | {position}")
-                new_comment = st.text_input(
-                    f"Comment for {player}",
-                    value=comment if comment else "",
-                    key=f"comment_{player}"
-                )
+# ============================================================
+# Optional summary
+# ============================================================
+visible_count = (edited_df["Visible"] == True).sum()
+hidden_count = (edited_df["Visible"] == False).sum()
 
-            with col2:
-                # Options with emoji indicators (now includes Needs Checked)
-                status_options = {
-                    "Go": "🟢 Go",
-                    "Monitor": "🟡 Monitor",
-                    "Needs Checked": "🟣 Needs Checked",
-                    "No Further Interest": "🔴 No Further Interest"
-                }
-
-                # Map stored value to dropdown label
-                current_label = next(
-                    (v for k, v in status_options.items() if colour.lower() in k.lower()),
-                    "🟡 Monitor"
-                )
-
-                new_label = st.selectbox(
-                    "Status",
-                    list(status_options.values()),
-                    index=list(status_options.values()).index(current_label),
-                    key=f"colour_{player}"
-                )
-
-                # Reverse-map the label back to database key
-                new_colour = [k for k, v in status_options.items() if v == new_label][0]
-
-            with col3:
-                if st.button(f"💾 Save Changes", key=f"save_{player}"):
-                    add_or_update_favourite(
-                        player, team, league, position, new_colour, new_comment
-                    )
-                    st.success(f"✅ Saved updates for {player}")
-                    st.rerun()
-
-            with col4:
-                if st.button("❌ Remove", key=f"remove_{player}"):
-                    remove_favourite(player)
-                    st.success(f"Removed {player} from favourites")
-                    st.rerun()
-
-else:
-    st.info("No favourites have been added yet.")
+st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). All changes are auto-saved.")
