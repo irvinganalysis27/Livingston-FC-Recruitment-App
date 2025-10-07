@@ -100,7 +100,7 @@ df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour
 # ============================================================
 # Table Configuration
 # ============================================================
-colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
+colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
 
 edited_df = st.data_editor(
     df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"]],
