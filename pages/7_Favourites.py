@@ -15,12 +15,12 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("⭐ Favourite Players")
+st.title("⭐ Favourite Players (Debug Mode)")
 
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 # ============================================================
-# Initialise + migrate DB
+# DB init
 # ============================================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -37,22 +37,13 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    for col, dtype in [
-        ("colour", "TEXT DEFAULT ''"),
-        ("comment", "TEXT DEFAULT ''"),
-        ("visible", "INTEGER DEFAULT 1"),
-        ("timestamp", "DATETIME DEFAULT CURRENT_TIMESTAMP")
-    ]:
-        if col not in existing_cols:
-            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
     conn.commit()
     conn.close()
 
 init_db()
 
 # ============================================================
-# Google Sheets Setup
+# Google Sheets
 # ============================================================
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -60,24 +51,33 @@ SCOPES = [
 ]
 
 def init_sheet():
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=SCOPES
-    )
-    client = gspread.authorize(creds)
-    sheet = client.open("Livingston_Favourites_Log").sheet1
-    return sheet
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
+        )
+        client = gspread.authorize(creds)
+        sheet = client.open("Livingston_Favourites_Log").sheet1
+        return sheet
+    except Exception as e:
+        st.error(f"❌ Failed to connect to Google Sheets: {e}")
+        return None
 
 def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
+    sheet = init_sheet()
+    if not sheet:
+        st.warning("⚠️ Skipped logging because sheet connection failed.")
+        return
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
-        sheet = init_sheet()
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         sheet.append_row([player, team, league, position, colour, comment, action, now])
+        st.write(f"✅ Logged to sheet: {player} → {action}")
     except Exception as e:
-        st.error(f"❌ Failed to log to Google Sheet: {e}")
+        st.error(f"❌ Failed to log {player}: {e}")
 
 # ============================================================
-# Database Functions
+# DB ops
 # ============================================================
 def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
@@ -109,57 +109,38 @@ def delete_favourite(player):
     conn.close()
 
 # ============================================================
-# Load favourites
+# Table logic
 # ============================================================
 show_hidden = st.checkbox("Show removed players", value=False)
-rows = get_favourites(show_hidden=show_hidden)
-
+rows = get_favourites(show_hidden)
 if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
+df["Remove"] = False
 
-# ============================================================
-# Editable Table
-# ============================================================
 colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
-df["Remove"] = False  # new column for inline delete
 
 st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
 
 edited_df = st.data_editor(
     df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Remove"]],
     column_config={
-        "Colour": st.column_config.SelectboxColumn(
-            "Colour",
-            help="Set player status colour (shown in Radar Chart)",
-            options=colour_options,
-            required=False,
-            default=""
-        ),
-        "Comment": st.column_config.TextColumn(
-            "Comment",
-            help="Add notes or scouting comments about this player"
-        ),
-        "Visible": st.column_config.CheckboxColumn(
-            "Visible",
-            help="Uncheck to hide player (instead of deleting)"
-        ),
-        "Remove": st.column_config.CheckboxColumn(
-            "🗑️ Remove",
-            help="Tick to permanently remove this player from favourites"
-        ),
+        "Colour": st.column_config.SelectboxColumn("Colour", options=colour_options),
+        "Comment": st.column_config.TextColumn("Comment"),
+        "Visible": st.column_config.CheckboxColumn("Visible"),
+        "Remove": st.column_config.CheckboxColumn("🗑️ Remove"),
     },
     hide_index=True,
     width="stretch",
 )
 
 # ============================================================
-# Save + Log Changes
+# Apply changes
 # ============================================================
 removed_players = []
-changes_logged = 0
+logged_changes = 0
 
 for _, row in edited_df.iterrows():
     player = row["Player"]
@@ -169,36 +150,28 @@ for _, row in edited_df.iterrows():
     remove_flag = bool(row.get("Remove", False))
 
     prev = df.loc[df["Player"] == player].iloc[0]
-    prev_colour = prev["Colour"]
-    prev_comment = prev["Comment"]
-    prev_visible = int(prev["Visible"])
+    changed = (
+        (colour != prev["Colour"]) or
+        (comment != prev["Comment"]) or
+        (int(prev["Visible"]) != visible)
+    )
 
     if remove_flag:
         delete_favourite(player)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
+        st.write(f"🗑️ Removed {player}")
         removed_players.append(player)
-        st.session_state[f"removed_{player}"] = True
         st.rerun()
 
-    # Update in DB always (ensures timestamp refresh)
     update_favourite(player, colour, comment, visible)
 
-    # Log only if there’s a change
-    if (colour != prev_colour) or (comment != prev_comment) or (visible != prev_visible):
+    if changed:
         action = "Hidden" if visible == 0 else "Updated"
+        st.write(f"🟨 Change detected for {player}: {action}")
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
-        changes_logged += 1
+        logged_changes += 1
 
 # ============================================================
 # Summary
 # ============================================================
-if removed_players:
-    st.success(f"Removed: {', '.join(removed_players)}")
-
-visible_count = int((edited_df["Visible"] == True).sum())
-hidden_count = int((edited_df["Visible"] == False).sum())
-
-st.caption(
-    f"Showing {visible_count} visible players ({hidden_count} hidden). "
-    f"Logged {changes_logged} change(s) to Google Sheets."
-)
+st.info(f"Logged {logged_changes} change(s). Removed {len(removed_players)} player(s).")
