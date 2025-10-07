@@ -64,6 +64,18 @@ def migrate_favourites_db():
 
 migrate_favourites_db()
 
+@st.cache_data(ttl=10, show_spinner=False)
+def get_favourites_with_colours_live():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT player, colour, comment, visible FROM favourites")
+        rows = c.fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    conn.close()
+    return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
+
 # --- Favourite helper functions ---
 def add_favourite(player, team=None, league=None, position=None):
     conn = sqlite3.connect(DB_PATH)
@@ -1437,7 +1449,7 @@ def hide_favourite(player):
 # ============================================================
 # 🟢 LOAD FAVOURITES AND APPLY COLOURS
 # ============================================================
-favs = get_favourites_with_colours()
+favs = get_favourites_with_colours_live()
 
 COLOUR_EMOJI = {
     "🟢 Green": "🟢",
