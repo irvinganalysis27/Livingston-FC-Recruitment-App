@@ -1452,10 +1452,14 @@ def hide_favourite(player):
 favs = get_favourites_with_colours_live()
 
 COLOUR_EMOJI = {
-    "🟢 Green": "🟢",
-    "🟡 Yellow": "🟡",
-    "🔴 Red": "🔴",
-    "🟣 Purple": "🟣",
+    "🟢 Go": "🟢",
+    "🟡 Monitor": "🟡",
+    "🔴 No Further Interest": "🔴",
+    "🟣 Needs Checked": "🟣",
+    "🟢": "🟢",
+    "🟡": "🟡",
+    "🔴": "🔴",
+    "🟣": "🟣",
 }
 
 def colourize_player_name(name):
