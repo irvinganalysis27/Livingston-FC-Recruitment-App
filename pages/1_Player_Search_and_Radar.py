@@ -1422,14 +1422,15 @@ def hide_favourite(player):
 favs = get_favourites_with_colours()
 
 COLOUR_EMOJI = ["🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
-COLOUR_DEFAULT = "🟡 Yellow"
 
 def colourize_player_name(name):
-    """Attach emoji to player name depending on favourites colour."""
+    """Attach emoji to player name if the player has a stored colour."""
     fav_data = favs.get(name, {})
-    colour = fav_data.get("colour", COLOUR_DEFAULT)
+    colour = fav_data.get("colour", "")
     emoji = colour.split()[0] if colour else ""
-    return f"{emoji} {name}" if emoji else name
+    if not emoji:
+        return name  # untouched → plain black text
+    return f"{emoji} {name}"
 
 # Add colour emoji beside names
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
@@ -1458,7 +1459,7 @@ edited_df = st.data_editor(
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player",
-            help="Emoji shows colour from Favourites page (🟢🟡🔴🟣)"
+            help="Shows current Favourites status (🟢🟡🔴🟣 only if edited)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite",
@@ -1487,10 +1488,12 @@ for _, row in edited_df.iterrows():
     position = row.get("Positions played", "")
     is_fav = bool(row.get("⭐ Favourite", False))
 
-    current_colour = favs.get(player_name, {}).get("colour", COLOUR_DEFAULT)
-    comment = favs.get(player_name, {}).get("comment", "")
+    # Get current stored values
+    current_data = favs.get(player_name, {})
+    colour = current_data.get("colour", "")  # only apply if already touched
+    comment = current_data.get("comment", "")
 
     if is_fav:
-        upsert_favourite(player_name, team, league, position, colour=current_colour, comment=comment, visible=1)
+        upsert_favourite(player_name, team, league, position, colour=colour, comment=comment, visible=1)
     else:
         hide_favourite(player_name)
