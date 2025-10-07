@@ -1506,7 +1506,6 @@ edited_df = st.data_editor(
 # ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
-# Add colourized name + favourite flag before showing the table
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
 z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
     lambda n: bool(favs.get(n, {}).get("visible", 0))
@@ -1544,7 +1543,7 @@ edited_df = st.data_editor(
     },
     hide_index=False,
     width="stretch",
-    key="ranking_editor",  # unique key avoids duplicate-element error
+    key=f"ranking_editor_{selected_position_template}",  # ✅ unique key avoids all duplication
 )
 
 # ============================================================
