@@ -113,7 +113,7 @@ if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
-df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Remove?", "Timestamp"])
+df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 
 # ============================================================
 # Editable Table
