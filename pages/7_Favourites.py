@@ -19,6 +19,19 @@ if not check_password():
 show_branding()
 st.title("⭐ Favourite Players")
 
+st.markdown(
+    """
+    <div style='text-align: center; margin-top: -10px; margin-bottom: 20px;'>
+        <a href='https://docs.google.com/spreadsheets/d/16oweZkbqNst16U5lQshnYjwjWiuCmd8ClZfPyAtoE0o/edit?gid=0#gid=0'
+           target='_blank'
+           style='font-size:16px; text-decoration:none; color:#1a73e8; font-weight:bold;'>
+           Player Database ↗
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # ============================================================
 # Database setup (with migration)
 # ============================================================
