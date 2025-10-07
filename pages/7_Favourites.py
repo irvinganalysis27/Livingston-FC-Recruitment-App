@@ -97,7 +97,6 @@ def update_favourite(player, colour, comment, visible):
     conn.close()
 
 def delete_favourite(player):
-    """Completely remove player from database."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM favourites WHERE player=?", (player,))
@@ -120,11 +119,12 @@ df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour
 # Editable Table
 # ============================================================
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
+df["Remove"] = False  # new column for inline delete
 
-st.markdown("##### ✏️ Add A Comment or Colour")
+st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
 
 edited_df = st.data_editor(
-    df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"]],
+    df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Remove"]],
     column_config={
         "Colour": st.column_config.SelectboxColumn(
             "Colour",
@@ -141,6 +141,10 @@ edited_df = st.data_editor(
             "Visible",
             help="Uncheck to hide player (instead of deleting)"
         ),
+        "Remove": st.column_config.CheckboxColumn(
+            "🗑️ Remove",
+            help="Tick to permanently remove this player from favourites"
+        ),
     },
     hide_index=True,
     width="stretch",
@@ -149,16 +153,25 @@ edited_df = st.data_editor(
 # ============================================================
 # Save and Sync Changes
 # ============================================================
+removed_players = []
+
 for idx, row in edited_df.iterrows():
     player = row["Player"]
     colour = row.get("Colour", "")
     comment = row.get("Comment", "")
     visible = int(row.get("Visible", True))
+    remove_flag = bool(row.get("Remove", False))
 
     prev = df.loc[df["Player"] == player].iloc[0]
     colour_changed = colour != prev["Colour"]
     comment_changed = comment != prev["Comment"]
     visible_changed = int(prev["Visible"]) != visible
+
+    if remove_flag:
+        delete_favourite(player)
+        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
+        removed_players.append(player)
+        continue
 
     update_favourite(player, colour, comment, visible)
 
@@ -167,24 +180,11 @@ for idx, row in edited_df.iterrows():
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
 
 # ============================================================
-# Remove Buttons (Permanent delete)
-# ============================================================
-st.markdown("##### Permanently Remove a Favourite")
-
-for _, row in df.iterrows():
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.write(f"**{row['Player']}** | {row['Team']} | {row['League']} | {row['Position']}")
-    with col2:
-        if st.button("🗑️ Remove", key=f"remove_{row['Player']}"):
-            delete_favourite(row["Player"])
-            log_to_sheet(row["Player"], row["Team"], row["League"], row["Position"], row["Colour"], row["Comment"], "Removed")
-            st.success(f"Removed {row['Player']} from favourites.")
-            st.rerun()
-
-# ============================================================
 # Summary
 # ============================================================
+if removed_players:
+    st.success(f"Removed: {', '.join(removed_players)}")
+
 visible_count = (edited_df["Visible"] == True).sum()
 hidden_count = (edited_df["Visible"] == False).sum()
-st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes and removals are logged.")
+st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes, hides, and removals are logged.")
