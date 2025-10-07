@@ -116,6 +116,26 @@ if not rows:
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 
 # ============================================================
+# Auto-log any new DB updates (e.g. from radar page)
+# ============================================================
+try:
+    sheet = init_sheet()
+    existing_rows = sheet.get_all_values()
+    logged_players = {r[0] for r in existing_rows[1:] if r and r[0]}  # skip header
+
+    # Find players not yet logged
+    new_updates = df[~df["Player"].isin(logged_players)]
+    if not new_updates.empty:
+        for _, r in new_updates.iterrows():
+            log_to_sheet(
+                r["Player"], r["Team"], r["League"], r["Position"],
+                r["Colour"], r["Comment"], "Sync from Radar"
+            )
+        st.success(f"✅ Synced {len(new_updates)} new favourites from radar page to Google Sheet.")
+except Exception as e:
+    st.warning(f"⚠️ Auto-sync skipped: {e}")
+
+# ============================================================
 # Editable Table
 # ============================================================
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
