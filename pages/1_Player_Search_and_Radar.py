@@ -1451,31 +1451,35 @@ def hide_favourite(player):
 # ============================================================
 favs = get_favourites_with_colours_live()
 
+# Map all shapes of the four statuses to their emoji
 COLOUR_EMOJI = {
-    "🟢 Go": "🟢",
-    "🟡 Monitor": "🟡",
-    "🔴 No Further Interest": "🔴",
+    # canonical (with emoji)
     "🟣 Needs Checked": "🟣",
-    "🟢": "🟢",
-    "🟡": "🟡",
-    "🔴": "🔴",
+    "🟡 Monitor": "🟡",
+    "🟢 Go": "🟢",
+    "🔴 No Further Interest": "🔴",
+    # plain words (in case older rows are without emoji)
+    "Needs Checked": "🟣",
+    "Monitor": "🟡",
+    "Go": "🟢",
+    "No Further Interest": "🔴",
+    # bare emoji (defensive)
     "🟣": "🟣",
+    "🟡": "🟡",
+    "🟢": "🟢",
+    "🔴": "🔴",
 }
 
-def colourize_player_name(name):
-    """Attach emoji to player name if the player has a stored colour."""
-    fav_data = favs.get(name, {})
-    colour = fav_data.get("colour", "")
+def colourize_player_name(name: str) -> str:
+    """Attach the correct emoji if the player is a visible favourite."""
+    data = favs.get(name)
+    if not data:
+        return name
+    if int(data.get("visible", 1)) == 0:
+        return name  # hidden favourites don’t get the badge
+    colour = str(data.get("colour", "")).strip()
     emoji = COLOUR_EMOJI.get(colour, "")
     return f"{emoji} {name}" if emoji else name
-
-# Add colour emoji beside names
-z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
-
-# Active favourite (visible=1)
-z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
-    lambda n: bool(favs.get(n, {}).get("visible", 0))
-)
 
 # ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
