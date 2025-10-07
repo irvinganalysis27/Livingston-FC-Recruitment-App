@@ -120,7 +120,12 @@ if not rows:
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 df["Remove"] = False
 
-colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
+colour_options = [
+    "🟣 Needs Checked",
+    "🟡 Monitor",
+    "🟢 Go",
+    "🔴 No Further Interest"
+]
 
 st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
 
