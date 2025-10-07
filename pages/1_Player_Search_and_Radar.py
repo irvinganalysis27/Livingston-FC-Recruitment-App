@@ -1453,17 +1453,14 @@ favs = get_favourites_with_colours_live()
 
 # Map all shapes of the four statuses to their emoji
 COLOUR_EMOJI = {
-    # canonical (with emoji)
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
     "🟢 Go": "🟢",
     "🔴 No Further Interest": "🔴",
-    # plain words (in case older rows are without emoji)
     "Needs Checked": "🟣",
     "Monitor": "🟡",
     "Go": "🟢",
     "No Further Interest": "🔴",
-    # bare emoji (defensive)
     "🟣": "🟣",
     "🟡": "🟡",
     "🟢": "🟢",
@@ -1480,6 +1477,48 @@ def colourize_player_name(name: str) -> str:
     colour = str(data.get("colour", "")).strip()
     emoji = COLOUR_EMOJI.get(colour, "")
     return f"{emoji} {name}" if emoji else name
+
+# ============================================================
+# 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
+# ============================================================
+# Add colourized name + favourite flag
+z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
+z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
+    lambda n: bool(favs.get(n, {}).get("visible", 0))
+)
+
+required_cols = [
+    "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
+    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
+]
+for col in required_cols:
+    if col not in z_ranking.columns:
+        z_ranking[col] = np.nan
+z_ranking = z_ranking[required_cols]
+
+# ============================================================
+# 📋 EDITABLE TABLE
+# ============================================================
+edited_df = st.data_editor(
+    z_ranking,
+    column_config={
+        "Player (coloured)": st.column_config.TextColumn(
+            "Player",
+            help="Shows Favourites colour (🟢🟡🔴🟣 only if marked)"
+        ),
+        "⭐ Favourite": st.column_config.CheckboxColumn(
+            "⭐ Favourite",
+            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
+        ),
+        "Multiplier": st.column_config.NumberColumn(
+            "League Weight",
+            help="League weighting applied in ranking",
+            format="%.3f"
+        ),
+    },
+    hide_index=False,
+    width="stretch",
+)
 
 # ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
