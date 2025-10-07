@@ -121,7 +121,7 @@ df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour
 # ============================================================
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
 
-st.markdown("### ✏️ Edit or Remove Favourites")
+st.markdown("##### ✏️ Add A Comment or Colour")
 
 edited_df = st.data_editor(
     df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"]],
@@ -169,7 +169,7 @@ for idx, row in edited_df.iterrows():
 # ============================================================
 # Remove Buttons (Permanent delete)
 # ============================================================
-st.markdown("### ❌ Permanently Remove a Favourite")
+st.markdown("##### Permanently Remove a Favourite")
 
 for _, row in df.iterrows():
     col1, col2 = st.columns([5, 1])
