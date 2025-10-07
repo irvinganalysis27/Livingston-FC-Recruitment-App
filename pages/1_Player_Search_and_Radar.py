@@ -1374,11 +1374,11 @@ z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
 # ============================================================
-# 🔄 FAVOURITES SYNC (integrated with colour + visibility)
+# 🔄 FAVOURITES SYNC (Integrated)
 # ============================================================
 
 def get_favourites_with_colours():
-    """Fetch favourites and their colour/comment/visibility."""
+    """Fetch all favourites and their colour/comment/visibility."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -1417,40 +1417,33 @@ def hide_favourite(player):
     conn.close()
 
 # ============================================================
-# 🟢 LOAD FAVOURITES + BUILD DISPLAY
+# 🟢 LOAD FAVOURITES AND APPLY COLOURS
 # ============================================================
-
-# Load all favourites
 favs = get_favourites_with_colours()
-# Only show those still visible
-favs_visible = {k: v for k, v in favs.items() if v["visible"] == 1}
 
-# Colour emoji + hex mappings
 COLOUR_EMOJI = ["🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
-COLOUR_HEX = {
-    "🟢 Green": "#34a853",
-    "🟡 Yellow": "#fbbc05",
-    "🔴 Red": "#ea4335",
-    "🟣 Purple": "#a142f4",
-}
+COLOUR_DEFAULT = "🟡 Yellow"
 
-# Apply colour to names
 def colourize_player_name(name):
-    colour = favs_visible.get(name, {}).get("colour", "")
-    if not colour:
-        return name
-    return f"{colour.split()[0]} {name}"  # Adds emoji only (🟢 Player)
+    """Attach emoji to player name depending on favourites colour."""
+    fav_data = favs.get(name, {})
+    colour = fav_data.get("colour", COLOUR_DEFAULT)
+    emoji = colour.split()[0] if colour else ""
+    return f"{emoji} {name}" if emoji else name
 
-# Add derived columns
-z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_visible.keys())
-z_ranking["Colour"] = z_ranking["Player"].apply(lambda n: favs_visible.get(n, {}).get("colour", "🟡 Yellow"))
+# Add colour emoji beside names
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
+
+# Active favourite = visible=1
+z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
+    lambda n: bool(favs.get(n, {}).get("visible", 0))
+)
 
 # ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST
 # ============================================================
 required_cols = [
-    "Player (coloured)", "Colour", "Positions played", "Team", "League", "Multiplier",
+    "Player (coloured)", "Positions played", "Team", "League", "Multiplier",
     "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"
 ]
 for col in required_cols:
@@ -1458,20 +1451,14 @@ for col in required_cols:
         z_ranking[col] = np.nan
 
 # ============================================================
-# 📋 EDITABLE TABLE (with colour + favourite sync)
+# 📋 EDITABLE TABLE (no Colour column)
 # ============================================================
 edited_df = st.data_editor(
     z_ranking[required_cols],
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player",
-            help="Emoji colour shows current Favourites status"
-        ),
-        "Colour": st.column_config.SelectboxColumn(
-            "Colour",
-            help="Change player highlight colour (syncs with Favourites)",
-            options=COLOUR_EMOJI,
-            default="🟡 Yellow"
+            help="Emoji shows colour from Favourites page (🟢🟡🔴🟣)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite",
@@ -1491,20 +1478,19 @@ edited_df = st.data_editor(
 # 💾 APPLY CHANGES TO favourites.db
 # ============================================================
 for _, row in edited_df.iterrows():
-    # Handle coloured column (which includes emoji like 🟢 Player)
+    # Strip emoji from the player name for DB consistency
     player_raw = str(row.get("Player (coloured)", "")).strip()
-    # Strip emoji if present
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
     team = row.get("Team", "")
     league = row.get("League", "")
     position = row.get("Positions played", "")
-    colour = row.get("Colour", "🟡 Yellow")
     is_fav = bool(row.get("⭐ Favourite", False))
 
+    current_colour = favs.get(player_name, {}).get("colour", COLOUR_DEFAULT)
+    comment = favs.get(player_name, {}).get("comment", "")
+
     if is_fav:
-        # Add or update favourite
-        upsert_favourite(player_name, team, league, position, colour=colour, visible=1)
+        upsert_favourite(player_name, team, league, position, colour=current_colour, comment=comment, visible=1)
     else:
-        # Hide favourite instead of deleting
         hide_favourite(player_name)
