@@ -1329,7 +1329,7 @@ if st.session_state.selected_player:
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Include Score (0–100) and Multiplier for quick reference
+# Include key columns
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
     "Score (0–100)", "Age", "Minutes played", "Rank"
@@ -1341,34 +1341,23 @@ for c in cols_for_table:
 
 z_ranking = plot_data[cols_for_table].copy()
 
-# Clean up
+# Clean up columns
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-z_ranking["Minutes played"] = pd.to_numeric(
-    z_ranking["Minutes played"], errors="coerce"
-).fillna(0).astype(int)
+z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
 
-z_ranking["Multiplier"] = pd.to_numeric(
-    z_ranking["Multiplier"], errors="coerce"
-).fillna(1.0).round(3)
-
-# Deduplicate by player, keeping best score
+# Deduplicate and rank
 z_ranking = (
     z_ranking.sort_values("Score (0–100)", ascending=False)
              .groupby("Player", as_index=False)
              .first()
 )
-
-# Recalculate proper Rank
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(
-    ascending=False, method="min"
-).astype(int)
-
-# Sort by Rank
+z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
@@ -1376,16 +1365,15 @@ z_ranking.index.name = "Row"
 # ============================================================
 # 🔄 FAVOURITES SYNC (Integrated)
 # ============================================================
-
 def get_favourites_with_colours():
     """Fetch all favourites and their colour/comment/visibility."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        SELECT player, colour, comment, visible
-        FROM favourites
-    """)
-    rows = c.fetchall()
+    try:
+        c.execute("SELECT player, colour, comment, visible FROM favourites")
+        rows = c.fetchall()
+    except sqlite3.OperationalError:
+        rows = []  # handle case if columns not yet added
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
@@ -1421,45 +1409,49 @@ def hide_favourite(player):
 # ============================================================
 favs = get_favourites_with_colours()
 
-COLOUR_EMOJI = ["🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
+COLOUR_EMOJI = {
+    "🟢 Green": "🟢",
+    "🟡 Yellow": "🟡",
+    "🔴 Red": "🔴",
+    "🟣 Purple": "🟣",
+}
 
 def colourize_player_name(name):
     """Attach emoji to player name if the player has a stored colour."""
     fav_data = favs.get(name, {})
     colour = fav_data.get("colour", "")
-    emoji = colour.split()[0] if colour else ""
-    if not emoji:
-        return name  # untouched → plain black text
-    return f"{emoji} {name}"
+    emoji = COLOUR_EMOJI.get(colour, "")
+    return f"{emoji} {name}" if emoji else name
 
 # Add colour emoji beside names
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
 
-# Active favourite = visible=1
+# Active favourite (visible=1)
 z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
     lambda n: bool(favs.get(n, {}).get("visible", 0))
 )
 
 # ============================================================
-# 🧾 ENSURE TABLE COLUMNS EXIST
+# 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
 required_cols = [
-    "Player (coloured)", "Positions played", "Team", "League", "Multiplier",
-    "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"
+    "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
+    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
         z_ranking[col] = np.nan
+z_ranking = z_ranking[required_cols]
 
 # ============================================================
-# 📋 EDITABLE TABLE (no Colour column)
+# 📋 EDITABLE TABLE
 # ============================================================
 edited_df = st.data_editor(
-    z_ranking[required_cols],
+    z_ranking,
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player",
-            help="Shows current Favourites status (🟢🟡🔴🟣 only if edited)"
+            help="Shows Favourites colour (🟢🟡🔴🟣 only if marked)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite",
@@ -1472,14 +1464,13 @@ edited_df = st.data_editor(
         ),
     },
     hide_index=False,
-    width="stretch"
+    width="stretch",
 )
 
 # ============================================================
 # 💾 APPLY CHANGES TO favourites.db
 # ============================================================
 for _, row in edited_df.iterrows():
-    # Strip emoji from the player name for DB consistency
     player_raw = str(row.get("Player (coloured)", "")).strip()
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
@@ -1488,9 +1479,8 @@ for _, row in edited_df.iterrows():
     position = row.get("Positions played", "")
     is_fav = bool(row.get("⭐ Favourite", False))
 
-    # Get current stored values
     current_data = favs.get(player_name, {})
-    colour = current_data.get("colour", "")  # only apply if already touched
+    colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
 
     if is_fav:
