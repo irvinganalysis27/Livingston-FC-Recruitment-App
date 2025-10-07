@@ -38,7 +38,12 @@ def init_db():
         )
     """)
     existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    for col, dtype in [("colour", "TEXT DEFAULT ''"), ("comment", "TEXT DEFAULT ''"), ("visible", "INTEGER DEFAULT 1")]:
+    for col, dtype in [
+        ("colour", "TEXT DEFAULT ''"),
+        ("comment", "TEXT DEFAULT ''"),
+        ("visible", "INTEGER DEFAULT 1"),
+        ("timestamp", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+    ]:
         if col not in existing_cols:
             c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
     conn.commit()
@@ -72,7 +77,7 @@ def log_to_sheet(player, team, league, position, colour, comment, action="Update
         st.error(f"❌ Failed to log to Google Sheet: {e}")
 
 # ============================================================
-# DB Functions
+# Database Functions
 # ============================================================
 def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
@@ -118,7 +123,7 @@ df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour
 # ============================================================
 # Editable Table
 # ============================================================
-colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
+colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
 df["Remove"] = False  # new column for inline delete
 
 st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
@@ -128,7 +133,7 @@ edited_df = st.data_editor(
     column_config={
         "Colour": st.column_config.SelectboxColumn(
             "Colour",
-            help="Set player status colour",
+            help="Set player status colour (shown in Radar Chart)",
             options=colour_options,
             required=False,
             default=""
@@ -151,11 +156,12 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# Save and Sync Changes
+# Save + Log Changes
 # ============================================================
 removed_players = []
+changes_logged = 0
 
-for idx, row in edited_df.iterrows():
+for _, row in edited_df.iterrows():
     player = row["Player"]
     colour = row.get("Colour", "")
     comment = row.get("Comment", "")
@@ -163,23 +169,25 @@ for idx, row in edited_df.iterrows():
     remove_flag = bool(row.get("Remove", False))
 
     prev = df.loc[df["Player"] == player].iloc[0]
-    colour_changed = colour != prev["Colour"]
-    comment_changed = comment != prev["Comment"]
-    visible_changed = int(prev["Visible"]) != visible
+    prev_colour = prev["Colour"]
+    prev_comment = prev["Comment"]
+    prev_visible = int(prev["Visible"])
 
     if remove_flag:
         delete_favourite(player)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
         removed_players.append(player)
-        # auto-refresh immediately after deletion
         st.session_state[f"removed_{player}"] = True
         st.rerun()
 
+    # Update in DB always (ensures timestamp refresh)
     update_favourite(player, colour, comment, visible)
 
-    if colour_changed or comment_changed or visible_changed:
+    # Log only if there’s a change
+    if (colour != prev_colour) or (comment != prev_comment) or (visible != prev_visible):
         action = "Hidden" if visible == 0 else "Updated"
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
+        changes_logged += 1
 
 # ============================================================
 # Summary
@@ -187,6 +195,10 @@ for idx, row in edited_df.iterrows():
 if removed_players:
     st.success(f"Removed: {', '.join(removed_players)}")
 
-visible_count = (edited_df["Visible"] == True).sum()
-hidden_count = (edited_df["Visible"] == False).sum()
-st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes, hides, and removals are logged.")
+visible_count = int((edited_df["Visible"] == True).sum())
+hidden_count = int((edited_df["Visible"] == False).sum())
+
+st.caption(
+    f"Showing {visible_count} visible players ({hidden_count} hidden). "
+    f"Logged {changes_logged} change(s) to Google Sheets."
+)
