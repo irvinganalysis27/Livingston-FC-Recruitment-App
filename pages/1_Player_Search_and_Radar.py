@@ -1518,6 +1518,7 @@ edited_df = st.data_editor(
     },
     hide_index=False,
     width="stretch",
+    key="ranking_editor",  # ✅ Added unique key to stop duplicate element error
 )
 
 # ============================================================
