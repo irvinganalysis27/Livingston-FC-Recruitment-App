@@ -111,7 +111,7 @@ def delete_favourite(player):
 # ============================================================
 # Table logic
 # ============================================================
-show_hidden = st.checkbox("Show removed players", value=False)
+show_hidden = st.checkbox("Show hidden players", value=False)
 rows = get_favourites(show_hidden)
 if not rows:
     st.info("No favourites saved yet.")
