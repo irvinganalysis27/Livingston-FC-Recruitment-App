@@ -1335,7 +1335,6 @@ cols_for_table = [
     "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
 ]
 
-# Ensure all columns exist
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
@@ -1375,62 +1374,56 @@ def get_favourites_with_colours():
         print(f"[DEBUG] Failed to load favourites with colours: {e}")
         return {}
 
-# Get favourites and their colours
+# Load favourites and colours
 favs_with_colours = get_favourites_with_colours()
 favs_in_db = set(favs_with_colours.keys())
 
 # Mark favourites
 z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-# Define colour hex map
+# Define hex colour map
 COLOUR_HEX = {
     "Green": "#34a853",   # Go
     "Yellow": "#fbbc05",  # Monitor
-    "Red": "#ea4335",     # No further interest
+    "Red": "#ea4335",     # No interest
     "Purple": "#a142f4",  # Needs checked
 }
 
-# Colour player names with HTML tint
-def colourize_text(player):
-    colour = favs_with_colours.get(player)
-    if not colour:
-        return player
-    text_colour = COLOUR_HEX.get(colour, "#FFFFFF")
-    return f"<span style='color:{text_colour}; font-weight:bold'>{player}</span>"
+# Colour styling
+def highlight_player(row):
+    colour = favs_with_colours.get(row["Player"])
+    if colour and colour in COLOUR_HEX:
+        return [f"color: {COLOUR_HEX[colour]}; font-weight: bold" if c == "Player" else "" for c in row.index]
+    else:
+        return [""] * len(row.index)
 
-z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_text)
-
-# ---- Show table ----
-edited_df = st.data_editor(
-    z_ranking[
-        ["Player (coloured)", "Positions played", "Team", "League", "Multiplier",
-         "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"]
-    ],
-    column_config={
-        "Player (coloured)": st.column_config.TextColumn(
-            "Player",
-            help="Player name coloured based on Favourites page status",
-            allow_html=True
-        ),
-        "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite",
-            help="Mark or unmark as favourite"
-        ),
-        "Multiplier": st.column_config.NumberColumn(
-            "League Weight",
-            help="League weighting applied in ranking",
-            format="%.3f"
-        ),
-    },
-    hide_index=False,
-    width="stretch"
+# ---- Display styled dataframe ----
+styled_df = (
+    z_ranking.style
+    .apply(highlight_player, axis=1)
+    .format({"Score (0–100)": "{:.1f}", "Multiplier": "{:.3f}", "Minutes played": "{:,}"})
 )
 
-# ---- Sync favourite changes back to DB ----
+st.dataframe(styled_df, use_container_width=True)
+
+# ---- Favourite toggle editor ----
+edited_df = st.data_editor(
+    z_ranking[["Player", "⭐ Favourite"]],
+    column_config={
+        "⭐ Favourite": st.column_config.CheckboxColumn(
+            "⭐ Favourite", help="Mark or unmark as favourite"
+        )
+    },
+    hide_index=True,
+    key="fav_editor",
+)
+
+# ---- Sync changes back to DB ----
 for _, row in edited_df.iterrows():
-    # Remove HTML tags before saving
-    player = re.sub("<.*?>", "", row["Player (coloured)"])
+    player = row["Player"]
     if row["⭐ Favourite"] and player not in favs_in_db:
-        add_favourite(player, row.get("Team"), row.get("League"), row.get("Positions played"))
+        add_favourite(player, z_ranking.loc[z_ranking["Player"] == player, "Team"].values[0],
+                      z_ranking.loc[z_ranking["Player"] == player, "League"].values[0],
+                      z_ranking.loc[z_ranking["Player"] == player, "Positions played"].values[0])
     elif not row["⭐ Favourite"] and player in favs_in_db:
         remove_favourite(player)
