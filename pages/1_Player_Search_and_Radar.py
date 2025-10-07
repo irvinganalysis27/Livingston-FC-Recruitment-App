@@ -1380,47 +1380,10 @@ z_ranking.index.name = "Row"
 favs_in_db = {row[0] for row in get_favourites()}   # player names from DB
 z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-# ---- Add colour column before Player ----
-colour_options = ["", "🟢 Green", "🟡 Yellow", "🔴 Red", "🟣 Purple"]
-z_ranking.insert(0, "Colour", "")  # blank by default
-
-# If any player already has a colour saved in favourites.db, load it
-def get_favourites_with_colours():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        # Add colour column to DB if missing
-        c.execute("PRAGMA table_info(favourites)")
-        cols = [col[1] for col in c.fetchall()]
-        if "colour" not in cols:
-            c.execute("ALTER TABLE favourites ADD COLUMN colour TEXT DEFAULT ''")
-            conn.commit()
-        c.execute("SELECT player, colour FROM favourites")
-        rows = c.fetchall()
-        conn.close()
-        return {r[0]: r[1] for r in rows}
-    except Exception as e:
-        print(f"[DEBUG] Could not load colours from favourites.db: {e}")
-        return {}
-
-favs_with_colours = get_favourites_with_colours()
-for i, r in z_ranking.iterrows():
-    if r["Player"] in favs_with_colours:
-        colour = favs_with_colours[r["Player"]]
-        if colour:
-            z_ranking.loc[i, "Colour"] = colour
-
-# ---- Editable table with Colour dropdown ----
+# ---- Editable table ----
 edited_df = st.data_editor(
     z_ranking,
     column_config={
-        "Colour": st.column_config.SelectboxColumn(
-            "Colour",
-            help="Highlight colour for this player (saved to Favourites DB)",
-            options=colour_options,
-            required=False,
-            default=""
-        ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite", help="Mark as favourite", default=False
         ),
@@ -1429,26 +1392,13 @@ edited_df = st.data_editor(
         ),
     },
     hide_index=False,
-    width="stretch",
+    width="stretch",  # replaces deprecated use_container_width
 )
 
 # ---- Sync changes back to DB ----
 for _, row in edited_df.iterrows():
     player = row["Player"]
-    colour_choice = row.get("Colour", "").strip()
-
-    # Ensure favourite exists if colour is set
-    if (row["⭐ Favourite"] or colour_choice) and player not in favs_in_db:
+    if row["⭐ Favourite"] and player not in favs_in_db:
         add_favourite(player, row.get("Team"), row.get("League"), row.get("Positions played"))
-    
-    # Update colour if changed
-    if colour_choice and (player in favs_in_db or row["⭐ Favourite"]):
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("UPDATE favourites SET colour=? WHERE player=?", (colour_choice, player))
-        conn.commit()
-        conn.close()
-    
-    # Remove if unstarred and no colour
-    elif not row["⭐ Favourite"] and player in favs_in_db and not colour_choice:
+    elif not row["⭐ Favourite"] and player in favs_in_db:
         remove_favourite(player)
