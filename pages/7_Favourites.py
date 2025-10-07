@@ -121,7 +121,7 @@ df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
 df["Remove"] = False  # new column for inline delete
 
-st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
+st.markdown("### ✏️ Edit or Remove Favourites")
 
 edited_df = st.data_editor(
     df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Remove"]],
