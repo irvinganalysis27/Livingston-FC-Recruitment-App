@@ -1428,14 +1428,29 @@ COLOUR_HEX = {
     "🟣 Purple": "#a142f4",
 }
 
-def colourize_player_name(player):
-    if player not in favs_visible:
-        return player
-    colour = favs_visible[player].get("colour", "")
-    hex_val = COLOUR_HEX.get(colour, "")
-    if not hex_val:
-        return player
-    return f"<span style='color:{hex_val}; font-weight:bold'>{player}</span>"
+edited_df = st.data_editor(
+    z_ranking[
+        ["Player (coloured)", "Positions played", "Team", "League", "Multiplier",
+         "Score (0–100)", "Age", "Minutes played", "Rank", "⭐ Favourite"]
+    ],
+    column_config={
+        "Player (coloured)": st.column_config.TextColumn(
+            "Player",
+            help="Coloured based on Favourites page status"
+        ),
+        "⭐ Favourite": st.column_config.CheckboxColumn(
+            "⭐ Favourite",
+            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
+        ),
+        "Multiplier": st.column_config.NumberColumn(
+            "League Weight",
+            help="League weighting applied in ranking",
+            format="%.3f"
+        ),
+    },
+    hide_index=False,
+    width="stretch"
+)
 
 # Build coloured column
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
