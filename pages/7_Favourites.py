@@ -37,7 +37,6 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Migration check
     existing_cols = [row[1] for row in c.execute("PRAGMA table_info(favourites)").fetchall()]
     for col, dtype in [("colour", "TEXT DEFAULT ''"), ("comment", "TEXT DEFAULT ''"), ("visible", "INTEGER DEFAULT 1")]:
         if col not in existing_cols:
@@ -65,7 +64,6 @@ def init_sheet():
     return sheet
 
 def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
-    """Log colour/comment changes to Google Sheet."""
     try:
         sheet = init_sheet()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -98,6 +96,14 @@ def update_favourite(player, colour, comment, visible):
     conn.commit()
     conn.close()
 
+def delete_favourite(player):
+    """Completely remove player from database."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM favourites WHERE player=?", (player,))
+    conn.commit()
+    conn.close()
+
 # ============================================================
 # Load favourites
 # ============================================================
@@ -111,9 +117,11 @@ if not rows:
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 
 # ============================================================
-# Table config
+# Editable Table
 # ============================================================
 colour_options = ["", "🟢 Go", "🟡 Monitor", "🔴 No Further Interest", "🟣 Needs Checked"]
+
+st.markdown("### ✏️ Edit or Remove Favourites")
 
 edited_df = st.data_editor(
     df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"]],
@@ -139,7 +147,7 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# Save + Log Changes
+# Save and Sync Changes
 # ============================================================
 for idx, row in edited_df.iterrows():
     player = row["Player"]
@@ -147,21 +155,36 @@ for idx, row in edited_df.iterrows():
     comment = row.get("Comment", "")
     visible = int(row.get("Visible", True))
 
-    # Compare to stored data
     prev = df.loc[df["Player"] == player].iloc[0]
     colour_changed = colour != prev["Colour"]
     comment_changed = comment != prev["Comment"]
+    visible_changed = int(prev["Visible"]) != visible
 
-    # Update DB
     update_favourite(player, colour, comment, visible)
 
-    # Log if colour or comment changed
-    if colour_changed or comment_changed:
-        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Updated")
+    if colour_changed or comment_changed or visible_changed:
+        action = "Hidden" if visible == 0 else "Updated"
+        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
+
+# ============================================================
+# Remove Buttons (Permanent delete)
+# ============================================================
+st.markdown("### ❌ Permanently Remove a Favourite")
+
+for _, row in df.iterrows():
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        st.write(f"**{row['Player']}** | {row['Team']} | {row['League']} | {row['Position']}")
+    with col2:
+        if st.button("🗑️ Remove", key=f"remove_{row['Player']}"):
+            delete_favourite(row["Player"])
+            log_to_sheet(row["Player"], row["Team"], row["League"], row["Position"], row["Colour"], row["Comment"], "Removed")
+            st.success(f"Removed {row['Player']} from favourites.")
+            st.rerun()
 
 # ============================================================
 # Summary
 # ============================================================
 visible_count = (edited_df["Visible"] == True).sum()
 hidden_count = (edited_df["Visible"] == False).sum()
-st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes are auto-saved and logged.")
+st.caption(f"Showing {visible_count} visible players ({hidden_count} hidden). Changes and removals are logged.")
