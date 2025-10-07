@@ -34,6 +34,36 @@ def init_db():
 
 init_db()  # ensure DB exists on startup
 
+# --- Ensure the radar page DB schema matches the favourites page ---
+def migrate_favourites_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS favourites (
+            player TEXT PRIMARY KEY,
+            team TEXT,
+            league TEXT,
+            position TEXT,
+            colour TEXT DEFAULT '',
+            comment TEXT DEFAULT '',
+            visible INTEGER DEFAULT 1,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
+    required_cols = {
+        "colour": "TEXT DEFAULT ''",
+        "comment": "TEXT DEFAULT ''",
+        "visible": "INTEGER DEFAULT 1"
+    }
+    for col, dtype in required_cols.items():
+        if col not in existing_cols:
+            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
+    conn.commit()
+    conn.close()
+
+migrate_favourites_db()
+
 # --- Favourite helper functions ---
 def add_favourite(player, team=None, league=None, position=None):
     conn = sqlite3.connect(DB_PATH)
