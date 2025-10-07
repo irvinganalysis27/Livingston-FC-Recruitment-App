@@ -1491,7 +1491,11 @@ edited_df = st.data_editor(
 # 💾 APPLY CHANGES TO favourites.db
 # ============================================================
 for _, row in edited_df.iterrows():
-    player_name = str(row["Player"]).strip()
+    # Handle coloured column (which includes emoji like 🟢 Player)
+    player_raw = str(row.get("Player (coloured)", "")).strip()
+    # Strip emoji if present
+    player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+
     team = row.get("Team", "")
     league = row.get("League", "")
     position = row.get("Positions played", "")
