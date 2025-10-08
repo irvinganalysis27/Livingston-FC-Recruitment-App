@@ -117,6 +117,14 @@ if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
+st.markdown("""
+**How to use this list:**
+- 🟢 **Choose Colour:** set a status for each player.
+- 💬 **Write Comment:** add your initials and scouting notes.
+- 👁️ **Deselect "Visible":** When you have finished to hide the player in this list.
+- 🗑️ **Added a player by accident?** Tick **Remove** to delete completely.
+""")
+
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 df["Remove"] = False
 
