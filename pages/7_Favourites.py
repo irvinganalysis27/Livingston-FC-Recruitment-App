@@ -15,7 +15,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("⭐ Favourite Players")
+st.title("⭐ Watch List")
 
 DB_PATH = Path(__file__).parent / "favourites.db"
 
