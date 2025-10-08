@@ -1468,12 +1468,10 @@ COLOUR_EMOJI = {
 }
 
 def colourize_player_name(name: str) -> str:
-    """Attach the correct emoji if the player is a visible favourite."""
+    """Attach the correct emoji to the player name, even if hidden."""
     data = favs.get(name)
     if not data:
         return name
-    if int(data.get("visible", 1)) == 0:
-        return name  # hidden favourites don’t get the badge
     colour = str(data.get("colour", "")).strip()
     emoji = COLOUR_EMOJI.get(colour, "")
     return f"{emoji} {name}" if emoji else name
