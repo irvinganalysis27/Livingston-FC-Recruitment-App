@@ -8,6 +8,8 @@ from branding import show_branding
 import gspread
 from google.oauth2.service_account import Credentials
 
+st.set_page_config(layout="wide")
+
 # ============================================================
 # Protect page
 # ============================================================
@@ -124,6 +126,7 @@ st.markdown("""
 - 👁️ **Deselect "Visible":** When you have finished to hide the player in this list.
 - 🗑️ **Added a player by accident?** Tick **Remove** to delete completely.
 """)
+
 
 df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
 df["Remove"] = False
