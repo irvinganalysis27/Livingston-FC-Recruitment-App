@@ -14,26 +14,6 @@ from branding import show_branding
 import sqlite3
 from pathlib import Path
 
-# --- Database setup ---
-DB_PATH = Path(__file__).parent / "favourites.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()  # ensure DB exists on startup
-
 # --- Ensure the radar page DB schema matches the favourites page ---
 def migrate_favourites_db():
     conn = sqlite3.connect(DB_PATH)
