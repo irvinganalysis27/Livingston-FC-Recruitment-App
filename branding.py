@@ -35,3 +35,13 @@ def show_branding():
     with right:
         if logo:
             st.image(logo, use_container_width=True)
+
+    # --- Sidebar reload controls (global, visible on all pages) ---
+    with st.sidebar:
+        st.divider()
+        st.caption("⚙️ App Controls")
+        if st.button("🔁 Force Reload Data"):
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.success("✅ Cache cleared — reloading app...")
+            st.rerun()
