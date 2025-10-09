@@ -172,34 +172,20 @@ for _, row in edited_df.iterrows():
         (int(prev["Visible"]) != visible)
     )
 
-if remove_flag:
-    delete_favourite(player)
-    log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
-    st.error(f"🗑️ {player} permanently removed from list")
-    removed_players.append(player)
-    st.rerun()
+    if remove_flag:
+        delete_favourite(player)
+        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
+        st.write(f"🗑️ Removed {player}")
+        removed_players.append(player)
+        st.rerun()
 
-# Update database entry
-update_favourite(player, colour, comment, visible)
+    update_favourite(player, colour, comment, visible)
 
-# Detect changes
-if changed:
-    # Detect what kind of change was made
-    if int(prev["Visible"]) != visible and visible == 0:
-        st.warning(f"👁️ {player} has been hidden from the list")
-        action = "Hidden"
-    elif comment != prev["Comment"]:
-        st.info(f"💬 Comment saved for {player}")
-        action = "Comment Updated"
-    elif colour != prev["Colour"]:
-        st.success(f"✅ Status saved for {player}")
-        action = "Status Updated"
-    else:
-        action = "Updated"
-
-    # Log and count
-    log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
-    logged_changes += 1
+    if changed:
+        action = "Hidden" if visible == 0 else "Updated"
+        st.write(f"🟨 Change detected for {player}: {action}")
+        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
+        logged_changes += 1
 
 # ============================================================
 # Summary
