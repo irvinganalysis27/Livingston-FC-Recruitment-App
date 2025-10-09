@@ -573,108 +573,111 @@ df = df_all.copy()
     else:
         df["Competition_norm"] = np.nan
 
-    # --- Merge league multipliers ---
-    try:
-        multipliers_df = pd.read_excel("league_multipliers.xlsx")
-        if {"League", "Multiplier"}.issubset(multipliers_df.columns):
-            df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-            missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
-            if missing_mult:
-                print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
-                st.warning(f"Some leagues did not match multipliers: {missing_mult}")
-            df["Multiplier"] = df["Multiplier"].fillna(1.0)
-        else:
-            st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
-            df["Multiplier"] = 1.0
-    except Exception as e:
-        print(f"[DEBUG] Failed to load multipliers: {e}")
-        df["Multiplier"] = 1.0
-
-    # --- Rename identifiers ---
-    rename_map = {}
-    if "Name" in df.columns: rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
-
-    # --- Metric renames / fixes ---
-    rename_map.update({
-        # Successful Box Cross variants
-        "Successful Box Cross %": "Successful Box Cross%",
-        "Player Season Box Cross Ratio": "Successful Box Cross%",
-
-        # Pass% under pressure
-        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-
-        # Build-up involvement
-        "Player Season Xgbuildup 90": "xGBuildup",
-
-        # Pressures in attacking 3rd
-        "Player Season F3 Pressures 90": "Pressures in Final 1/3",
-
-        # Long balls
-        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
-        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
-    })
-
-    df.rename(columns=rename_map, inplace=True)
-
-        # --- Derive Successful Crosses (robust check) ---
-    cross_cols = [c for c in df.columns if "crosses" in c.lower()]
-    crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
-
-    if cross_cols and crossperc_cols:
-        c1 = cross_cols[0]
-        c2 = crossperc_cols[0]
-        df["Successful Crosses"] = (
-            pd.to_numeric(df[c1], errors="coerce") *
-            (pd.to_numeric(df[c2], errors="coerce") / 100.0)
-        )
-        print(f"[DEBUG] Created 'Successful Crosses' from {c1} and {c2}")
+# --- Merge league multipliers ---
+try:
+    multipliers_df = pd.read_excel("league_multipliers.xlsx")
+    if {"League", "Multiplier"}.issubset(multipliers_df.columns):
+        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+        missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
+        if missing_mult:
+            print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
+            st.warning(f"Some leagues did not match multipliers: {missing_mult}")
+        df["Multiplier"] = df["Multiplier"].fillna(1.0)
     else:
-        print("[DEBUG] Could not find both 'Crosses' and 'Crossing%' columns.")
+        st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
+        df["Multiplier"] = 1.0
+except Exception as e:
+    print(f"[DEBUG] Failed to load multipliers: {e}")
+    df["Multiplier"] = 1.0
 
-    # --- Derive Successful Dribbles ---
-    if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
-        df["Successful Dribbles"] = (
-            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
-            - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
+# --- Rename identifiers ---
+rename_map = {}
+if "Name" in df.columns:
+    rename_map["Name"] = "Player"
+if "Primary Position" in df.columns:
+    rename_map["Primary Position"] = "Position"
+if "Minutes" in df.columns:
+    rename_map["Minutes"] = "Minutes played"
+
+# --- Metric renames / fixes ---
+rename_map.update({
+    # Successful Box Cross variants
+    "Successful Box Cross %": "Successful Box Cross%",
+    "Player Season Box Cross Ratio": "Successful Box Cross%",
+
+    # Pass% under pressure
+    "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
+
+    # Build-up involvement
+    "Player Season Xgbuildup 90": "xGBuildup",
+
+    # Pressures in attacking 3rd
+    "Player Season F3 Pressures 90": "Pressures in Final 1/3",
+
+    # Long balls
+    "Player Season Pressured Long Balls 90": "Pr. Long Balls",
+    "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
+})
+df.rename(columns=rename_map, inplace=True)
+
+# --- Derive Successful Crosses (robust check) ---
+cross_cols = [c for c in df.columns if "crosses" in c.lower()]
+crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
+if cross_cols and crossperc_cols:
+    c1 = cross_cols[0]
+    c2 = crossperc_cols[0]
+    df["Successful Crosses"] = (
+        pd.to_numeric(df[c1], errors="coerce") *
+        (pd.to_numeric(df[c2], errors="coerce") / 100.0)
+    )
+    print(f"[DEBUG] Created 'Successful Crosses' from {c1} and {c2}")
+else:
+    print("[DEBUG] Could not find both 'Crosses' and 'Crossing%' columns.")
+
+# --- Derive Successful Dribbles ---
+if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
+    df["Successful Dribbles"] = (
+        pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
+        - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
     )
 
-    # --- Build "Positions played" ---
-    if "Position" in df.columns:
-        if "Secondary Position" in df.columns:
-            df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
-                df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
-                ", " + df["Secondary Position"].astype(str),
-                ""
-            )
-        else:
-            df["Positions played"] = df["Position"].astype(str)
+# --- Build "Positions played" ---
+if "Position" in df.columns:
+    if "Secondary Position" in df.columns:
+        df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
+            df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
+            ", " + df["Secondary Position"].astype(str),
+            ""
+        )
     else:
-        df["Positions played"] = np.nan
+        df["Positions played"] = df["Position"].astype(str)
+else:
+    df["Positions played"] = np.nan
 
-    # --- Fallbacks ---
-    if "Team within selected timeframe" not in df.columns:
-        df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
-    if "Height" not in df.columns:
-        df["Height"] = np.nan
+# --- Fallbacks ---
+if "Team within selected timeframe" not in df.columns:
+    df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
+if "Height" not in df.columns:
+    df["Height"] = np.nan
 
-    # --- Six-Group Position mapping ---
-    if "Position" in df.columns:
-        df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-    else:
-        df["Six-Group Position"] = np.nan
+# --- Six-Group Position mapping ---
+if "Position" in df.columns:
+    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+else:
+    df["Six-Group Position"] = np.nan
 
-    # --- Duplicate generic CMs into both 6 & 8 ---
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"] == "Centre Midfield"
-        if cm_mask.any():
-            cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
-            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+# --- Duplicate generic CMs into both 6 & 8 ---
+if "Six-Group Position" in df.columns:
+    cm_mask = df["Six-Group Position"] == "Centre Midfield"
+    if cm_mask.any():
+        cm_rows = df.loc[cm_mask].copy()
+        cm_as_6 = cm_rows.copy()
+        cm_as_6["Six-Group Position"] = "Number 6"
+        cm_as_8 = cm_rows.copy()
+        cm_as_8["Six-Group Position"] = "Number 8"
+        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
-    return df
+return df
 
 # ---------- Load & preprocess ----------
 df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
