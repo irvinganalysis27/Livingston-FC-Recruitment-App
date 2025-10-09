@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import json
 from pathlib import Path
 from datetime import datetime
 from auth import check_password
@@ -20,6 +21,7 @@ show_branding()
 st.title("⭐ Watch List")
 
 DB_PATH = Path(__file__).parent / "favourites.db"
+QUEUE_FILE = Path(__file__).parent / "pending_logs.json"
 
 # ============================================================
 # 🧱 Database setup
@@ -45,7 +47,7 @@ def init_db():
 init_db()
 
 # ============================================================
-# 📄 Google Sheets logging
+# 📄 Google Sheets logging setup
 # ============================================================
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -59,24 +61,68 @@ def init_sheet():
             scopes=SCOPES
         )
         client = gspread.authorize(creds)
-        sheet = client.open("Livingston_Favourites_Log").sheet1
-        return sheet
-    except Exception as e:
-        st.error(f"❌ Failed to connect to Google Sheets: {e}")
+        return client.open("Livingston_Favourites_Log").sheet1
+    except Exception:
         return None
 
-def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
-    sheet = init_sheet()
-    if not sheet:
-        st.warning("⚠️ Skipped logging because sheet connection failed.")
+# ============================================================
+# 🧰 Queue handling (persistent async logging)
+# ============================================================
+def load_queue():
+    if QUEUE_FILE.exists():
+        try:
+            return json.loads(QUEUE_FILE.read_text())
+        except Exception:
+            return []
+    return []
+
+def save_queue(queue):
+    with open(QUEUE_FILE, "w") as f:
+        json.dump(queue, f)
+
+def enqueue_log(player, team, league, position, colour, comment, action):
+    queue = load_queue()
+    queue.append({
+        "player": player,
+        "team": team,
+        "league": league,
+        "position": position,
+        "colour": colour,
+        "comment": comment,
+        "action": action,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
+    save_queue(queue)
+
+def flush_logs():
+    queue = load_queue()
+    if not queue:
         return
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        sheet.append_row([player, team, league, position, colour, comment, action, now])
-        st.caption(f"📋 {player} → {action} logged to sheet")
-    except Exception as e:
-        st.error(f"❌ Failed to log {player}: {e}")
+    sheet = init_sheet()
+    if not sheet:
+        return  # keep queue until next rerun if sheet unavailable
+
+    new_queue = []
+    for entry in queue:
+        try:
+            sheet.append_row([
+                entry["player"],
+                entry["team"],
+                entry["league"],
+                entry["position"],
+                entry["colour"],
+                entry["comment"],
+                entry["action"],
+                entry["timestamp"],
+            ])
+        except Exception:
+            new_queue.append(entry)  # retry next run
+
+    save_queue(new_queue)
+
+# Run queued logs first (non-blocking)
+flush_logs()
 
 # ============================================================
 # ⚙️ Database operations
@@ -115,7 +161,6 @@ def delete_favourite(player):
 # ============================================================
 show_hidden = st.checkbox("Show hidden players", value=False)
 rows = get_favourites(show_hidden)
-
 if not rows:
     st.info("No favourites saved yet.")
     st.stop()
@@ -155,16 +200,14 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 Apply changes (single-run, debounced)
+# 💾 Apply changes (instant save + async logging)
 # ============================================================
 removed_players = []
 logged_changes = 0
+status_messages = []
 
-# Store last saved values to prevent repeat triggers
 if "last_saved" not in st.session_state:
     st.session_state["last_saved"] = {}
-
-status_messages = []
 
 for _, row in edited_df.iterrows():
     player = row["Player"]
@@ -180,47 +223,37 @@ for _, row in edited_df.iterrows():
         (int(prev["Visible"]) != visible)
     )
 
-    # --- Skip duplicate re-run noise ---
     prev_key = f"{player}_{colour}_{comment}_{visible}_{remove_flag}"
     if st.session_state["last_saved"].get(player) == prev_key:
-        continue  # skip repeat of same change
+        continue
     st.session_state["last_saved"][player] = prev_key
 
-    # --- Handle removals ---
     if remove_flag:
         delete_favourite(player)
-        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
+        enqueue_log(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
         status_messages.append(f"🗑️ {player} permanently removed from list")
         removed_players.append(player)
         st.session_state["needs_rerun"] = True
         continue
 
-    # --- Save updates only if something changed ---
     if changed:
         update_favourite(player, colour, comment, visible)
-
         if int(prev["Visible"]) != visible and visible == 0:
-            msg = f"👁️ {player} hidden from list"
-            action = "Hidden"
+            msg, action = f"👁️ {player} hidden from list", "Hidden"
         elif comment != prev["Comment"]:
-            msg = f"💬 Comment saved for {player}"
-            action = "Comment Updated"
+            msg, action = f"💬 Comment saved for {player}", "Comment Updated"
         elif colour != prev["Colour"]:
-            msg = f"✅ Status saved for {player}"
-            action = "Status Updated"
+            msg, action = f"✅ Status saved for {player}", "Status Updated"
         else:
-            msg = f"💾 Changes saved for {player}"
-            action = "Updated"
+            msg, action = f"💾 Changes saved for {player}", "Updated"
 
+        enqueue_log(player, row["Team"], row["League"], row["Position"], colour, comment, action)
         status_messages.append(msg)
-        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
         logged_changes += 1
 
-# --- Show messages once per run ---
 if status_messages:
     st.success("\n".join(status_messages))
 
-# --- Single rerun after deletions only ---
 if st.session_state.get("needs_rerun", False):
     del st.session_state["needs_rerun"]
     st.rerun()
