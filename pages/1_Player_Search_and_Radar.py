@@ -538,48 +538,47 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # --- Merge league multipliers by competition ID ---
-    try:
-        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        multipliers_df = pd.read_excel(multipliers_path)
-    
-        # Normalize column names
-        df.columns = df.columns.str.strip().str.lower()
-        multipliers_df.columns = multipliers_df.columns.str.strip().str.lower()
-    
-        # Convert types
-        for col in ["competition_id", "multiplier"]:
-            if col in multipliers_df.columns:
-                multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
-    
-        # Merge safely
-            merge_done = False
+# --- Merge league multipliers by competition ID ---
+try:
+    multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
+    multipliers_df = pd.read_excel(multipliers_path)
+
+    # Normalize all column names
+    df.columns = df.columns.str.strip().str.lower()
+    multipliers_df.columns = multipliers_df.columns.str.strip().str.lower()
+
+    # Ensure numeric types
+    for col in ["competition_id", "multiplier"]:
+        if col in multipliers_df.columns:
+            multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
+
+    # Try to merge by ID first
+    merge_done = False
     for cid_col in ["competition_id", "competition id", "competitionid"]:
         if cid_col in df.columns and "competition_id" in multipliers_df.columns:
             df = df.merge(multipliers_df, left_on=cid_col, right_on="competition_id", how="left")
             print(f"[DEBUG] ✅ Merged by column '{cid_col}'")
             merge_done = True
             break
-    
+
+    # Fallback to name match
     if not merge_done and "competition" in df.columns and "league" in multipliers_df.columns:
         df = df.merge(multipliers_df, left_on="competition", right_on="league", how="left")
         print("[DEBUG] ⚠️ Fallback merge on competition name")
-    
+
+    # Fill multiplier defaults
     if "multiplier" not in df.columns:
         df["multiplier"] = 1.0
     else:
         df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-    
-        # Default fallback
-        df["multiplier"] = pd.to_numeric(df.get("multiplier", 1.0), errors="coerce").fillna(1.0)
-    
-        print("[DEBUG] Unique multipliers after merge:", sorted(df["multiplier"].dropna().unique())[:15])
-        unmatched = df[df["multiplier"] == 1.0]["competition_id"].unique()
-        print("[DEBUG] Competitions missing multipliers:", unmatched)
-    
-    except Exception as e:
-        print(f"[DEBUG] Failed to merge multipliers: {e}")
-        df["multiplier"] = 1.0
+
+    print("[DEBUG] Unique multipliers after merge:", sorted(df["multiplier"].dropna().unique())[:15])
+    unmatched = df[df["multiplier"] == 1.0]["competition"].dropna().unique()
+    print("[DEBUG] Competitions missing multipliers:", unmatched)
+
+except Exception as e:
+    print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
+    df["multiplier"] = 1.0
 
     # --- Rename identifiers ---
     rename_map = {}
@@ -690,6 +689,16 @@ def load_data_once(_sig=None):
     
 # ---------- Load & preprocess ----------
 df_all_raw = load_data_once(_sig=_data_signature(DATA_PATH))
+
+if df_all_raw is None or df_all_raw.empty:
+    st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
+    st.stop()
+
+if "Competition" not in df_all_raw.columns:
+    st.error("❌ Expected a 'Competition' column in your data.")
+    st.stop()
+
+print("[DEBUG] Sample Competitions:", df_all_raw["Competition"].dropna().unique()[:10])
 
 # ---------- Debug: list all 'cross' columns ----------
 print("[DEBUG] Columns containing 'cross':")
