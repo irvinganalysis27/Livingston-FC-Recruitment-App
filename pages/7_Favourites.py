@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(layout="wide")
 
 # ============================================================
-# 🔒 Protect page
+# 🔒 Password protection
 # ============================================================
 if not check_password():
     st.stop()
@@ -22,9 +22,10 @@ st.title("⭐ Watch List")
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 # ============================================================
-# 🧱 Database setup
+# 🧱 Database setup (self-healing schema)
 # ============================================================
-def init_db():
+def init_or_migrate_db():
+    """Create or update the favourites table so it matches Radar Page structure."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -39,13 +40,26 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
+    required_cols = {
+        "team": "TEXT",
+        "league": "TEXT",
+        "position": "TEXT",
+        "colour": "TEXT DEFAULT ''",
+        "comment": "TEXT DEFAULT ''",
+        "visible": "INTEGER DEFAULT 1",
+        "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
+    }
+    for col, dtype in required_cols.items():
+        if col not in existing_cols:
+            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
     conn.commit()
     conn.close()
 
-init_db()
+init_or_migrate_db()
 
 # ============================================================
-# 📄 Google Sheets logging
+# 📄 Google Sheets setup
 # ============================================================
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -93,7 +107,7 @@ def update_favourite(player, colour, comment, visible):
     c = conn.cursor()
     c.execute("""
         UPDATE favourites
-        SET colour=?, comment=?, visible=?
+        SET colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
         WHERE player=?
     """, (colour, comment, visible, player))
     conn.commit()
