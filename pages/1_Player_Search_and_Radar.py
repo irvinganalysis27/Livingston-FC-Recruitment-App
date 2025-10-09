@@ -551,15 +551,20 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
 
             print("[DEBUG] After merge columns:", list(df.columns))
-            if "Multiplier" in df.columns:
-                matched = int(df["Multiplier"].notna().sum())
-                total = len(df)
-                print(f"[DEBUG] Matched rows with multipliers: {matched}/{total}")
+
+            # --- Handle duplicate suffixes (_x / _y) ---
+            if "Multiplier_y" in df.columns:
+                df["Multiplier"] = df["Multiplier_y"]
+            elif "Multiplier_x" in df.columns:
+                df["Multiplier"] = df["Multiplier_x"]
+            elif "Multiplier" in df.columns:
+                pass
             else:
-                print("[DEBUG] ❌ No 'Multiplier' column found after merge")
+                print("[DEBUG] ❌ No 'Multiplier' column found after merge, defaulting to 1.0")
+                df["Multiplier"] = 1.0
 
             # --- Fill missing multipliers ---
-            df["Multiplier"] = df.get("Multiplier", 1.0).fillna(1.0)
+            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
 
             # --- Identify missing leagues ---
             missing_mult = df.loc[df["Multiplier"] == 1.0, "Competition_norm"].unique().tolist()
@@ -570,7 +575,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         else:
             st.warning("⚠️ 'League' and 'Multiplier' columns not found in league_multipliers.xlsx. Using 1.0 for all.")
             df["Multiplier"] = 1.0
-
     except Exception as e:
         print(f"[DEBUG] Failed to load or merge multipliers: {e}")
         df["Multiplier"] = 1.0
