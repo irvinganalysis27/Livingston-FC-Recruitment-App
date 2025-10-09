@@ -515,7 +515,6 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ---------- Preprocessing ----------
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     df = df_in.copy()
 
@@ -527,55 +526,54 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-# --- Merge league multipliers (robust + debug) ---
-try:
-    multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-    multipliers_df = pd.read_excel(multipliers_path)
+    # --- Merge league multipliers (robust + debug) ---
+    try:
+        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
+        multipliers_df = pd.read_excel(multipliers_path)
 
-    print("[DEBUG] Columns detected in league_multipliers.xlsx:", list(multipliers_df.columns))
+        print("[DEBUG] Columns detected in league_multipliers.xlsx:", list(multipliers_df.columns))
 
-    # --- Clean up and normalise ---
-    multipliers_df.columns = multipliers_df.columns.str.strip()
-    if "League" in multipliers_df.columns:
-        multipliers_df["League"] = multipliers_df["League"].astype(str).str.strip()
-    if "Multiplier" in multipliers_df.columns:
-        multipliers_df["Multiplier"] = pd.to_numeric(multipliers_df["Multiplier"], errors="coerce")
+        # --- Clean up and normalise ---
+        multipliers_df.columns = multipliers_df.columns.str.strip()
+        if "League" in multipliers_df.columns:
+            multipliers_df["League"] = multipliers_df["League"].astype(str).str.strip()
+        if "Multiplier" in multipliers_df.columns:
+            multipliers_df["Multiplier"] = pd.to_numeric(multipliers_df["Multiplier"], errors="coerce")
 
-    # Ensure consistency in dataset side too
-    if "Competition_norm" in df.columns:
-        df["Competition_norm"] = df["Competition_norm"].astype(str).str.strip()
-    else:
-        df["Competition_norm"] = np.nan
-
-    # --- Merge and report ---
-    if {"League", "Multiplier"}.issubset(multipliers_df.columns):
-        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-
-        print("[DEBUG] After merge columns:", list(df.columns))
-        if "Multiplier" in df.columns:
-            matched = int(df["Multiplier"].notna().sum())
-            total = len(df)
-            print(f"[DEBUG] Matched rows with multipliers: {matched}/{total}")
+        # Ensure consistency in dataset side too
+        if "Competition_norm" in df.columns:
+            df["Competition_norm"] = df["Competition_norm"].astype(str).str.strip()
         else:
-            print("[DEBUG] ❌ No 'Multiplier' column found after merge")
+            df["Competition_norm"] = np.nan
 
-        # --- Fill missing multipliers ---
-        df["Multiplier"] = df.get("Multiplier", 1.0).fillna(1.0)
+        # --- Merge and report ---
+        if {"League", "Multiplier"}.issubset(multipliers_df.columns):
+            df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
 
-        # --- Identify missing leagues ---
-        missing_mult = df.loc[df["Multiplier"] == 1.0, "Competition_norm"].unique().tolist()
-        if missing_mult:
-            preview = ", ".join(missing_mult[:5])
-            print(f"[DEBUG] Leagues without multipliers: {missing_mult[:10]}{'...' if len(missing_mult) > 10 else ''}")
-            st.warning(f"Some leagues did not match multipliers (showing first few): {preview}")
+            print("[DEBUG] After merge columns:", list(df.columns))
+            if "Multiplier" in df.columns:
+                matched = int(df["Multiplier"].notna().sum())
+                total = len(df)
+                print(f"[DEBUG] Matched rows with multipliers: {matched}/{total}")
+            else:
+                print("[DEBUG] ❌ No 'Multiplier' column found after merge")
 
-    else:
-        st.warning("⚠️ 'League' and 'Multiplier' columns not found in league_multipliers.xlsx. Using 1.0 for all.")
+            # --- Fill missing multipliers ---
+            df["Multiplier"] = df.get("Multiplier", 1.0).fillna(1.0)
+
+            # --- Identify missing leagues ---
+            missing_mult = df.loc[df["Multiplier"] == 1.0, "Competition_norm"].unique().tolist()
+            if missing_mult:
+                preview = ", ".join(missing_mult[:5])
+                print(f"[DEBUG] Leagues without multipliers: {missing_mult[:10]}{'...' if len(missing_mult) > 10 else ''}")
+                st.warning(f"Some leagues did not match multipliers (showing first few): {preview}")
+        else:
+            st.warning("⚠️ 'League' and 'Multiplier' columns not found in league_multipliers.xlsx. Using 1.0 for all.")
+            df["Multiplier"] = 1.0
+
+    except Exception as e:
+        print(f"[DEBUG] Failed to load or merge multipliers: {e}")
         df["Multiplier"] = 1.0
-
-except Exception as e:
-    print(f"[DEBUG] Failed to load or merge multipliers: {e}")
-    df["Multiplier"] = 1.0
 
     # --- Rename identifiers ---
     rename_map = {}
