@@ -528,9 +528,12 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
+    """Clean, normalise, and enrich the StatsBomb player dataset."""
     df = df_in.copy()
 
-    # --- Normalise Competition name ---
+    # ============================================================
+    # 🏆 1. Normalise Competition names
+    # ============================================================
     if "Competition" in df.columns:
         df["Competition_norm"] = (
             df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
@@ -538,49 +541,50 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-# --- Merge league multipliers by competition ID ---
-try:
-    multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-    multipliers_df = pd.read_excel(multipliers_path)
+    # ============================================================
+    # ⚖️ 2. Merge League Multipliers (by Competition ID or Name)
+    # ============================================================
+    try:
+        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
+        multipliers_df = pd.read_excel(multipliers_path)
 
-    # Normalize all column names
-    df.columns = df.columns.str.strip().str.lower()
-    multipliers_df.columns = multipliers_df.columns.str.strip().str.lower()
+        # Normalise column names
+        df.columns = df.columns.str.strip().str.lower()
+        multipliers_df.columns = multipliers_df.columns.str.strip().str.lower()
 
-    # Ensure numeric types
-    for col in ["competition_id", "multiplier"]:
-        if col in multipliers_df.columns:
-            multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
+        # Ensure numeric types
+        for col in ["competition_id", "multiplier"]:
+            if col in multipliers_df.columns:
+                multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
 
-    # Try to merge by ID first
-    merge_done = False
-    for cid_col in ["competition_id", "competition id", "competitionid"]:
-        if cid_col in df.columns and "competition_id" in multipliers_df.columns:
-            df = df.merge(multipliers_df, left_on=cid_col, right_on="competition_id", how="left")
-            print(f"[DEBUG] ✅ Merged by column '{cid_col}'")
-            merge_done = True
-            break
+        merge_done = False
+        for cid_col in ["competition_id", "competition id", "competitionid"]:
+            if cid_col in df.columns and "competition_id" in multipliers_df.columns:
+                df = df.merge(multipliers_df, left_on=cid_col, right_on="competition_id", how="left")
+                print(f"[DEBUG] ✅ Merged by column '{cid_col}'")
+                merge_done = True
+                break
 
-    # Fallback to name match
-    if not merge_done and "competition" in df.columns and "league" in multipliers_df.columns:
-        df = df.merge(multipliers_df, left_on="competition", right_on="league", how="left")
-        print("[DEBUG] ⚠️ Fallback merge on competition name")
+        if not merge_done and "competition" in df.columns and "league" in multipliers_df.columns:
+            df = df.merge(multipliers_df, left_on="competition", right_on="league", how="left")
+            print("[DEBUG] ⚠️ Fallback merge on competition name")
 
-    # Fill multiplier defaults
-    if "multiplier" not in df.columns:
+        if "multiplier" not in df.columns:
+            df["multiplier"] = 1.0
+        else:
+            df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
+
+        print("[DEBUG] Unique multipliers after merge:", sorted(df["multiplier"].dropna().unique())[:15])
+        unmatched = df[df["multiplier"] == 1.0]["competition"].dropna().unique()
+        print("[DEBUG] Competitions missing multipliers:", unmatched)
+
+    except Exception as e:
+        print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
         df["multiplier"] = 1.0
-    else:
-        df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
 
-    print("[DEBUG] Unique multipliers after merge:", sorted(df["multiplier"].dropna().unique())[:15])
-    unmatched = df[df["multiplier"] == 1.0]["competition"].dropna().unique()
-    print("[DEBUG] Competitions missing multipliers:", unmatched)
-
-except Exception as e:
-    print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
-    df["multiplier"] = 1.0
-
-    # --- Rename identifiers ---
+    # ============================================================
+    # 🪪 3. Rename Identifiers to Match Radar Columns
+    # ============================================================
     rename_map = {}
     if "Name" in df.columns:
         rename_map["Name"] = "Player"
@@ -598,9 +602,12 @@ except Exception as e:
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
+
     df.rename(columns=rename_map, inplace=True)
 
-    # --- Derived metrics ---
+    # ============================================================
+    # ⚙️ 4. Derived / Calculated Metrics
+    # ============================================================
     cross_cols = [c for c in df.columns if "crosses" in c.lower()]
     crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
     if cross_cols and crossperc_cols:
@@ -615,7 +622,9 @@ except Exception as e:
             - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
         )
 
-    # --- Positions ---
+    # ============================================================
+    # 🧩 5. Position Handling & Mapping
+    # ============================================================
     if "Position" in df.columns:
         if "Secondary Position" in df.columns:
             df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
@@ -628,19 +637,19 @@ except Exception as e:
     else:
         df["Positions played"] = np.nan
 
-    # --- Fallbacks ---
+    # Fallbacks
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # --- Map to six groups ---
+    # Map to six positional groups
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
 
-    # --- Duplicate generic CMs into both 6 & 8 ---
+    # Duplicate generic CMs into both 6 & 8
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"] == "Centre Midfield"
         if cm_mask.any():
@@ -651,6 +660,9 @@ except Exception as e:
             cm_as_8["Six-Group Position"] = "Number 8"
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
+    # ============================================================
+    # ✅ 6. Return Cleaned Data
+    # ============================================================
     return df
 
 # ---------- Cached Data Loader ----------
