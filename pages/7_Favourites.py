@@ -224,11 +224,3 @@ if status_messages:
 if st.session_state.get("needs_rerun", False):
     del st.session_state["needs_rerun"]
     st.rerun()
-
-# --- Summary ---
-st.info(f"✅ Saved {logged_changes} change(s). Removed {len(removed_players)} player(s).")
-
-# ============================================================
-# 📊 Summary
-# ============================================================
-st.info(f"✅ Saved {logged_changes} change(s). Removed {len(removed_players)} player(s).")
