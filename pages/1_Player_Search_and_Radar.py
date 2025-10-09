@@ -17,8 +17,8 @@ from pathlib import Path
 # --- Database setup ---
 DB_PATH = Path(__file__).parent / "favourites.db"
 
-def migrate_favourites_db():
-    """Ensure the favourites table exists and has the correct columns."""
+def init_or_migrate_favourites_db():
+    """Create or update the favourites table so it matches Watch List structure."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -33,9 +33,11 @@ def migrate_favourites_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Double-check that all columns exist
     existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
     required_cols = {
+        "team": "TEXT",
+        "league": "TEXT",
+        "position": "TEXT",
         "colour": "TEXT DEFAULT ''",
         "comment": "TEXT DEFAULT ''",
         "visible": "INTEGER DEFAULT 1",
@@ -47,11 +49,15 @@ def migrate_favourites_db():
     conn.commit()
     conn.close()
 
-# --- Run migration immediately on app start ---
-migrate_favourites_db()
+# --- Run on startup ---
+init_or_migrate_favourites_db()
 
+# ============================================================
+# ⚙️ Favourite Helper Functions
+# ============================================================
 @st.cache_data(ttl=2, show_spinner=False)
 def get_favourites_with_colours_live():
+    """Fetch all favourites with colour, comment, and visibility info."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
@@ -62,18 +68,19 @@ def get_favourites_with_colours_live():
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-# --- Favourite helper functions ---
 def add_favourite(player, team=None, league=None, position=None):
+    """Insert or update a favourite entry."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT OR REPLACE INTO favourites (player, team, league, position)
-        VALUES (?, ?, ?, ?)
+        INSERT OR REPLACE INTO favourites (player, team, league, position, timestamp)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     """, (player, team, league, position))
     conn.commit()
     conn.close()
 
 def remove_favourite(player):
+    """Permanently remove a player from favourites."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM favourites WHERE player=?", (player,))
@@ -81,6 +88,7 @@ def remove_favourite(player):
     conn.close()
 
 def get_favourites():
+    """Return all favourites ordered by most recent."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT player, team, league, position FROM favourites ORDER BY timestamp DESC")
