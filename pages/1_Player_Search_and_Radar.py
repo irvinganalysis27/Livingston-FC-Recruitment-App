@@ -538,6 +538,8 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
+print("[DEBUG] Unique competition_ids found in CSV:", sorted(df["competition_id"].dropna().unique())[:40])
+
     # --- Merge league multipliers (prefer Competition ID, fallback to name) ---
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
