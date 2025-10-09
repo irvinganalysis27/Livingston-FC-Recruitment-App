@@ -155,14 +155,16 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 Apply changes (debounced, instant saving)
+# 💾 Apply changes (single-run, debounced)
 # ============================================================
 removed_players = []
 logged_changes = 0
 
-# Cache old data in session state (prevents reset after first re-run)
-if "previous_df" not in st.session_state:
-    st.session_state["previous_df"] = df.copy()
+# Store last saved values to prevent repeat triggers
+if "last_saved" not in st.session_state:
+    st.session_state["last_saved"] = {}
+
+status_messages = []
 
 for _, row in edited_df.iterrows():
     player = row["Player"]
@@ -171,52 +173,59 @@ for _, row in edited_df.iterrows():
     visible = int(row.get("Visible", True))
     remove_flag = bool(row.get("Remove", False))
 
-    prev_df = st.session_state["previous_df"]
-    prev = prev_df.loc[prev_df["Player"] == player].iloc[0]
+    prev = df.loc[df["Player"] == player].iloc[0]
     changed = (
         (colour != prev["Colour"]) or
         (comment != prev["Comment"]) or
         (int(prev["Visible"]) != visible)
     )
 
-    # Permanent removal
+    # --- Skip duplicate re-run noise ---
+    prev_key = f"{player}_{colour}_{comment}_{visible}_{remove_flag}"
+    if st.session_state["last_saved"].get(player) == prev_key:
+        continue  # skip repeat of same change
+    st.session_state["last_saved"][player] = prev_key
+
+    # --- Handle removals ---
     if remove_flag:
         delete_favourite(player)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
-        st.error(f"🗑️ {player} permanently removed from list")
+        status_messages.append(f"🗑️ {player} permanently removed from list")
         removed_players.append(player)
         st.session_state["needs_rerun"] = True
         continue
 
-    # Save update
+    # --- Save updates only if something changed ---
     if changed:
         update_favourite(player, colour, comment, visible)
 
-        # Detect type of change for feedback
         if int(prev["Visible"]) != visible and visible == 0:
-            st.warning(f"👁️ {player} has been hidden from the list")
+            msg = f"👁️ {player} hidden from list"
             action = "Hidden"
         elif comment != prev["Comment"]:
-            st.info(f"💬 Comment saved for {player}")
+            msg = f"💬 Comment saved for {player}"
             action = "Comment Updated"
         elif colour != prev["Colour"]:
-            st.success(f"✅ Status saved for {player}")
+            msg = f"✅ Status saved for {player}"
             action = "Status Updated"
         else:
+            msg = f"💾 Changes saved for {player}"
             action = "Updated"
 
+        status_messages.append(msg)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
         logged_changes += 1
 
-# Update session copy so next re-run compares correctly
-st.session_state["previous_df"] = edited_df.copy()
+# --- Show messages once per run ---
+if status_messages:
+    st.success("\n".join(status_messages))
 
-# Single rerun after deletions only
+# --- Single rerun after deletions only ---
 if st.session_state.get("needs_rerun", False):
     del st.session_state["needs_rerun"]
     st.rerun()
 
-# Summary
+# --- Summary ---
 st.info(f"✅ Saved {logged_changes} change(s). Removed {len(removed_players)} player(s).")
 
 # ============================================================
