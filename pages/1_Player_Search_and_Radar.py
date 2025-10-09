@@ -453,50 +453,37 @@ position_metrics = {
 # ---------- Data source: local repo ----------
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
+# ---------- Helper functions for flexible loading ----------
 def load_one_file(p: Path) -> pd.DataFrame:
+    """Load a single CSV/XLSX file safely, handling encoding issues."""
     print(f"[DEBUG] Trying to load file at: {p.resolve()}")
+    df = None
 
-    def try_excel() -> pd.DataFrame | None:
+    if p.suffix.lower() in {".xlsx", ".xls"}:
         try:
             import openpyxl
-            return pd.read_excel(p, engine="openpyxl")
-        except ImportError:
-            print("[DEBUG] openpyxl not available, trying CSV reader next.")
-            return None
+            df = pd.read_excel(p, engine="openpyxl")
         except Exception as e:
-            print(f"[DEBUG] Excel read failed: {e}. Trying CSV instead.")
-            return None
-
-    def try_csv() -> pd.DataFrame | None:
+            print(f"[DEBUG] Excel read failed: {e}, trying CSV fallback.")
+    if df is None:
         for kwargs in [
             dict(sep=None, engine="python"),
             dict(),
             dict(encoding="latin1"),
         ]:
             try:
-                return pd.read_csv(p, **kwargs)
+                df = pd.read_csv(p, **kwargs)
+                break
             except Exception:
                 continue
-        return None
-
-    # Decide reader
-    df = None
-    if p.suffix.lower() in {".xlsx", ".xls"}:
-        df = try_excel()
-        if df is None:
-            df = try_csv()
-    else:
-        df = try_csv()
-        if df is None:
-            df = try_excel()
-
     if df is None:
         raise ValueError(f"Unsupported or unreadable file: {p.name}")
-
     print(f"[DEBUG] Loaded {p.name}, {len(df)} rows, {len(df.columns)} cols")
     return df
 
+
 def _data_signature(path: Path):
+    """Create a simple signature so Streamlit cache invalidates if file changes."""
     path = Path(path)
     if path.is_file():
         s = path.stat()
@@ -512,37 +499,50 @@ def _data_signature(path: Path):
                     continue
         return ("dir", str(path.resolve()), tuple(sigs))
 
+
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Add numeric Age column based on birth_date."""
+    """Add numeric Age column based on birth_date (if present)."""
     if "birth_date" not in df.columns:
         df["Age"] = np.nan
         return df
 
     today = datetime.today()
-
     df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
         lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if pd.notna(dob) else np.nan
     )
-
     print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
     return df
 
-@st.cache_data(show_spinner=False)
-def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
-    print(f"[DEBUG] Data path configured as: {path}")
-    if not path.exists():
-        raise FileNotFoundError(f"{path} not found. Put a CSV or XLSX there, or a folder of them.")
 
+# ---------- Preprocessing (your existing function) ----------
+def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
+    df = df_in.copy()
+    # keep your entire existing preprocessing body here unchanged
+    # ...
+    return df
+
+
+# ---------- Cached data loading ----------
+@st.cache_data(show_spinner=True)
+def load_data_once(_sig=None):
+    """
+    Load and preprocess StatsBomb data once per session.
+    Automatically detects file/folder and caches preprocessed result.
+    """
+    path = DATA_PATH
+    sig = _data_signature(path)
+
+    # Load one or many files
     if path.is_file():
-        df = load_one_file(path)
+        df_raw = load_one_file(path)
     else:
         files = sorted(
             f for f in path.iterdir()
             if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
         )
         if not files:
-            raise FileNotFoundError(f"No data files found inside {path.name}. Add CSV or XLSX.")
+            raise FileNotFoundError(f"No data files found in {path.name}. Add CSV or XLSX.")
         frames = []
         for f in files:
             try:
@@ -551,15 +551,19 @@ def load_statsbomb(path: Path, _sig=None) -> pd.DataFrame:
                 print(f"[WARNING] Skipping {f.name} ({e})")
         if not frames:
             raise ValueError("No readable files found in statsbombdata")
-        df = pd.concat(frames, ignore_index=True, sort=False)
-        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df)}")
+        df_raw = pd.concat(frames, ignore_index=True, sort=False)
+        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
 
-    # Always add Age column
-    df = add_age_column(df)
-    return df
+    df_raw = add_age_column(df_raw)
+    df_preprocessed = preprocess_df(df_raw)
+    print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
 
-def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
-    df = df_in.copy()
+    return df_preprocessed
+
+
+# ---------- Run the cached load ----------
+df_all = load_data_once(_sig=_data_signature(DATA_PATH))
+df = df_all.copy()
 
     # --- Normalise Competition name ---
     if "Competition" in df.columns:
