@@ -120,6 +120,7 @@ st.markdown("""
 **How to use this list:**
 - 🟢 **Choose Colour:** Set a status for each player.  
 - 💬 **Write Comment:** Add your initials and short scouting notes.  
+- 💾 **Click 'Save'** after making any changes — this updates both the database and the log.  
 - 👁️ **Deselect 'Visible':** Hide the player when finished.  
 - 🗑️ **Added a player by accident?** Click **Remove** to delete permanently.  
 """)
