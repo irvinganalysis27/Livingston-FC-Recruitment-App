@@ -553,11 +553,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
     
         # Merge safely
-        if "competition_id" in df.columns and "competition_id" in multipliers_df.columns:
-            df = df.merge(multipliers_df, on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged by competition_id")
-        else:
-            print("[DEBUG] ⚠️ competition_id not found, defaulting multipliers to 1.0")
+            merge_done = False
+    for cid_col in ["competition_id", "competition id", "competitionid"]:
+        if cid_col in df.columns and "competition_id" in multipliers_df.columns:
+            df = df.merge(multipliers_df, left_on=cid_col, right_on="competition_id", how="left")
+            print(f"[DEBUG] ✅ Merged by column '{cid_col}'")
+            merge_done = True
+            break
+    
+    if not merge_done and "competition" in df.columns and "league" in multipliers_df.columns:
+        df = df.merge(multipliers_df, left_on="competition", right_on="league", how="left")
+        print("[DEBUG] ⚠️ Fallback merge on competition name")
+    
+    if "multiplier" not in df.columns:
+        df["multiplier"] = 1.0
+    else:
+        df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
     
         # Default fallback
         df["multiplier"] = pd.to_numeric(df.get("multiplier", 1.0), errors="coerce").fillna(1.0)
