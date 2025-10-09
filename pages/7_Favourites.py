@@ -8,10 +8,6 @@ from branding import show_branding
 import gspread
 from google.oauth2.service_account import Credentials
 
-st.write("Current working directory:", Path.cwd())
-st.write("Database path:", Path(__file__).parent / "favourites.db")
-st.write("Files currently in folder:", os.listdir(Path(__file__).parent))
-
 st.set_page_config(layout="wide")
 
 # ============================================================
