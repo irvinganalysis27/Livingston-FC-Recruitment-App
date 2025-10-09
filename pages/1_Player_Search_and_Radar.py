@@ -1506,23 +1506,8 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db (with confirmation + scroll memory)
+# 💾 APPLY CHANGES TO favourites.db
 # ============================================================
-
-# --- Track last player favourited to show confirmation after rerun ---
-if "last_fav_player" not in st.session_state:
-    st.session_state["last_fav_player"] = None
-
-# --- Track scroll position (approximate row index before rerun) ---
-if "last_scroll_index" not in st.session_state:
-    st.session_state["last_scroll_index"] = None
-
-# Detect the top visible row in the ranking table (approximation)
-# We’ll just remember the first player visible in the sorted order
-if len(z_ranking) > 0:
-    st.session_state["last_scroll_index"] = z_ranking.index[0]
-
-# --- Apply favourites updates ---
 for _, row in edited_df.iterrows():
     player_raw = str(row.get("Player (coloured)", "")).strip()
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
@@ -1536,30 +1521,7 @@ for _, row in edited_df.iterrows():
     colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
 
-    # --- When starred ---
     if is_fav:
-        upsert_favourite(player_name, team, league, position,
-                         colour=colour, comment=comment, visible=1)
-        st.session_state["last_fav_player"] = player_name
-        st.toast(f"⭐ {player_name} added to favourites", icon="✅")
-
-    # --- When unstarred (hidden) ---
+        upsert_favourite(player_name, team, league, position, colour=colour, comment=comment, visible=1)
     else:
         hide_favourite(player_name)
-        st.session_state["last_fav_player"] = player_name
-        st.toast(f"🚫 {player_name} removed from favourites", icon="⚠️")
-
-# --- Small confirmation text below table ---
-if st.session_state.get("last_fav_player"):
-    st.caption(f"✅ Last change saved for: {st.session_state['last_fav_player']}")
-
-# --- Restore approximate scroll position after rerun ---
-if st.session_state.get("last_scroll_index") is not None:
-    st.markdown(
-        f"<style>html, body {{scroll-behavior: smooth;}} [data-testid='stAppViewContainer'] {{scroll-margin-top: 150px;}}</style>",
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        f"<script>window.scrollTo(0, {st.session_state['last_scroll_index'] * 40});</script>",
-        unsafe_allow_html=True
-    )
