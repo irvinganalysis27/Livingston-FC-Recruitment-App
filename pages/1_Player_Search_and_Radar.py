@@ -546,41 +546,43 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     # ============================================================
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        multipliers_df = pd.read_excel(multipliers_path)
+        m = pd.read_excel(multipliers_path)
 
-        # Normalise column names
-        df.columns = df.columns.str.strip().str.lower()
-        multipliers_df.columns = multipliers_df.columns.str.strip().str.lower()
+        # normalise only the *multiplier* frame; leave df's columns untouched
+        m = m.copy()
+        m.columns = m.columns.str.strip().str.lower()
 
-        # Ensure numeric types
-        for col in ["competition_id", "multiplier"]:
-            if col in multipliers_df.columns:
-                multipliers_df[col] = pd.to_numeric(multipliers_df[col], errors="coerce")
+        # find columns in df case-insensitively
+        lookup = {c.lower(): c for c in df.columns}
+        cid_col = next((lookup.get(n) for n in ["competition_id", "competition id", "competitionid"] if lookup.get(n)), None)
+        comp_col = lookup.get("competition")
 
-        merge_done = False
-        for cid_col in ["competition_id", "competition id", "competitionid"]:
-            if cid_col in df.columns and "competition_id" in multipliers_df.columns:
-                df = df.merge(multipliers_df, left_on=cid_col, right_on="competition_id", how="left")
-                print(f"[DEBUG] ✅ Merged by column '{cid_col}'")
-                merge_done = True
-                break
-
-        if not merge_done and "competition" in df.columns and "league" in multipliers_df.columns:
-            df = df.merge(multipliers_df, left_on="competition", right_on="league", how="left")
+        merged = False
+        if cid_col and "competition_id" in m.columns:
+            df = df.merge(m, left_on=cid_col, right_on="competition_id", how="left")
+            print(f"[DEBUG] ✅ Merged multipliers by ID column '{cid_col}'")
+            merged = True
+        elif comp_col and "league" in m.columns:
+            df = df.merge(m, left_on=comp_col, right_on="league", how="left")
             print("[DEBUG] ⚠️ Fallback merge on competition name")
-
-        if "multiplier" not in df.columns:
-            df["multiplier"] = 1.0
+            merged = True
         else:
-            df["multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
+            print("[DEBUG] ⚠️ No suitable key to merge multipliers; defaulting to 1.0")
 
-        print("[DEBUG] Unique multipliers after merge:", sorted(df["multiplier"].dropna().unique())[:15])
-        unmatched = df[df["multiplier"] == 1.0]["competition"].dropna().unique()
-        print("[DEBUG] Competitions missing multipliers:", unmatched)
+        # standardise the output column name that the rest of the app expects
+        df["Multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce").fillna(1.0)
+        # keep lowercase 'multiplier' too if it already exists; otherwise it's fine if it's missing
+
+        # debug
+        comp_col_for_debug = comp_col or "Competition"
+        print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
+        if merged and comp_col_for_debug in df.columns:
+            unmatched = df.loc[df["Multiplier"].eq(1.0) & df[comp_col_for_debug].notna(), comp_col_for_debug].unique()
+            print("[DEBUG] Competitions missing multipliers (showing first 20):", unmatched[:20])
 
     except Exception as e:
         print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
-        df["multiplier"] = 1.0
+        df["Multiplier"] = 1.0
 
     # ============================================================
     # 🪪 3. Rename Identifiers to Match Radar Columns
@@ -746,12 +748,15 @@ df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
 df = df_all.copy()                   # working copy (filtered by UI)
 
 # ---------- League filter ----------
-league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-if league_col not in df.columns:
-    df[league_col] = np.nan
+league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
+league_col = next((c for c in league_candidates if c in df.columns), None)
+if league_col is None:
+    st.error("❌ No league/competition column found after preprocessing.")
+    st.stop()
 
-df[league_col] = df[league_col].astype(str).str.strip()
-all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
+# build clean options; avoid the literal string "nan"
+leagues_series = pd.Series(df[league_col], dtype="string").str.strip()
+all_leagues = sorted([x for x in leagues_series.dropna().unique().tolist() if x and x.lower() != "nan"])
 
 st.markdown("#### Choose league(s)")
 
@@ -766,7 +771,6 @@ with b2:
     if st.button("Clear all"):
         st.session_state.league_selection = []
 
-# Ensure stored selections are valid
 valid_defaults = [l for l in st.session_state.get("league_selection", []) if l in all_leagues]
 
 selected_leagues = st.multiselect(
@@ -777,9 +781,10 @@ selected_leagues = st.multiselect(
     label_visibility="collapsed"
 )
 
-# Update session state if any old leagues were invalid
+# keep session_state clean if options changed
 if set(valid_defaults) != set(st.session_state.league_selection):
     st.session_state.league_selection = valid_defaults
+
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
