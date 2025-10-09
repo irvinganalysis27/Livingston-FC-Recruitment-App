@@ -11,16 +11,21 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+
+# ============================================================
+# 🧱 Favourites Database — Safe Reset & Schema Guarantee
+# ============================================================
 import sqlite3
 from pathlib import Path
 
-# --- Database setup ---
 DB_PATH = Path(__file__).parent / "favourites.db"
 
-def init_or_migrate_favourites_db():
-    """Create or update the favourites table so it matches Watch List structure."""
+def ensure_favourites_table():
+    """Force-correct the favourites table schema so it always matches expected columns."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # Create table if missing
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
@@ -33,8 +38,11 @@ def init_or_migrate_favourites_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Check for missing columns and add them
     existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    required_cols = {
+    expected_cols = {
+        "player": "TEXT",
         "team": "TEXT",
         "league": "TEXT",
         "position": "TEXT",
@@ -43,21 +51,39 @@ def init_or_migrate_favourites_db():
         "visible": "INTEGER DEFAULT 1",
         "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
     }
-    for col, dtype in required_cols.items():
+    for col, dtype in expected_cols.items():
         if col not in existing_cols:
             c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
     conn.commit()
     conn.close()
 
-# --- Run on startup ---
-init_or_migrate_favourites_db()
+ensure_favourites_table()
 
 # ============================================================
-# ⚙️ Favourite Helper Functions
+# ⚙️ Favourites Helper Functions
 # ============================================================
+def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
+    """Insert or update a favourite record."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(player) DO UPDATE SET
+            team=excluded.team,
+            league=excluded.league,
+            position=excluded.position,
+            colour=excluded.colour,
+            comment=excluded.comment,
+            visible=excluded.visible,
+            timestamp=CURRENT_TIMESTAMP
+    """, (player, team, league, position, colour, comment, visible))
+    conn.commit()
+    conn.close()
+
 @st.cache_data(ttl=2, show_spinner=False)
 def get_favourites_with_colours_live():
-    """Fetch all favourites with colour, comment, and visibility info."""
+    """Return dict of favourites and their attributes."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
@@ -68,33 +94,21 @@ def get_favourites_with_colours_live():
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-def add_favourite(player, team=None, league=None, position=None):
-    """Insert or update a favourite entry."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT OR REPLACE INTO favourites (player, team, league, position, timestamp)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    """, (player, team, league, position))
-    conn.commit()
-    conn.close()
-
 def remove_favourite(player):
-    """Permanently remove a player from favourites."""
+    """Hard delete a favourite."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM favourites WHERE player=?", (player,))
     conn.commit()
     conn.close()
 
-def get_favourites():
-    """Return all favourites ordered by most recent."""
+def hide_favourite(player):
+    """Soft hide favourite."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT player, team, league, position FROM favourites ORDER BY timestamp DESC")
-    rows = c.fetchall()
+    c.execute("UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?", (player,))
+    conn.commit()
     conn.close()
-    return rows
 
 # --- Password protection ---
 from auth import check_password
