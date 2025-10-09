@@ -1433,12 +1433,12 @@ def get_favourites_with_colours():
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
 def upsert_favourite(player, team, league, position, colour="🟡 Yellow", comment="", visible=1):
-    """Add or update a favourite record."""
+    """Add or update a favourite record (SQLite-safe version)."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO favourites (player, team, league, position, colour, comment, visible)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(player) DO UPDATE SET
             team=excluded.team,
             league=excluded.league,
