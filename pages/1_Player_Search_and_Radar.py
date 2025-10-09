@@ -526,57 +526,37 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # --- Merge league multipliers (robust + debug) ---
+    # --- Merge league multipliers ---
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         multipliers_df = pd.read_excel(multipliers_path)
-
-        print("[DEBUG] Columns detected in league_multipliers.xlsx:", list(multipliers_df.columns))
-
-        # --- Clean up and normalise ---
         multipliers_df.columns = multipliers_df.columns.str.strip()
+
         if "League" in multipliers_df.columns:
             multipliers_df["League"] = multipliers_df["League"].astype(str).str.strip()
         if "Multiplier" in multipliers_df.columns:
             multipliers_df["Multiplier"] = pd.to_numeric(multipliers_df["Multiplier"], errors="coerce")
 
-        # Ensure consistency in dataset side too
         if "Competition_norm" in df.columns:
             df["Competition_norm"] = df["Competition_norm"].astype(str).str.strip()
-        else:
-            df["Competition_norm"] = np.nan
 
-        # --- Merge and report ---
+        # Merge
         if {"League", "Multiplier"}.issubset(multipliers_df.columns):
             df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
 
-            print("[DEBUG] After merge columns:", list(df.columns))
-
-            # --- Handle duplicate suffixes (_x / _y) ---
+            # Handle suffixes
             if "Multiplier_y" in df.columns:
                 df["Multiplier"] = df["Multiplier_y"]
             elif "Multiplier_x" in df.columns:
                 df["Multiplier"] = df["Multiplier_x"]
-            elif "Multiplier" in df.columns:
-                pass
-            else:
-                print("[DEBUG] ❌ No 'Multiplier' column found after merge, defaulting to 1.0")
+            elif "Multiplier" not in df.columns:
                 df["Multiplier"] = 1.0
 
-            # --- Fill missing multipliers ---
             df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-
-            # --- Identify missing leagues ---
-            missing_mult = df.loc[df["Multiplier"] == 1.0, "Competition_norm"].unique().tolist()
-            if missing_mult:
-                preview = ", ".join(missing_mult[:5])
-                print(f"[DEBUG] Leagues without multipliers: {missing_mult[:10]}{'...' if len(missing_mult) > 10 else ''}")
-                st.warning(f"Some leagues did not match multipliers (showing first few): {preview}")
         else:
-            st.warning("⚠️ 'League' and 'Multiplier' columns not found in league_multipliers.xlsx. Using 1.0 for all.")
             df["Multiplier"] = 1.0
-    except Exception as e:
-        print(f"[DEBUG] Failed to load or merge multipliers: {e}")
+
+    except Exception:
         df["Multiplier"] = 1.0
 
     # --- Rename identifiers ---
@@ -588,7 +568,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Minutes" in df.columns:
         rename_map["Minutes"] = "Minutes played"
 
-    # --- Metric renames / fixes ---
     rename_map.update({
         "Successful Box Cross %": "Successful Box Cross%",
         "Player Season Box Cross Ratio": "Successful Box Cross%",
@@ -600,28 +579,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     })
     df.rename(columns=rename_map, inplace=True)
 
-    # --- Derive Successful Crosses ---
+    # --- Derived metrics ---
     cross_cols = [c for c in df.columns if "crosses" in c.lower()]
     crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
     if cross_cols and crossperc_cols:
-        c1 = cross_cols[0]
-        c2 = crossperc_cols[0]
         df["Successful Crosses"] = (
-            pd.to_numeric(df[c1], errors="coerce") *
-            (pd.to_numeric(df[c2], errors="coerce") / 100.0)
+            pd.to_numeric(df[cross_cols[0]], errors="coerce") *
+            (pd.to_numeric(df[crossperc_cols[0]], errors="coerce") / 100.0)
         )
-        print(f"[DEBUG] Created 'Successful Crosses' from {c1} and {c2}")
-    else:
-        print("[DEBUG] Could not find both 'Crosses' and 'Crossing%' columns.")
 
-    # --- Derive Successful Dribbles ---
     if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
         df["Successful Dribbles"] = (
             pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
             - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
         )
 
-    # --- Build "Positions played" ---
+    # --- Positions ---
     if "Position" in df.columns:
         if "Secondary Position" in df.columns:
             df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
@@ -640,7 +613,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # --- Six-Group Position mapping ---
+    # --- Map to six groups ---
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
