@@ -13,40 +13,20 @@ from auth import check_password
 from branding import show_branding
 
 # ============================================================
-# 🧱 Favourites Database — Safe Reset & Schema Guarantee
+# 🧱 Favourites Database — Safe Schema Guarantee
 # ============================================================
 import sqlite3
 from pathlib import Path
 
+# Path to the database file (stored in the same folder as this page)
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 def ensure_favourites_table():
-    """Ensure the favourites table exists with correct schema."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            colour TEXT DEFAULT '',
-            comment TEXT DEFAULT '',
-            visible INTEGER DEFAULT 1,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-ensure_favourites_table()
-
-def ensure_favourites_table():
-    """Force-correct the favourites table schema so it always matches expected columns."""
+    """Ensure the favourites table exists and matches the correct schema."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # Create table if missing
+    # --- Create the table if it doesn't exist ---
     c.execute("""
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
@@ -60,7 +40,7 @@ def ensure_favourites_table():
         )
     """)
 
-    # Check for missing columns and add them
+    # --- Check existing columns and add any missing ones ---
     existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
     expected_cols = {
         "player": "TEXT",
@@ -72,12 +52,15 @@ def ensure_favourites_table():
         "visible": "INTEGER DEFAULT 1",
         "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
     }
+
     for col, dtype in expected_cols.items():
         if col not in existing_cols:
             c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
+
     conn.commit()
     conn.close()
 
+# --- Run automatically on page load ---
 ensure_favourites_table()
 
 # ============================================================
