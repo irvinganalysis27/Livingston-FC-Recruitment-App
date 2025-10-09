@@ -3,8 +3,6 @@ import pandas as pd
 from auth import check_password
 from branding import show_branding
 
-st.cache_data.clear()
-
 # ---------- Protect page ----------
 if not check_password():
     st.stop()
