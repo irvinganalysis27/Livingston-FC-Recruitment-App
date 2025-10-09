@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(layout="wide")
 
 # ============================================================
-# Protect page
+# 🔒 Protect page
 # ============================================================
 if not check_password():
     st.stop()
@@ -22,7 +22,7 @@ st.title("⭐ Watch List")
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 # ============================================================
-# DB init
+# 🧱 Database setup
 # ============================================================
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -45,7 +45,7 @@ def init_db():
 init_db()
 
 # ============================================================
-# Google Sheets
+# 📄 Google Sheets logging
 # ============================================================
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -74,12 +74,12 @@ def log_to_sheet(player, team, league, position, colour, comment, action="Update
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         sheet.append_row([player, team, league, position, colour, comment, action, now])
-        st.write(f"✅ Logged to sheet: {player} → {action}")
+        st.caption(f"📋 {player} → {action} logged to sheet")
     except Exception as e:
         st.error(f"❌ Failed to log {player}: {e}")
 
 # ============================================================
-# DB ops
+# ⚙️ Database operations
 # ============================================================
 def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
@@ -111,24 +111,26 @@ def delete_favourite(player):
     conn.close()
 
 # ============================================================
-# Table logic
+# 🧩 Table logic
 # ============================================================
 show_hidden = st.checkbox("Show hidden players", value=False)
 rows = get_favourites(show_hidden)
+
 if not rows:
     st.info("No favourites saved yet.")
     st.stop()
 
 st.markdown("""
 **How to use this list:**
-- 🟢 **Choose Colour:** set a status for each player.
-- 💬 **Write Comment:** add your initials and scouting notes.
-- 👁️ **Deselect "Visible":** When you have finished to hide the player in this list.
-- 🗑️ **Added a player by accident?** Tick **Remove** to delete completely.
+- 🟢 **Choose Colour:** Set a status for each player.  
+- 💬 **Write Comment:** Add your initials and short scouting notes.  
+- 👁️ **Deselect "Visible":** Hide the player when finished.  
+- 🗑️ **Added a player by accident?** Tick **Remove** to delete permanently.  
 """)
 
-
-df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
+df = pd.DataFrame(rows, columns=[
+    "Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"
+])
 df["Remove"] = False
 
 colour_options = [
@@ -153,7 +155,7 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# Apply changes
+# 💾 Apply changes
 # ============================================================
 removed_players = []
 logged_changes = 0
@@ -172,22 +174,41 @@ for _, row in edited_df.iterrows():
         (int(prev["Visible"]) != visible)
     )
 
+    # Permanent removal
     if remove_flag:
         delete_favourite(player)
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
-        st.write(f"🗑️ Removed {player}")
+        st.error(f"🗑️ {player} permanently removed from list")
         removed_players.append(player)
-        st.rerun()
+        st.session_state["needs_rerun"] = True
+        continue
 
+    # Save update
     update_favourite(player, colour, comment, visible)
 
+    # Detect and describe changes
     if changed:
-        action = "Hidden" if visible == 0 else "Updated"
-        st.write(f"🟨 Change detected for {player}: {action}")
+        if int(prev["Visible"]) != visible and visible == 0:
+            st.warning(f"👁️ {player} has been hidden from the list")
+            action = "Hidden"
+        elif comment != prev["Comment"]:
+            st.info(f"💬 Comment saved for {player}")
+            action = "Comment Updated"
+        elif colour != prev["Colour"]:
+            st.success(f"✅ Status saved for {player}")
+            action = "Status Updated"
+        else:
+            action = "Updated"
+
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
         logged_changes += 1
 
+# Rerun once at the end if any deletions occurred
+if st.session_state.get("needs_rerun", False):
+    del st.session_state["needs_rerun"]
+    st.rerun()
+
 # ============================================================
-# Summary
+# 📊 Summary
 # ============================================================
-st.info(f"Logged {logged_changes} change(s). Removed {len(removed_players)} player(s).")
+st.info(f"✅ Saved {logged_changes} change(s). Removed {len(removed_players)} player(s).")
