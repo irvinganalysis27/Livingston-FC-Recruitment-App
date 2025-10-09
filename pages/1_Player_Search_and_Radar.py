@@ -1432,22 +1432,29 @@ def get_favourites_with_colours():
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-def upsert_favourite(player, team, league, position, colour="🟡 Yellow", comment="", visible=1):
-    """Add or update a favourite record (SQLite-safe version)."""
+def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
+    """Add or update a favourite record (compatible with all SQLite versions)."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, visible)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(player) DO UPDATE SET
-            team=excluded.team,
-            league=excluded.league,
-            position=excluded.position,
-            colour=excluded.colour,
-            comment=excluded.comment,
-            visible=excluded.visible,
-            timestamp=CURRENT_TIMESTAMP
-    """, (player, team, league, position, colour, comment, visible))
+
+    # First, check if the player already exists
+    c.execute("SELECT player FROM favourites WHERE player=?", (player,))
+    exists = c.fetchone()
+
+    if exists:
+        # Update existing record
+        c.execute("""
+            UPDATE favourites
+            SET team=?, league=?, position=?, colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
+            WHERE player=?
+        """, (team, league, position, colour, comment, visible, player))
+    else:
+        # Insert new record
+        c.execute("""
+            INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (player, team, league, position, colour, comment, visible))
+
     conn.commit()
     conn.close()
 
