@@ -623,6 +623,41 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
+
+# ---------- Cached Data Loader ----------
+@st.cache_data(show_spinner=True)
+def load_data_once(_sig=None):
+    """Load and preprocess StatsBomb data once per session."""
+    path = DATA_PATH
+    sig = _data_signature(path)
+
+    # Load one or many files
+    if path.is_file():
+        df_raw = load_one_file(path)
+    else:
+        files = sorted(
+            f for f in path.iterdir()
+            if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
+        )
+        if not files:
+            raise FileNotFoundError(f"No data files found in {path.name}. Add CSV or XLSX.")
+        frames = []
+        for f in files:
+            try:
+                frames.append(load_one_file(f))
+            except Exception as e:
+                print(f"[WARNING] Skipping {f.name} ({e})")
+        if not frames:
+            raise ValueError("No readable files found in statsbombdata")
+        df_raw = pd.concat(frames, ignore_index=True, sort=False)
+        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
+
+    df_raw = add_age_column(df_raw)
+    df_preprocessed = preprocess_df(df_raw)
+    print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
+
+    return df_preprocessed
+    
 # ---------- Load & preprocess ----------
 df_all_raw = load_data_once(_sig=_data_signature(DATA_PATH))
 
