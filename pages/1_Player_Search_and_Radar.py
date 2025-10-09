@@ -538,38 +538,39 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # --- Merge league multipliers ---
-    try:
-        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        multipliers_df = pd.read_excel(multipliers_path)
-        multipliers_df.columns = multipliers_df.columns.str.strip()
+    # --- Merge league multipliers (prefer Competition ID, fallback to name) ---
+try:
+    multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
+    multipliers_df = pd.read_excel(multipliers_path)
+    multipliers_df.columns = multipliers_df.columns.str.strip()
 
-        if "League" in multipliers_df.columns:
-            multipliers_df["League"] = multipliers_df["League"].astype(str).str.strip()
-        if "Multiplier" in multipliers_df.columns:
-            multipliers_df["Multiplier"] = pd.to_numeric(multipliers_df["Multiplier"], errors="coerce")
+    # Convert and clean types
+    if "Competition_ID" in multipliers_df.columns:
+        multipliers_df["Competition_ID"] = pd.to_numeric(multipliers_df["Competition_ID"], errors="coerce")
+    if "Multiplier" in multipliers_df.columns:
+        multipliers_df["Multiplier"] = pd.to_numeric(multipliers_df["Multiplier"], errors="coerce").fillna(1.0)
 
-        if "Competition_norm" in df.columns:
-            df["Competition_norm"] = df["Competition_norm"].astype(str).str.strip()
+    # Normalise Competition column
+    if "Competition" in df.columns:
+        df["Competition"] = df["Competition"].astype(str).str.strip()
+    if "competition_id" in df.columns:
+        df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce")
 
-        # Merge
-        if {"League", "Multiplier"}.issubset(multipliers_df.columns):
-            df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-
-            # Handle suffixes
-            if "Multiplier_y" in df.columns:
-                df["Multiplier"] = df["Multiplier_y"]
-            elif "Multiplier_x" in df.columns:
-                df["Multiplier"] = df["Multiplier_x"]
-            elif "Multiplier" not in df.columns:
-                df["Multiplier"] = 1.0
-
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-        else:
-            df["Multiplier"] = 1.0
-
-    except Exception:
+    # --- Merge by ID if possible ---
+    if "competition_id" in df.columns and "Competition_ID" in multipliers_df.columns:
+        df = df.merge(multipliers_df, left_on="competition_id", right_on="Competition_ID", how="left")
+        df["Multiplier"] = df["Multiplier"].fillna(1.0)
+        print(f"[DEBUG] Merged by Competition_ID, found {df['Multiplier'].notna().sum()} matches")
+    elif "Competition_norm" in df.columns and "League" in multipliers_df.columns:
+        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+        df["Multiplier"] = df["Multiplier"].fillna(1.0)
+        print(f"[DEBUG] Merged by League name fallback, found {df['Multiplier'].notna().sum()} matches")
+    else:
         df["Multiplier"] = 1.0
+
+except Exception as e:
+    print(f"[DEBUG] Failed to merge multipliers: {e}")
+    df["Multiplier"] = 1.0
 
     # --- Rename identifiers ---
     rename_map = {}
