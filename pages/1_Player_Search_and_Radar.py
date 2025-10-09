@@ -529,7 +529,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     # --- Merge league multipliers ---
     try:
-        multipliers_df = pd.read_excel("league_multipliers.xlsx")
+        multipliers_df = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(multipliers_df.columns):
             df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
             missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
