@@ -565,7 +565,6 @@ def load_data_once(_sig=None):
 df_all = load_data_once(_sig=_data_signature(DATA_PATH))
 df = df_all.copy()
 
-    # --- Normalise Competition name ---
 df_all = load_data_once(_sig=_data_signature(DATA_PATH))
 df = df_all.copy()
 
@@ -605,26 +604,17 @@ if "Minutes" in df.columns:
 
 # --- Metric renames / fixes ---
 rename_map.update({
-    # Successful Box Cross variants
     "Successful Box Cross %": "Successful Box Cross%",
     "Player Season Box Cross Ratio": "Successful Box Cross%",
-
-    # Pass% under pressure
     "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-
-    # Build-up involvement
     "Player Season Xgbuildup 90": "xGBuildup",
-
-    # Pressures in attacking 3rd
     "Player Season F3 Pressures 90": "Pressures in Final 1/3",
-
-    # Long balls
     "Player Season Pressured Long Balls 90": "Pr. Long Balls",
     "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
 })
 df.rename(columns=rename_map, inplace=True)
 
-# --- Derive Successful Crosses (robust check) ---
+# --- Derive Successful Crosses ---
 cross_cols = [c for c in df.columns if "crosses" in c.lower()]
 crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
 if cross_cols and crossperc_cols:
