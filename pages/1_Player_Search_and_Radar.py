@@ -14,8 +14,11 @@ from branding import show_branding
 import sqlite3
 from pathlib import Path
 
-# --- Ensure the radar page DB schema matches the favourites page ---
+# --- Database setup ---
+DB_PATH = Path(__file__).parent / "favourites.db"
+
 def migrate_favourites_db():
+    """Ensure the favourites table exists and has the correct columns."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -30,11 +33,13 @@ def migrate_favourites_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Double-check that all columns exist
     existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
     required_cols = {
         "colour": "TEXT DEFAULT ''",
         "comment": "TEXT DEFAULT ''",
-        "visible": "INTEGER DEFAULT 1"
+        "visible": "INTEGER DEFAULT 1",
+        "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
     }
     for col, dtype in required_cols.items():
         if col not in existing_cols:
@@ -42,6 +47,7 @@ def migrate_favourites_db():
     conn.commit()
     conn.close()
 
+# --- Run migration immediately on app start ---
 migrate_favourites_db()
 
 @st.cache_data(ttl=2, show_spinner=False)
