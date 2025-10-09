@@ -528,23 +528,23 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Competition_norm"] = np.nan
 
 # --- Merge league multipliers ---
-try:
-    multipliers_df = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
-    print("[DEBUG] Columns detected in league_multipliers.xlsx:", list(multipliers_df.columns))  # 👈 ADD THIS LINE
-
-    if {"League", "Multiplier"}.issubset(multipliers_df.columns):
-        df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
-        missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
-        if missing_mult:
-            print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
-            st.warning(f"Some leagues did not match multipliers: {missing_mult}")
-        df["Multiplier"] = df["Multiplier"].fillna(1.0)
-    else:
-        st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
+    try:
+        multipliers_df = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
+        print("[DEBUG] Columns detected in league_multipliers.xlsx:", list(multipliers_df.columns))  # 👈 ADD THIS LINE
+    
+        if {"League", "Multiplier"}.issubset(multipliers_df.columns):
+            df = df.merge(multipliers_df, left_on="Competition_norm", right_on="League", how="left")
+            missing_mult = df[df["Multiplier"].isna()]["Competition_norm"].unique().tolist()
+            if missing_mult:
+                print(f"[DEBUG] Leagues without multipliers: {missing_mult}")
+                st.warning(f"Some leagues did not match multipliers: {missing_mult}")
+            df["Multiplier"] = df["Multiplier"].fillna(1.0)
+        else:
+            st.warning("league_multipliers.xlsx must have columns: 'League', 'Multiplier'. Using 1.0 for all.")
+            df["Multiplier"] = 1.0
+    except Exception as e:
+        print(f"[DEBUG] Failed to load multipliers: {e}")
         df["Multiplier"] = 1.0
-except Exception as e:
-    print(f"[DEBUG] Failed to load multipliers: {e}")
-    df["Multiplier"] = 1.0
 
     # --- Rename identifiers ---
     rename_map = {}
