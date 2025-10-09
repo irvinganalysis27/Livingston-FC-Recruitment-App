@@ -734,13 +734,20 @@ with b2:
     if st.button("Clear all"):
         st.session_state.league_selection = []
 
+# Ensure stored selections are valid
+valid_defaults = [l for l in st.session_state.get("league_selection", []) if l in all_leagues]
+
 selected_leagues = st.multiselect(
-    "Leagues",   # dummy label, won’t be shown
+    "Leagues",
     options=all_leagues,
-    default=st.session_state.league_selection,
+    default=valid_defaults,
     key="league_selection",
     label_visibility="collapsed"
 )
+
+# Update session state if any old leagues were invalid
+if set(valid_defaults) != set(st.session_state.league_selection):
+    st.session_state.league_selection = valid_defaults
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
