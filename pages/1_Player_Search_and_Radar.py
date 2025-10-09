@@ -1120,6 +1120,13 @@ df_all["Avg Z Score"] = pd.to_numeric(avg_z_all, errors="coerce").fillna(0)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
+print("[DEBUG] Multiplier stats:")
+print("   Unique multipliers found:", sorted(df_all["Multiplier"].dropna().unique())[:15])
+print("   Weighted Z Score range:", df_all["Weighted Z Score"].min(), "→", df_all["Weighted Z Score"].max())
+
+# Show a few sample rows to confirm multiplier usage
+print(df_all[["Competition_norm", "Multiplier", "Avg Z Score", "Weighted Z Score"]].head(10).to_string())
+
 # For current view (plot_data): subset the raw Z's and avg
 raw_z_view = raw_z_all.loc[df.index, sel_metrics]
 avg_z_view = raw_z_view.mean(axis=1)
