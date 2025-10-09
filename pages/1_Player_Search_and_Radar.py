@@ -12,6 +12,14 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 
+DEBUG_PATH = Path(__file__).parent.parent / "statsbomb_player_stats_clean.csv"
+try:
+    df_debug = pd.read_csv(DEBUG_PATH)
+    print("✅ DEBUG: Loaded new file successfully")
+    print("✅ DEBUG: Found leagues:", sorted(df_debug["Competition"].dropna().unique())[:20])
+except Exception as e:
+    print("❌ DEBUG: Failed to load statsbomb_player_stats_clean.csv:", e)
+
 # ============================================================
 # 🧱 Favourites Database — Safe Schema Guarantee
 # ============================================================
