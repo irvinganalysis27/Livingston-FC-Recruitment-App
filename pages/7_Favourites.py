@@ -155,10 +155,14 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 Apply changes
+# 💾 Apply changes (debounced, instant saving)
 # ============================================================
 removed_players = []
 logged_changes = 0
+
+# Cache old data in session state (prevents reset after first re-run)
+if "previous_df" not in st.session_state:
+    st.session_state["previous_df"] = df.copy()
 
 for _, row in edited_df.iterrows():
     player = row["Player"]
@@ -167,7 +171,8 @@ for _, row in edited_df.iterrows():
     visible = int(row.get("Visible", True))
     remove_flag = bool(row.get("Remove", False))
 
-    prev = df.loc[df["Player"] == player].iloc[0]
+    prev_df = st.session_state["previous_df"]
+    prev = prev_df.loc[prev_df["Player"] == player].iloc[0]
     changed = (
         (colour != prev["Colour"]) or
         (comment != prev["Comment"]) or
@@ -184,10 +189,10 @@ for _, row in edited_df.iterrows():
         continue
 
     # Save update
-    update_favourite(player, colour, comment, visible)
-
-    # Detect and describe changes
     if changed:
+        update_favourite(player, colour, comment, visible)
+
+        # Detect type of change for feedback
         if int(prev["Visible"]) != visible and visible == 0:
             st.warning(f"👁️ {player} has been hidden from the list")
             action = "Hidden"
@@ -203,10 +208,16 @@ for _, row in edited_df.iterrows():
         log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
         logged_changes += 1
 
-# Rerun once at the end if any deletions occurred
+# Update session copy so next re-run compares correctly
+st.session_state["previous_df"] = edited_df.copy()
+
+# Single rerun after deletions only
 if st.session_state.get("needs_rerun", False):
     del st.session_state["needs_rerun"]
     st.rerun()
+
+# Summary
+st.info(f"✅ Saved {logged_changes} change(s). Removed {len(removed_players)} player(s).")
 
 # ============================================================
 # 📊 Summary
