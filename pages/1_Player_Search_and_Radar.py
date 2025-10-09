@@ -1554,12 +1554,6 @@ for _, row in edited_df.iterrows():
     current_data = favs.get(player_name, {})
     colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
-
-    if is_fav:
-        upsert_favourite(player_name, team, league, position, colour=colour, comment=comment, visible=1)
-    else:
-        hide_favourite(player_name)
-
 if st.sidebar.button("🔁 Refresh Leagues (safe)"):
     st.cache_data.clear()
     st.cache_resource.clear()
