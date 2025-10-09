@@ -20,25 +20,26 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "favourites.db"
 
-conn = sqlite3.connect(DB_PATH)
-c = conn.cursor()
-c.execute("DROP TABLE IF EXISTS favourites")
-c.execute("""
-    CREATE TABLE favourites (
-        player TEXT PRIMARY KEY,
-        team TEXT,
-        league TEXT,
-        position TEXT,
-        colour TEXT DEFAULT '',
-        comment TEXT DEFAULT '',
-        visible INTEGER DEFAULT 1,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-""")
-conn.commit()
-conn.close()
+def ensure_favourites_table():
+    """Ensure the favourites table exists with correct schema."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS favourites (
+            player TEXT PRIMARY KEY,
+            team TEXT,
+            league TEXT,
+            position TEXT,
+            colour TEXT DEFAULT '',
+            comment TEXT DEFAULT '',
+            visible INTEGER DEFAULT 1,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-print("[DEBUG] ✅ favourites.db rebuilt successfully.")
+ensure_favourites_table()
 
 def ensure_favourites_table():
     """Force-correct the favourites table schema so it always matches expected columns."""
