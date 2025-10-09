@@ -93,7 +93,7 @@ def update_favourite(player, colour, comment, visible):
     c = conn.cursor()
     c.execute("""
         UPDATE favourites
-        SET colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
+        SET colour=?, comment=?, visible=?
         WHERE player=?
     """, (colour, comment, visible, player))
     conn.commit()
