@@ -64,7 +64,7 @@ def migrate_favourites_db():
 
 migrate_favourites_db()
 
-@st.cache_data(ttl=10, show_spinner=False)
+@st.cache_data(ttl=2, show_spinner=False)
 def get_favourites_with_colours_live():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
