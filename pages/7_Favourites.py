@@ -1,7 +1,6 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import json
 from pathlib import Path
 from datetime import datetime
 from auth import check_password
@@ -21,7 +20,6 @@ show_branding()
 st.title("⭐ Watch List")
 
 DB_PATH = Path(__file__).parent / "favourites.db"
-QUEUE_FILE = Path(__file__).parent / "pending_logs.json"
 
 # ============================================================
 # 🧱 Database setup
@@ -47,7 +45,7 @@ def init_db():
 init_db()
 
 # ============================================================
-# 📄 Google Sheets logging setup
+# 📄 Google Sheets logging
 # ============================================================
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -65,64 +63,16 @@ def init_sheet():
     except Exception:
         return None
 
-# ============================================================
-# 🧰 Queue handling (persistent async logging)
-# ============================================================
-def load_queue():
-    if QUEUE_FILE.exists():
-        try:
-            return json.loads(QUEUE_FILE.read_text())
-        except Exception:
-            return []
-    return []
-
-def save_queue(queue):
-    with open(QUEUE_FILE, "w") as f:
-        json.dump(queue, f)
-
-def enqueue_log(player, team, league, position, colour, comment, action):
-    queue = load_queue()
-    queue.append({
-        "player": player,
-        "team": team,
-        "league": league,
-        "position": position,
-        "colour": colour,
-        "comment": comment,
-        "action": action,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-    save_queue(queue)
-
-def flush_logs():
-    queue = load_queue()
-    if not queue:
-        return
-
+def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
     sheet = init_sheet()
     if not sheet:
-        return  # keep queue until next rerun if sheet unavailable
-
-    new_queue = []
-    for entry in queue:
-        try:
-            sheet.append_row([
-                entry["player"],
-                entry["team"],
-                entry["league"],
-                entry["position"],
-                entry["colour"],
-                entry["comment"],
-                entry["action"],
-                entry["timestamp"],
-            ])
-        except Exception:
-            new_queue.append(entry)  # retry next run
-
-    save_queue(new_queue)
-
-# Run queued logs first (non-blocking)
-flush_logs()
+        st.warning("⚠️ Could not connect to Google Sheets.")
+        return
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        sheet.append_row([player, team, league, position, colour, comment, action, now])
+    except Exception as e:
+        st.error(f"❌ Failed to log {player}: {e}")
 
 # ============================================================
 # ⚙️ Database operations
@@ -130,7 +80,7 @@ flush_logs()
 def get_favourites(show_hidden=False):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    query = "SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites"
+    query = "SELECT player, team, league, position, colour, comment, visible FROM favourites"
     if not show_hidden:
         query += " WHERE visible=1"
     query += " ORDER BY timestamp DESC"
@@ -157,10 +107,11 @@ def delete_favourite(player):
     conn.close()
 
 # ============================================================
-# 🧩 Table logic
+# 🧩 Page layout
 # ============================================================
 show_hidden = st.checkbox("Show hidden players", value=False)
 rows = get_favourites(show_hidden)
+
 if not rows:
     st.info("No favourites saved yet.")
     st.stop()
@@ -169,91 +120,62 @@ st.markdown("""
 **How to use this list:**
 - 🟢 **Choose Colour:** Set a status for each player.  
 - 💬 **Write Comment:** Add your initials and short scouting notes.  
-- 👁️ **Deselect "Visible":** Hide the player when finished.  
-- 🗑️ **Added a player by accident?** Tick **Remove** to delete permanently.  
+- 👁️ **Deselect 'Visible':** Hide the player when finished.  
+- 🗑️ **Added a player by accident?** Click **Remove** to delete permanently.  
 """)
 
-df = pd.DataFrame(rows, columns=[
-    "Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"
-])
-df["Remove"] = False
+colour_options = ["🟣 Needs Checked", "🟡 Monitor", "🟢 Go", "🔴 No Further Interest"]
 
-colour_options = [
-    "🟣 Needs Checked",
-    "🟡 Monitor",
-    "🟢 Go",
-    "🔴 No Further Interest"
-]
-
-st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
-
-edited_df = st.data_editor(
-    df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Remove"]],
-    column_config={
-        "Colour": st.column_config.SelectboxColumn("Colour", options=colour_options),
-        "Comment": st.column_config.TextColumn("Comment"),
-        "Visible": st.column_config.CheckboxColumn("Visible"),
-        "Remove": st.column_config.CheckboxColumn("🗑️ Remove"),
-    },
-    hide_index=True,
-    width="stretch",
-)
+df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible"])
 
 # ============================================================
-# 💾 Apply changes (instant save + async logging)
+# 🧠 Per-row editing interface
 # ============================================================
-removed_players = []
-logged_changes = 0
-status_messages = []
+for _, row in df.iterrows():
+    player, team, league, position, colour, comment, visible = row
 
-if "last_saved" not in st.session_state:
-    st.session_state["last_saved"] = {}
+    with st.container():
+        st.markdown(f"### **{player}**  ({team}, {league}, {position})")
 
-for _, row in edited_df.iterrows():
-    player = row["Player"]
-    colour = row.get("Colour", "")
-    comment = row.get("Comment", "")
-    visible = int(row.get("Visible", True))
-    remove_flag = bool(row.get("Remove", False))
+        col1, col2, col3, col4, col5 = st.columns([2, 3, 1, 1, 1])
 
-    prev = df.loc[df["Player"] == player].iloc[0]
-    changed = (
-        (colour != prev["Colour"]) or
-        (comment != prev["Comment"]) or
-        (int(prev["Visible"]) != visible)
-    )
+        with col1:
+            new_colour = st.selectbox(
+                "Status",
+                colour_options,
+                index=colour_options.index(colour) if colour in colour_options else 1,
+                key=f"colour_{player}"
+            )
 
-    prev_key = f"{player}_{colour}_{comment}_{visible}_{remove_flag}"
-    if st.session_state["last_saved"].get(player) == prev_key:
-        continue
-    st.session_state["last_saved"][player] = prev_key
+        with col2:
+            new_comment = st.text_input(
+                "Comment",
+                value=comment if comment else "",
+                key=f"comment_{player}"
+            )
 
-    if remove_flag:
-        delete_favourite(player)
-        enqueue_log(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
-        status_messages.append(f"🗑️ {player} permanently removed from list")
-        removed_players.append(player)
-        st.session_state["needs_rerun"] = True
-        continue
+        with col3:
+            new_visible = st.checkbox(
+                "Visible",
+                value=bool(visible),
+                key=f"visible_{player}"
+            )
 
-    if changed:
-        update_favourite(player, colour, comment, visible)
-        if int(prev["Visible"]) != visible and visible == 0:
-            msg, action = f"👁️ {player} hidden from list", "Hidden"
-        elif comment != prev["Comment"]:
-            msg, action = f"💬 Comment saved for {player}", "Comment Updated"
-        elif colour != prev["Colour"]:
-            msg, action = f"✅ Status saved for {player}", "Status Updated"
-        else:
-            msg, action = f"💾 Changes saved for {player}", "Updated"
+        with col4:
+            save = st.button("💾 Save", key=f"save_{player}")
+        with col5:
+            remove = st.button("❌ Remove", key=f"remove_{player}")
 
-        enqueue_log(player, row["Team"], row["League"], row["Position"], colour, comment, action)
-        status_messages.append(msg)
-        logged_changes += 1
+        # --- Handle actions ---
+        if save:
+            update_favourite(player, new_colour, new_comment, int(new_visible))
+            log_to_sheet(player, team, league, position, new_colour, new_comment, "Updated")
+            st.success(f"✅ Saved changes for {player}")
 
-if status_messages:
-    st.success("\n".join(status_messages))
+        if remove:
+            delete_favourite(player)
+            log_to_sheet(player, team, league, position, colour, comment, "Removed")
+            st.error(f"🗑️ {player} removed from list")
+            st.rerun()
 
-if st.session_state.get("needs_rerun", False):
-    del st.session_state["needs_rerun"]
-    st.rerun()
+        st.divider()
