@@ -566,12 +566,16 @@ df_all = load_data_once(_sig=_data_signature(DATA_PATH))
 df = df_all.copy()
 
     # --- Normalise Competition name ---
-    if "Competition" in df.columns:
-        df["Competition_norm"] = (
-            df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
-        )
-    else:
-        df["Competition_norm"] = np.nan
+df_all = load_data_once(_sig=_data_signature(DATA_PATH))
+df = df_all.copy()
+
+# --- Normalise Competition name ---
+if "Competition" in df.columns:
+    df["Competition_norm"] = (
+        df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+    )
+else:
+    df["Competition_norm"] = np.nan
 
 # --- Merge league multipliers ---
 try:
