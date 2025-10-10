@@ -1553,7 +1553,7 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db
+# 💾 APPLY CHANGES TO favourites.db  (compatible upsert)
 # ============================================================
 for _, row in edited_df.iterrows():
     player_raw = str(row.get("Player (coloured)", "")).strip()
@@ -1571,20 +1571,26 @@ for _, row in edited_df.iterrows():
     comment = current_data.get("comment", "")
     visible = 1 if is_fav else 0
 
-    # Insert or update record directly
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(player) DO UPDATE SET
-            team=excluded.team,
-            league=excluded.league,
-            position=excluded.position,
-            colour=excluded.colour,
-            comment=excluded.comment,
-            visible=excluded.visible,
-            timestamp=CURRENT_TIMESTAMP
-    """, (player_name, team, league, position, colour, comment, visible))
+
+    # --- Check if the record already exists ---
+    c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
+    exists = c.fetchone() is not None
+
+    if exists:
+        # Update existing record
+        c.execute("""
+            UPDATE favourites
+            SET team=?, league=?, position=?, colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
+            WHERE player=?
+        """, (team, league, position, colour, comment, visible, player_name))
+    else:
+        # Insert new record
+        c.execute("""
+            INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (player_name, team, league, position, colour, comment, visible))
+
     conn.commit()
     conn.close()
