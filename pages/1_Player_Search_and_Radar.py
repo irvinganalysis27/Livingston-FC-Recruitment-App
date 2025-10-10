@@ -1557,6 +1557,7 @@ edited_df = st.data_editor(
 # ============================================================
 for _, row in edited_df.iterrows():
     player_raw = str(row.get("Player (coloured)", "")).strip()
+    # Remove emoji if present
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
     team = row.get("Team", "")
@@ -1564,10 +1565,26 @@ for _, row in edited_df.iterrows():
     position = row.get("Positions played", "")
     is_fav = bool(row.get("⭐ Favourite", False))
 
+    # Retrieve any existing data from the current favourites dictionary
     current_data = favs.get(player_name, {})
     colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
-if st.sidebar.button("🔁 Refresh Leagues (safe)"):
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.rerun()
+    visible = 1 if is_fav else 0
+
+    # Insert or update record directly
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(player) DO UPDATE SET
+            team=excluded.team,
+            league=excluded.league,
+            position=excluded.position,
+            colour=excluded.colour,
+            comment=excluded.comment,
+            visible=excluded.visible,
+            timestamp=CURRENT_TIMESTAMP
+    """, (player_name, team, league, position, colour, comment, visible))
+    conn.commit()
+    conn.close()
