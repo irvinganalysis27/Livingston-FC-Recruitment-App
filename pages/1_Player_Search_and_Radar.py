@@ -1553,60 +1553,63 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db  (strict version)
+# 💾 APPLY CHANGES TO favourites.db  (fully corrected version)
 # ============================================================
-# Only process rows that are actually marked as favourites
-favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
+# 1️⃣ Only process rows where the star is ticked
+if "⭐ Favourite" not in edited_df.columns:
+    st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
+else:
+    favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
+    print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
 
-# Keep track for debugging
-print(f"[DEBUG] Favourite rows to sync: {len(favourite_rows)} of {len(edited_df)} total")
+    for _, row in favourite_rows.iterrows():
+        player_raw = str(row.get("Player (coloured)", "")).strip()
+        player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
-for _, row in favourite_rows.iterrows():
-    player_raw = str(row.get("Player (coloured)", "")).strip()
-    player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+        team = row.get("Team", "")
+        league = row.get("League", "")
+        position = row.get("Positions played", "")
 
-    team = row.get("Team", "")
-    league = row.get("League", "")
-    position = row.get("Positions played", "")
+        current_data = favs.get(player_name, {})
+        colour = current_data.get("colour", "")
+        comment = current_data.get("comment", "")
+        visible = 1  # always visible if starred
 
-    # Pull any existing stored data (colour/comment)
-    current_data = favs.get(player_name, {})
-    colour = current_data.get("colour", "")
-    comment = current_data.get("comment", "")
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
+        exists = c.fetchone() is not None
 
-    # Force visible = 1 for all favourites
-    visible = 1
+        if exists:
+            c.execute("""
+                UPDATE favourites
+                SET team=?, league=?, position=?, colour=?, comment=?, visible=1, timestamp=CURRENT_TIMESTAMP
+                WHERE player=?
+            """, (team, league, position, colour, comment, player_name))
+        else:
+            c.execute("""
+                INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            """, (player_name, team, league, position, colour, comment))
 
-    # Write safely (works on all SQLite versions)
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+        conn.commit()
+        conn.close()
 
-    c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
-    exists = c.fetchone() is not None
+    # 2️⃣ Hide any players whose star was unticked
+    if "⭐ Favourite" in edited_df.columns:
+        non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
+        if not non_fav_rows.empty:
+            non_fav_names = non_fav_rows["Player (coloured)"].apply(
+                lambda n: re.sub(r"^[🟢🟡🔴🟣]\s*", "", str(n)).strip()
+            ).tolist()
 
-    if exists:
-        c.execute("""
-            UPDATE favourites
-            SET team=?, league=?, position=?, colour=?, comment=?, visible=1, timestamp=CURRENT_TIMESTAMP
-            WHERE player=?
-        """, (team, league, position, colour, comment, player_name))
-    else:
-        c.execute("""
-            INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-        """, (player_name, team, league, position, colour, comment))
+            print(f"[DEBUG] Hiding {len(non_fav_names)} non-favourites")
 
-    conn.commit()
-    conn.close()
-
-# Optional: hide any old favourites that are no longer ticked
-non_fav_names = edited_df.loc[edited_df["⭐ Favourite"] == False, "Player"].tolist()
-if non_fav_names:
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.executemany(
-        "UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?",
-        [(n,) for n in non_fav_names]
-    )
-    conn.commit()
-    conn.close()
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.executemany(
+                "UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?",
+                [(n,) for n in non_fav_names]
+            )
+            conn.commit()
+            conn.close()
