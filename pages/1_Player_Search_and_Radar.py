@@ -1505,7 +1505,7 @@ def colourize_player_name(name: str, favs_dict: dict) -> str:
 # ============================================================
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
-z_ranking["Player (coloured)"] = z_ranking["Player"].apply(colourize_player_name)
+z_ranking["Player (coloured)"] = z_ranking["Player"].apply(lambda n: colourize_player_name(n, favs))
 z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
     lambda n: bool(favs.get(n, {}).get("visible", 0))
 )
