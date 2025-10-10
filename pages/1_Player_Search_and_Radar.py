@@ -1463,20 +1463,27 @@ z_ranking.index.name = "Row"
 from pathlib import Path
 import sqlite3
 
-# Path to shared favourites database
+# ============================================================
+# 🟢 LOAD FAVOURITES AND APPLY COLOURS
+# ============================================================
 DB_PATH = Path(__file__).parent / "favourites.db"
 
 def get_favourites_with_colours_live():
     """Fetch all favourites with their colour/comment/visibility."""
+    if not DB_PATH.exists():
+        return {}
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("SELECT player, colour, comment, visible FROM favourites")
         rows = c.fetchall()
-    except sqlite3.OperationalError:
+    except Exception:
         rows = []
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
+
+# ✅ Create global favourites dictionary before use
+favs = get_favourites_with_colours_live()
 
 # Colour emoji map
 COLOUR_EMOJI = {
