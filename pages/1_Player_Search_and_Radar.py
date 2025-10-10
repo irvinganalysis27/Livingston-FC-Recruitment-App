@@ -1553,47 +1553,60 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db  (only update ticked or existing)
+# 💾 APPLY CHANGES TO favourites.db  (strict version)
 # ============================================================
-for _, row in edited_df.iterrows():
+# Only process rows that are actually marked as favourites
+favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
+
+# Keep track for debugging
+print(f"[DEBUG] Favourite rows to sync: {len(favourite_rows)} of {len(edited_df)} total")
+
+for _, row in favourite_rows.iterrows():
     player_raw = str(row.get("Player (coloured)", "")).strip()
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
     team = row.get("Team", "")
     league = row.get("League", "")
     position = row.get("Positions played", "")
-    is_fav = bool(row.get("⭐ Favourite", False))
 
-    # If not ticked and not already in favourites → skip entirely
-    if not is_fav and player_name not in favs:
-        continue
-
-    # Retrieve any existing data from current favourites
+    # Pull any existing stored data (colour/comment)
     current_data = favs.get(player_name, {})
     colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
-    visible = 1 if is_fav else 0
 
+    # Force visible = 1 for all favourites
+    visible = 1
+
+    # Write safely (works on all SQLite versions)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # Check if record exists
     c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
     exists = c.fetchone() is not None
 
     if exists:
-        # Update existing record
         c.execute("""
             UPDATE favourites
-            SET team=?, league=?, position=?, colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
+            SET team=?, league=?, position=?, colour=?, comment=?, visible=1, timestamp=CURRENT_TIMESTAMP
             WHERE player=?
-        """, (team, league, position, colour, comment, visible, player_name))
-    elif is_fav:
-        # Only insert new record if actually ticked as favourite
+        """, (team, league, position, colour, comment, player_name))
+    else:
         c.execute("""
             INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (player_name, team, league, position, colour, comment, visible))
+            VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        """, (player_name, team, league, position, colour, comment))
 
+    conn.commit()
+    conn.close()
+
+# Optional: hide any old favourites that are no longer ticked
+non_fav_names = edited_df.loc[edited_df["⭐ Favourite"] == False, "Player"].tolist()
+if non_fav_names:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.executemany(
+        "UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?",
+        [(n,) for n in non_fav_names]
+    )
     conn.commit()
     conn.close()
