@@ -1553,11 +1553,10 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db  (compatible upsert)
+# 💾 APPLY CHANGES TO favourites.db  (only update ticked or existing)
 # ============================================================
 for _, row in edited_df.iterrows():
     player_raw = str(row.get("Player (coloured)", "")).strip()
-    # Remove emoji if present
     player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
     team = row.get("Team", "")
@@ -1565,7 +1564,11 @@ for _, row in edited_df.iterrows():
     position = row.get("Positions played", "")
     is_fav = bool(row.get("⭐ Favourite", False))
 
-    # Retrieve any existing data from the current favourites dictionary
+    # If not ticked and not already in favourites → skip entirely
+    if not is_fav and player_name not in favs:
+        continue
+
+    # Retrieve any existing data from current favourites
     current_data = favs.get(player_name, {})
     colour = current_data.get("colour", "")
     comment = current_data.get("comment", "")
@@ -1574,7 +1577,7 @@ for _, row in edited_df.iterrows():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # --- Check if the record already exists ---
+    # Check if record exists
     c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
     exists = c.fetchone() is not None
 
@@ -1585,8 +1588,8 @@ for _, row in edited_df.iterrows():
             SET team=?, league=?, position=?, colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
             WHERE player=?
         """, (team, league, position, colour, comment, visible, player_name))
-    else:
-        # Insert new record
+    elif is_fav:
+        # Only insert new record if actually ticked as favourite
         c.execute("""
             INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
