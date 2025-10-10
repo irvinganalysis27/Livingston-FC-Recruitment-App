@@ -7,6 +7,21 @@ from auth import check_password
 from branding import show_branding
 import gspread
 from google.oauth2.service_account import Credentials
+import os
+from pathlib import Path
+
+DB_PATH = Path(__file__).parent / "favourites.db"
+
+# --- TEMPORARY RESET SWITCH ---
+if st.sidebar.button("🧹 Reset Favourites Database (safe)"):
+    if DB_PATH.exists():
+        os.remove(DB_PATH)
+        st.success("✅ favourites.db deleted. It will be recreated automatically on next run.")
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.rerun()
+    else:
+        st.info("No favourites.db file found to delete.")
 
 st.set_page_config(layout="wide")
 
