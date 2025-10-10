@@ -1460,61 +1460,25 @@ z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
-# ============================================================
-# 🔄 FAVOURITES SYNC (Integrated)
-# ============================================================
-def get_favourites_with_colours():
-    """Fetch all favourites and their colour/comment/visibility."""
+from pathlib import Path
+import sqlite3
+
+# Path to shared favourites database
+DB_PATH = Path(__file__).parent / "favourites.db"
+
+def get_favourites_with_colours_live():
+    """Fetch all favourites with their colour/comment/visibility."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("SELECT player, colour, comment, visible FROM favourites")
         rows = c.fetchall()
     except sqlite3.OperationalError:
-        rows = []  # handle case if columns not yet added
+        rows = []
     conn.close()
     return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
-    """Add or update a favourite record (compatible with all SQLite versions)."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # First, check if the player already exists
-    c.execute("SELECT player FROM favourites WHERE player=?", (player,))
-    exists = c.fetchone()
-
-    if exists:
-        # Update existing record
-        c.execute("""
-            UPDATE favourites
-            SET team=?, league=?, position=?, colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
-            WHERE player=?
-        """, (team, league, position, colour, comment, visible, player))
-    else:
-        # Insert new record
-        c.execute("""
-            INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (player, team, league, position, colour, comment, visible))
-
-    conn.commit()
-    conn.close()
-
-def hide_favourite(player):
-    """Soft-remove favourite (visible = 0 instead of delete)."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
-
-# ============================================================
-# 🟢 LOAD FAVOURITES AND APPLY COLOURS
-# ============================================================
-favs = get_favourites_with_colours_live()
-
-# Map all shapes of the four statuses to their emoji
+# Colour emoji map
 COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
@@ -1530,13 +1494,12 @@ COLOUR_EMOJI = {
     "🔴": "🔴",
 }
 
-def colourize_player_name(name: str) -> str:
-    """Attach the correct emoji to the player name, even if hidden."""
-    data = favs.get(name)
+def colourize_player_name(name: str, favs_dict: dict) -> str:
+    """Attach the correct emoji to the player name based on their status."""
+    data = favs_dict.get(name)
     if not data:
         return name
-    colour = str(data.get("colour", "")).strip()
-    emoji = COLOUR_EMOJI.get(colour, "")
+    emoji = COLOUR_EMOJI.get(str(data.get("colour", "")).strip(), "")
     return f"{emoji} {name}" if emoji else name
 
 # ============================================================
