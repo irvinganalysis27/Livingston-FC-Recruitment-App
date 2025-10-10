@@ -104,8 +104,20 @@ def restore_if_empty():
             return
 
         df = pd.DataFrame(rows)
-        keep_cols = ["player", "team", "league", "position", "colour", "comment"]
-        df = df.rename(columns=str.lower)[keep_cols]
+
+        # --- Normalise column names (accepts 'Rating' or 'Colour') ---
+        df.columns = (
+            df.columns.str.strip()
+            .str.lower()
+            .str.replace("rating", "colour")
+        )
+
+        expected_cols = ["player", "team", "league", "position", "colour", "comment"]
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = ""
+
+        df = df[expected_cols].copy()
         df["visible"] = 1
         df["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -114,6 +126,7 @@ def restore_if_empty():
         conn.close()
 
         st.success(f"✅ Restored {len(df)} favourites from Google Sheet")
+
     except Exception as e:
         st.error(f"❌ Restore failed: {e}")
 
