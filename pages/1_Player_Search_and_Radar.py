@@ -12,6 +12,7 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 from supabase import create_client
+from lib.favourites_repo import append_to_google_sheet
 
 # ============================================================
 # 🌐 Supabase Favourites Connection
