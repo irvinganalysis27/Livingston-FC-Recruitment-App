@@ -542,43 +542,64 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Competition_norm"] = np.nan
 
     # ============================================================
-    # ⚖️ 2. Merge League Multipliers (by Competition ID or Name)
+    # ⚖️ 2. Merge League Multipliers (by Competition_norm or ID)
     # ============================================================
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         m = pd.read_excel(multipliers_path)
 
-        # normalise only the *multiplier* frame; leave df's columns untouched
         m = m.copy()
-        m.columns = m.columns.str.strip().str.lower()
+        m.columns = m.columns.str.strip().str.lower()  # -> ['league', 'multiplier']
 
-        # find columns in df case-insensitively
         lookup = {c.lower(): c for c in df.columns}
         cid_col = next((lookup.get(n) for n in ["competition_id", "competition id", "competitionid"] if lookup.get(n)), None)
         comp_col = lookup.get("competition")
 
         merged = False
+        merge_key = None
+        right_key = None
+        source = None
+
         if cid_col and "competition_id" in m.columns:
-            df = df.merge(m, left_on=cid_col, right_on="competition_id", how="left")
-            print(f"[DEBUG] ✅ Merged multipliers by ID column '{cid_col}'")
-            merged = True
+            merge_key = cid_col
+            right_key = "competition_id"
+            source = "Competition ID"
+        elif "Competition_norm" in df.columns and "league" in m.columns:
+            merge_key = "Competition_norm"
+            right_key = "league"
+            source = "Competition_norm"
         elif comp_col and "league" in m.columns:
-            df = df.merge(m, left_on=comp_col, right_on="league", how="left")
-            print("[DEBUG] ⚠️ Fallback merge on competition name")
+            merge_key = comp_col
+            right_key = "league"
+            source = "Competition"
+        else:
+            source = None
+
+        if merge_key:
+            df = df.merge(m, left_on=merge_key, right_on=right_key, how="left")
+            print(f"[DEBUG] ✅ Merged league multipliers using {source}")
             merged = True
         else:
-            print("[DEBUG] ⚠️ No suitable key to merge multipliers; defaulting to 1.0")
+            print("[DEBUG] ⚠️ No suitable key found to merge league multipliers; using 1.0 for all.")
 
-        # standardise the output column name that the rest of the app expects
+        # Assign multiplier safely
         df["Multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce").fillna(1.0)
-        # keep lowercase 'multiplier' too if it already exists; otherwise it's fine if it's missing
 
-        # debug
-        comp_col_for_debug = comp_col or "Competition"
+        # --- Debug printout for visibility ---
         print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
-        if merged and comp_col_for_debug in df.columns:
-            unmatched = df.loc[df["Multiplier"].eq(1.0) & df[comp_col_for_debug].notna(), comp_col_for_debug].unique()
-            print("[DEBUG] Competitions missing multipliers (showing first 20):", unmatched[:20])
+        if merged:
+            sample = (
+                df[["Competition_norm", "Multiplier"]]
+                .drop_duplicates()
+                .sort_values("Competition_norm")
+                .head(15)
+            )
+            print("[DEBUG] Sample multiplier matches:")
+            print(sample.to_string(index=False))
+
+            unmatched = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique()
+            if len(unmatched) > 0:
+                print("[DEBUG] ⚠️ Competitions missing multipliers (first 10):", unmatched[:10])
 
     except Exception as e:
         print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
