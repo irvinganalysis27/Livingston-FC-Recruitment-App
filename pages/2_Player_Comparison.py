@@ -584,12 +584,23 @@ df = df_all.copy()
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 df[league_col] = df[league_col].astype(str).str.strip()
+
+# Collect all available leagues from the dataset
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
 st.markdown("#### Choose league(s)")
-if "league_selection" not in st.session_state:
-    st.session_state.league_selection = all_leagues.copy()
 
+# --- Ensure session state defaults are valid ---
+if "league_selection" not in st.session_state:
+    # Initialise with all leagues selected
+    st.session_state.league_selection = all_leagues.copy()
+else:
+    # Remove any invalid or outdated leagues from the session state
+    st.session_state.league_selection = [
+        l for l in st.session_state.league_selection if l in all_leagues
+    ]
+
+# --- Buttons for quick select/clear ---
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all"):
@@ -598,6 +609,7 @@ with b2:
     if st.button("Clear all"):
         st.session_state.league_selection = []
 
+# --- Multiselect control ---
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
@@ -606,6 +618,7 @@ selected_leagues = st.multiselect(
     label_visibility="collapsed"
 )
 
+# --- Apply filter or stop if empty ---
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
@@ -613,6 +626,7 @@ if selected_leagues:
         st.warning("No players match these leagues.")
         st.stop()
 else:
+    st.warning("Please select at least one league.")
     st.stop()
 
 # ---------- Minutes + Age filters ----------
