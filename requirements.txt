@@ -5,3 +5,4 @@ numpy
 openpyxl
 gspread
 google-auth
+supabase>=2.5.0
