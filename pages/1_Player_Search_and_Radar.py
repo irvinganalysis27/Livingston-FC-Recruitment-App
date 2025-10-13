@@ -212,6 +212,8 @@ LEAGUE_SYNONYMS = {
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
+    "Denmark 1. Division": "Denmark 1st Division",
+    "Slovenia 1. SNL": "Slovenia 1. Liga",
 
     # --- Tunisia fixes ---
     "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
