@@ -47,6 +47,7 @@ def add_to_supabase_favourites(player, team, league, position, colour="🟡 Moni
     try:
         sb.table(TABLE).upsert(payload, on_conflict="player").execute()
         st.toast(f"⭐ {player} added to favourites", icon="⭐")
+        append_to_google_sheet(payload)
     except Exception as e:
         st.error(f"❌ Supabase save failed: {e}")
 
@@ -1558,6 +1559,7 @@ else:
         try:
             sb.table(TABLE).upsert(payload, on_conflict="player").execute()
             st.toast(f"⭐ {player_name} added to favourites", icon="⭐")
+            append_to_google_sheet(payload)
         except Exception as e:
             st.error(f"❌ Supabase insert failed for {player_name}: {e}")
 
@@ -1573,3 +1575,9 @@ else:
             print(f"[DEBUG] Hid player {player_name}")
         except Exception as e:
             st.error(f"❌ Failed to hide {player_name}: {e}")
+            append_to_google_sheet({
+    "player": player_name,
+    "visible": False,
+    "updated_at": datetime.utcnow().isoformat(),
+    "source": "radar-page-hide",
+})
