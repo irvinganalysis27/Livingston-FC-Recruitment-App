@@ -1,6 +1,38 @@
 from datetime import datetime
 import streamlit as st
 from supabase import create_client
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+def append_to_google_sheet(record):
+    """Append a new favourite or update to the Google Sheet log."""
+    try:
+        # Load credentials from Streamlit secrets
+        creds_info = st.secrets["gcp_service_account"]
+        creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+
+        gc = gspread.authorize(creds)
+        sheet = gc.open("Livingston_Favourites_Log").worksheet("favourites_log")
+
+        # Build row to append
+        row = [
+            datetime.utcnow().isoformat(),
+            record.get("player", ""),
+            record.get("team", ""),
+            record.get("league", ""),
+            record.get("position", ""),
+            record.get("colour", ""),
+            record.get("comment", ""),
+            record.get("visible", True),
+            record.get("updated_by", "auto"),
+            record.get("source", "radar-page"),
+        ]
+
+        sheet.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOG] Added record for {record.get('player')}")
+    except Exception as e:
+        print(f"[ERROR] Failed to write to Google Sheet: {e}")
 
 @st.cache_resource(show_spinner=False)
 def get_supabase():
