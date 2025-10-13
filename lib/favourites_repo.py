@@ -1,32 +1,23 @@
-from typing import Dict, Any, List, Optional
-from .supabase_client import get_supabase
+from datetime import datetime
+import streamlit as st
+from supabase import create_client
 
+@st.cache_resource(show_spinner=False)
+def get_supabase():
+    try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["service_key"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"Supabase init failed: {e}")
+        return None
+
+sb = get_supabase()
 TABLE = "favourites"
 
-def list_favourites(only_visible: bool = False) -> List[Dict[str, Any]]:
-    sb = get_supabase()
-    q = sb.table(TABLE).select("*")
-    if only_visible:
-        q = q.eq("visible", True)
-    res = q.execute()
-    return res.data or []
-
-def get_favourites_map() -> Dict[str, Dict[str, Any]]:
-    rows = list_favourites(only_visible=False)
-    return {r["player"]: r for r in rows}
-
-def upsert_favourite(
-    player: str,
-    team: str = "",
-    league: str = "",
-    position: str = "",
-    colour: str = "",
-    comment: str = "",
-    visible: bool = True,
-    updated_by: Optional[str] = None,
-    source: Optional[str] = "dev"
-) -> None:
-    sb = get_supabase()
+def upsert_favourite(player, team, league, position, colour="", comment="", visible=True, updated_by=None, source="app"):
+    if not sb:
+        return False
     payload = {
         "player": player,
         "team": team,
@@ -34,16 +25,36 @@ def upsert_favourite(
         "position": position,
         "colour": colour,
         "comment": comment,
-        "visible": visible,
-        "updated_by": updated_by,
+        "visible": bool(visible),
+        "updated_at": datetime.utcnow().isoformat(),
+        "updated_by": updated_by or "",
         "source": source,
     }
-    sb.table(TABLE).upsert(payload, on_conflict="player").execute()
+    try:
+        sb.table(TABLE).upsert(payload, on_conflict="player").execute()
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to save favourite {player}: {e}")
+        return False
 
-def set_visible(player: str, visible: bool) -> None:
-    sb = get_supabase()
-    sb.table(TABLE).update({"visible": visible}).eq("player", player).execute()
+def list_favourites(only_visible=True):
+    if not sb:
+        return []
+    q = sb.table(TABLE).select("*").order("player", desc=False)
+    if only_visible:
+        q = q.eq("visible", True)
+    try:
+        return q.execute().data or []
+    except Exception as e:
+        print(f"[ERROR] list_favourites failed: {e}")
+        return []
 
-def delete_favourite(player: str) -> None:
-    sb = get_supabase()
-    sb.table(TABLE).delete().eq("player", player).execute()
+def delete_favourite(player):
+    if not sb:
+        return False
+    try:
+        sb.table(TABLE).delete().eq("player", player).execute()
+        return True
+    except Exception as e:
+        print(f"[ERROR] delete_favourite failed: {e}")
+        return False
