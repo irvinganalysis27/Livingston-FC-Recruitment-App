@@ -542,51 +542,40 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Competition_norm"] = np.nan
 
     # ============================================================
-    # ⚖️ 2. Merge League Multipliers (by Competition_norm or ID)
+    # ⚖️ 2. Merge League Multipliers (using Competition_ID first)
     # ============================================================
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         m = pd.read_excel(multipliers_path)
 
-        m = m.copy()
-        m.columns = m.columns.str.strip().str.lower()  # -> ['league', 'multiplier']
-
-        lookup = {c.lower(): c for c in df.columns}
-        cid_col = next((lookup.get(n) for n in ["competition_id", "competition id", "competitionid"] if lookup.get(n)), None)
-        comp_col = lookup.get("competition")
+        # Normalise Excel headers
+        m.columns = m.columns.str.strip().str.lower()  # -> competition_id, league, multiplier
+        df.columns = df.columns.str.strip()  # ensure consistency
 
         merged = False
-        merge_key = None
-        right_key = None
-        source = None
 
-        if cid_col and "competition_id" in m.columns:
-            merge_key = cid_col
-            right_key = "competition_id"
-            source = "Competition ID"
+        if "competition_id" in df.columns and "competition_id" in m.columns:
+            df = df.merge(m, on="competition_id", how="left")
+            print("[DEBUG] ✅ Merged league multipliers using Competition_ID")
+            merged = True
         elif "Competition_norm" in df.columns and "league" in m.columns:
-            merge_key = "Competition_norm"
-            right_key = "league"
-            source = "Competition_norm"
-        elif comp_col and "league" in m.columns:
-            merge_key = comp_col
-            right_key = "league"
-            source = "Competition"
-        else:
-            source = None
-
-        if merge_key:
-            df = df.merge(m, left_on=merge_key, right_on=right_key, how="left")
-            print(f"[DEBUG] ✅ Merged league multipliers using {source}")
+            df = df.merge(m, left_on="Competition_norm", right_on="league", how="left")
+            print("[DEBUG] ✅ Merged league multipliers using Competition_norm")
+            merged = True
+        elif "Competition" in df.columns and "league" in m.columns:
+            df = df.merge(m, left_on="Competition", right_on="league", how="left")
+            print("[DEBUG] ⚠️ Fallback merge on raw Competition name")
             merged = True
         else:
-            print("[DEBUG] ⚠️ No suitable key found to merge league multipliers; using 1.0 for all.")
+            print("[DEBUG] ⚠️ No matching key found for league multipliers; using 1.0 for all.")
+            df["multiplier"] = 1.0
 
-        # Assign multiplier safely
+        # Safely assign numeric multiplier
         df["Multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce").fillna(1.0)
 
-        # --- Debug printout for visibility ---
+        # Debug output
         print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
+
         if merged:
             sample = (
                 df[["Competition_norm", "Multiplier"]]
@@ -602,7 +591,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 print("[DEBUG] ⚠️ Competitions missing multipliers (first 10):", unmatched[:10])
 
     except Exception as e:
-        print(f"[DEBUG] ⚠️ Failed to merge multipliers: {e}")
+        print(f"[DEBUG] ⚠️ Failed to merge league multipliers: {e}")
         df["Multiplier"] = 1.0
 
     # ============================================================
