@@ -12,45 +12,7 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 from supabase import create_client
-from lib.favourites_repo import append_to_google_sheet
-
-# ============================================================
-# 🌐 Supabase Favourites Connection
-# ============================================================
-@st.cache_resource(show_spinner=False)
-def get_supabase():
-    try:
-        url = st.secrets["supabase"]["url"]
-        key = st.secrets["supabase"]["service_key"]
-        return create_client(url, key)
-    except Exception as e:
-        st.error(f"❌ Failed to connect to Supabase: {e}")
-        return None
-
-sb = get_supabase()
-TABLE = "favourites"
-
-def add_to_supabase_favourites(player, team, league, position, colour="🟡 Monitor", comment="", visible=True):
-    if not sb:
-        st.warning("⚠️ Supabase not connected, skipping favourite save.")
-        return
-    payload = {
-        "player": player,
-        "team": team,
-        "league": league,
-        "position": position,
-        "colour": colour,
-        "comment": comment,
-        "visible": visible,
-        "updated_at": datetime.utcnow().isoformat(),
-        "source": "radar-page",
-    }
-    try:
-        sb.table(TABLE).upsert(payload, on_conflict="player").execute()
-        st.toast(f"⭐ {player} added to favourites", icon="⭐")
-        append_to_google_sheet(payload)
-    except Exception as e:
-        st.error(f"❌ Supabase save failed: {e}")
+from lib.favourites_repo import upsert_favourite, hide_favourite
 
 # --- Password protection ---
 from auth import check_password
@@ -1418,23 +1380,13 @@ z_ranking.index.name = "Row"
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
 # ============================================================
-from supabase import create_client
-
-# --- Connect to Supabase ---
-@st.cache_resource(show_spinner=False)
-def get_supabase():
-    try:
-        url = st.secrets["supabase"]["url"]
-        key = st.secrets["supabase"]["service_key"]
-        return create_client(url, key)
-    except Exception as e:
-        st.error(f"❌ Failed to connect to Supabase: {e}")
-        return None
-
-sb = get_supabase()
-TABLE = "favourites"
 
 # --- Load current favourites ---
+from lib.favourites_repo import get_supabase_client
+
+sb = get_supabase_client()
+TABLE = "favourites"
+
 @st.cache_data(ttl=5, show_spinner=False)
 def get_favourites_with_colours_live():
     """Fetch favourites (shared cloud data)."""
@@ -1558,11 +1510,9 @@ else:
             "source": "radar-page",
         }
         try:
-            sb.table(TABLE).upsert(payload, on_conflict="player").execute()
-            st.toast(f"⭐ {player_name} added to favourites", icon="⭐")
-            append_to_google_sheet(payload)
+            upsert_favourite(payload)
         except Exception as e:
-            st.error(f"❌ Supabase insert failed for {player_name}: {e}")
+            st.error(f"❌ Failed to save favourite for {player_name}: {e}")
 
     # --- Hide players unstarred ---
     non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
@@ -1570,15 +1520,6 @@ else:
         player_raw = str(row.get("Player (coloured)", "")).strip()
         player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
         try:
-            sb.table(TABLE).update(
-                {"visible": False, "updated_at": datetime.utcnow().isoformat()}
-            ).eq("player", player_name).execute()
-            print(f"[DEBUG] Hid player {player_name}")
+            hide_favourite(player_name)
         except Exception as e:
             st.error(f"❌ Failed to hide {player_name}: {e}")
-            append_to_google_sheet({
-    "player": player_name,
-    "visible": False,
-    "updated_at": datetime.utcnow().isoformat(),
-    "source": "radar-page-hide",
-})
