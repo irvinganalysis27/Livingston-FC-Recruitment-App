@@ -571,12 +571,12 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df["multiplier"] = 1.0
 
         # Safely assign numeric multiplier
-if "multiplier" in df.columns:
-    df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-elif "Multiplier" in df.columns:
-    df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-else:
-    df["Multiplier"] = 1.0
+        if "multiplier" in df.columns:
+            df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
+        elif "Multiplier" in df.columns:
+            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
+        else:
+            df["Multiplier"] = 1.0
 
         # Debug output
         print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
