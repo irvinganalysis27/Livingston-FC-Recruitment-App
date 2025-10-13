@@ -11,108 +11,44 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+from supabase import create_client
 
 # ============================================================
-# 🧱 Favourites Database — Safe Schema Guarantee
+# 🌐 Supabase Favourites Connection
 # ============================================================
-import sqlite3
-from pathlib import Path
-
-# Path to the database file (stored in the same folder as this page)
-DB_PATH = Path(__file__).parent / "favourites.db"
-
-def ensure_favourites_table():
-    """Ensure the favourites table exists and matches the correct schema."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # --- Create the table if it doesn't exist ---
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            colour TEXT DEFAULT '',
-            comment TEXT DEFAULT '',
-            visible INTEGER DEFAULT 1,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # --- Check existing columns and add any missing ones ---
-    existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    expected_cols = {
-        "player": "TEXT",
-        "team": "TEXT",
-        "league": "TEXT",
-        "position": "TEXT",
-        "colour": "TEXT DEFAULT ''",
-        "comment": "TEXT DEFAULT ''",
-        "visible": "INTEGER DEFAULT 1",
-        "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
-    }
-
-    for col, dtype in expected_cols.items():
-        if col not in existing_cols:
-            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
-
-    conn.commit()
-    conn.close()
-
-# --- Run automatically on page load ---
-ensure_favourites_table()
-
-# ============================================================
-# ⚙️ Favourites Helper Functions
-# ============================================================
-def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
-    """Insert or update a favourite record."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(player) DO UPDATE SET
-            team=excluded.team,
-            league=excluded.league,
-            position=excluded.position,
-            colour=excluded.colour,
-            comment=excluded.comment,
-            visible=excluded.visible,
-            timestamp=CURRENT_TIMESTAMP
-    """, (player, team, league, position, colour, comment, visible))
-    conn.commit()
-    conn.close()
-
-@st.cache_data(ttl=2, show_spinner=False)
-def get_favourites_with_colours_live():
-    """Return dict of favourites and their attributes."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+@st.cache_resource(show_spinner=False)
+def get_supabase():
     try:
-        c.execute("SELECT player, colour, comment, visible FROM favourites")
-        rows = c.fetchall()
-    except sqlite3.OperationalError:
-        rows = []
-    conn.close()
-    return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["service_key"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"❌ Failed to connect to Supabase: {e}")
+        return None
 
-def remove_favourite(player):
-    """Hard delete a favourite."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("DELETE FROM favourites WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
+sb = get_supabase()
+TABLE = "favourites"
 
-def hide_favourite(player):
-    """Soft hide favourite."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
+def add_to_supabase_favourites(player, team, league, position, colour="🟡 Monitor", comment="", visible=True):
+    if not sb:
+        st.warning("⚠️ Supabase not connected, skipping favourite save.")
+        return
+    payload = {
+        "player": player,
+        "team": team,
+        "league": league,
+        "position": position,
+        "colour": colour,
+        "comment": comment,
+        "visible": visible,
+        "updated_at": datetime.utcnow().isoformat(),
+        "source": "radar-page",
+    }
+    try:
+        sb.table(TABLE).upsert(payload, on_conflict="player").execute()
+        st.toast(f"⭐ {player} added to favourites", icon="⭐")
+    except Exception as e:
+        st.error(f"❌ Supabase save failed: {e}")
 
 # --- Password protection ---
 from auth import check_password
@@ -1477,32 +1413,52 @@ z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
-from pathlib import Path
-import sqlite3
-
 # ============================================================
-# 🟢 LOAD FAVOURITES AND APPLY COLOURS
+# 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
 # ============================================================
-DB_PATH = Path(__file__).parent / "favourites.db"
+from supabase import create_client
 
-def get_favourites_with_colours_live():
-    """Fetch all favourites with their colour/comment/visibility."""
-    if not DB_PATH.exists():
-        return {}
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+# --- Connect to Supabase ---
+@st.cache_resource(show_spinner=False)
+def get_supabase():
     try:
-        c.execute("SELECT player, colour, comment, visible FROM favourites")
-        rows = c.fetchall()
-    except Exception:
-        rows = []
-    conn.close()
-    return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["service_key"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"❌ Failed to connect to Supabase: {e}")
+        return None
 
-# ✅ Create global favourites dictionary before use
+sb = get_supabase()
+TABLE = "favourites"
+
+# --- Load current favourites ---
+@st.cache_data(ttl=5, show_spinner=False)
+def get_favourites_with_colours_live():
+    """Fetch favourites (shared cloud data)."""
+    if not sb:
+        return {}
+    try:
+        res = sb.table(TABLE).select("*").execute()
+        if not res.data:
+            return {}
+        return {
+            r["player"]: {
+                "colour": r.get("colour", ""),
+                "comment": r.get("comment", ""),
+                "visible": r.get("visible", True),
+            }
+            for r in res.data
+            if r.get("player")
+        }
+    except Exception as e:
+        st.warning(f"⚠️ Could not load favourites: {e}")
+        return {}
+
+# --- Build local dictionary for colouring ---
 favs = get_favourites_with_colours_live()
 
-# Colour emoji map
+# --- Colour emoji map ---
 COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
@@ -1519,7 +1475,7 @@ COLOUR_EMOJI = {
 }
 
 def colourize_player_name(name: str, favs_dict: dict) -> str:
-    """Attach the correct emoji to the player name based on their status."""
+    """Attach correct emoji to player name."""
     data = favs_dict.get(name)
     if not data:
         return name
@@ -1531,7 +1487,7 @@ def colourize_player_name(name: str, favs_dict: dict) -> str:
 # ============================================================
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(lambda n: colourize_player_name(n, favs))
 z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
-    lambda n: bool(favs.get(n, {}).get("visible", 0))
+    lambda n: bool(favs.get(n, {}).get("visible", False))
 )
 
 required_cols = [
@@ -1541,7 +1497,6 @@ required_cols = [
 for col in required_cols:
     if col not in z_ranking.columns:
         z_ranking[col] = np.nan
-
 z_ranking = z_ranking[required_cols]
 
 # ============================================================
@@ -1552,11 +1507,11 @@ edited_df = st.data_editor(
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player",
-            help="Shows Favourites colour (🟢🟡🔴🟣 only if marked)"
+            help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
             "⭐ Favourite",
-            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
+            help="Mark or unmark as favourite (shared to Supabase)"
         ),
         "Multiplier": st.column_config.NumberColumn(
             "League Weight",
@@ -1566,13 +1521,12 @@ edited_df = st.data_editor(
     },
     hide_index=False,
     width="stretch",
-    key=f"ranking_editor_{selected_position_template}",  # ✅ unique key avoids all duplication
+    key=f"ranking_editor_{selected_position_template}",
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db  (fully corrected version)
+# 💾 APPLY CHANGES TO SUPABASE
 # ============================================================
-# 1️⃣ Only process rows where the star is ticked
 if "⭐ Favourite" not in edited_df.columns:
     st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
 else:
@@ -1582,51 +1536,40 @@ else:
     for _, row in favourite_rows.iterrows():
         player_raw = str(row.get("Player (coloured)", "")).strip()
         player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
-
         team = row.get("Team", "")
         league = row.get("League", "")
         position = row.get("Positions played", "")
 
-        current_data = favs.get(player_name, {})
-        colour = current_data.get("colour", "")
-        comment = current_data.get("comment", "")
-        visible = 1  # always visible if starred
+        # Default to 🟡 Monitor if not set
+        colour = favs.get(player_name, {}).get("colour", "🟡 Monitor")
+        comment = favs.get(player_name, {}).get("comment", "")
 
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
-        exists = c.fetchone() is not None
+        payload = {
+            "player": player_name,
+            "team": team,
+            "league": league,
+            "position": position,
+            "colour": colour,
+            "comment": comment,
+            "visible": True,
+            "updated_at": datetime.utcnow().isoformat(),
+            "source": "radar-page",
+        }
+        try:
+            sb.table(TABLE).upsert(payload, on_conflict="player").execute()
+            st.toast(f"⭐ {player_name} added to favourites", icon="⭐")
+        except Exception as e:
+            st.error(f"❌ Supabase insert failed for {player_name}: {e}")
 
-        if exists:
-            c.execute("""
-                UPDATE favourites
-                SET team=?, league=?, position=?, colour=?, comment=?, visible=1, timestamp=CURRENT_TIMESTAMP
-                WHERE player=?
-            """, (team, league, position, colour, comment, player_name))
-        else:
-            c.execute("""
-                INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-            """, (player_name, team, league, position, colour, comment))
-
-        conn.commit()
-        conn.close()
-
-    # 2️⃣ Hide any players whose star was unticked
-    if "⭐ Favourite" in edited_df.columns:
-        non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
-        if not non_fav_rows.empty:
-            non_fav_names = non_fav_rows["Player (coloured)"].apply(
-                lambda n: re.sub(r"^[🟢🟡🔴🟣]\s*", "", str(n)).strip()
-            ).tolist()
-
-            print(f"[DEBUG] Hiding {len(non_fav_names)} non-favourites")
-
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.executemany(
-                "UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?",
-                [(n,) for n in non_fav_names]
-            )
-            conn.commit()
-            conn.close()
+    # --- Hide players unstarred ---
+    non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
+    for _, row in non_fav_rows.iterrows():
+        player_raw = str(row.get("Player (coloured)", "")).strip()
+        player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+        try:
+            sb.table(TABLE).update(
+                {"visible": False, "updated_at": datetime.utcnow().isoformat()}
+            ).eq("player", player_name).execute()
+            print(f"[DEBUG] Hid player {player_name}")
+        except Exception as e:
+            st.error(f"❌ Failed to hide {player_name}: {e}")
