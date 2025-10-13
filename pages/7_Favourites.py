@@ -1,240 +1,99 @@
+# pages/3_Favourites.py  (DEV app)
 import streamlit as st
-import sqlite3
 import pandas as pd
-from pathlib import Path
+from lib.favourites_repo import list_favourites, upsert_favourite, set_visible, delete_favourite
 from datetime import datetime
-from auth import check_password
-from branding import show_branding
 import gspread
 from google.oauth2.service_account import Credentials
-import os
-from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "favourites.db"
+st.title("⭐ Watch List (DEV)")
 
-# ============================================================
-# 🔒 Password protection
-# ============================================================
-if not check_password():
-    st.stop()
+# --- Load existing
+rows = list_favourites(only_visible=False)
+df = pd.DataFrame(rows)
 
-show_branding()
-st.title("⭐ Watch List")
-
-# Link to shared Google Sheet
-SHEET_LINK = "https://docs.google.com/spreadsheets/d/16oweZkbqNst16U5lQshnYjwjWiuCmd8ClZfPyAtoE0o/edit?usp=sharing"
-st.markdown(f"📊 [**Open Livingston Favourites Google Sheet**]({SHEET_LINK})")
-
-DB_PATH = Path(__file__).parent / "favourites.db"
-
-# ============================================================
-# 🧱 Database init
-# ============================================================
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            colour TEXT DEFAULT '',
-            comment TEXT DEFAULT '',
-            visible INTEGER DEFAULT 1,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ============================================================
-# 📄 Google Sheets connection
-# ============================================================
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-def init_sheet():
-    try:
-        creds = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
-            scopes=SCOPES
-        )
-        client = gspread.authorize(creds)
-        return client.open("Livingston_Favourites_Log").sheet1
-    except Exception as e:
-        st.error(f"❌ Failed to connect to Google Sheets: {e}")
-        return None
-
-def log_to_sheet(player, team, league, position, colour, comment, action="Updated"):
-    sheet = init_sheet()
-    if not sheet:
-        st.warning("⚠️ Skipped logging because sheet connection failed.")
-        return
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    try:
-        sheet.append_row([player, team, league, position, colour, comment, action, now])
-    except Exception as e:
-        st.error(f"❌ Failed to log {player}: {e}")
-
-# ============================================================
-# 🧩 Auto-restore from Google Sheet if local DB is empty
-# ============================================================
-def restore_if_empty():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    count = c.execute("SELECT COUNT(*) FROM favourites").fetchone()[0]
-    conn.close()
-
-    if count > 0:
-        return
-
-    st.warning("📥 Local database empty, restoring from Google Sheet…")
-    sheet = init_sheet()
-    if not sheet:
-        st.error("❌ Could not connect to Google Sheet for restore.")
-        return
-
-    try:
-        rows = sheet.get_all_records()
-        if not rows:
-            st.info("Google Sheet is empty, nothing to restore.")
-            return
-
-        df = pd.DataFrame(rows)
-
-        # --- Normalise column names (accepts 'Rating' or 'Colour') ---
-        df.columns = (
-            df.columns.str.strip()
-            .str.lower()
-            .str.replace("rating", "colour")
-        )
-
-        expected_cols = ["player", "team", "league", "position", "colour", "comment"]
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = ""
-
-        df = df[expected_cols].copy()
-        df["visible"] = 1
-        df["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        conn = sqlite3.connect(DB_PATH)
-        df.to_sql("favourites", conn, if_exists="replace", index=False)
-        conn.close()
-
-        st.success(f"✅ Restored {len(df)} favourites from Google Sheet")
-
-    except Exception as e:
-        st.error(f"❌ Restore failed: {e}")
-
-restore_if_empty()
-
-# ============================================================
-# ⚙️ Database operations
-# ============================================================
-def get_favourites(show_hidden=False):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    query = "SELECT player, team, league, position, colour, comment, visible, timestamp FROM favourites"
-    if not show_hidden:
-        query += " WHERE visible=1"
-    query += " ORDER BY timestamp DESC"
-    rows = c.execute(query).fetchall()
-    conn.close()
-    return rows
-
-def update_favourite(player, colour, comment, visible):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        UPDATE favourites
-        SET colour=?, comment=?, visible=?, timestamp=CURRENT_TIMESTAMP
-        WHERE player=?
-    """, (colour, comment, visible, player))
-    conn.commit()
-    conn.close()
-
-def delete_favourite(player):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("DELETE FROM favourites WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
-
-# ============================================================
-# 🧠 Page layout
-# ============================================================
-show_hidden = st.checkbox("Show hidden players", value=False)
-rows = get_favourites(show_hidden)
-
-if not rows:
-    st.info("No favourites saved yet.")
-    st.stop()
-
-st.markdown("""
-**How to use this list:**
-- 🟢 **Choose Colour:** set a status for each player.  
-- 💬 **Write Comment:** add your initials and scouting notes.  
-- 👁️ **Deselect "Visible":** to hide completed players.  
-- 🗑️ **Added a player by accident?** Tick **Remove** to delete completely.  
-""")
-
-df = pd.DataFrame(rows, columns=["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Timestamp"])
-df["Remove"] = False
-
-colour_options = ["🟣 Needs Checked", "🟡 Monitor", "🟢 Go", "🔴 No Further Interest"]
-
-st.markdown("### ✏️ Edit, Hide, or Remove Favourites")
-
-edited_df = st.data_editor(
-    df[["Player", "Team", "League", "Position", "Colour", "Comment", "Visible", "Remove"]],
-    column_config={
-        "Colour": st.column_config.SelectboxColumn("Colour", options=colour_options),
-        "Comment": st.column_config.TextColumn("Comment"),
-        "Visible": st.column_config.CheckboxColumn("Visible"),
-        "Remove": st.column_config.CheckboxColumn("🗑️ Remove"),
-    },
-    hide_index=True,
-    width="stretch",
-)
-
-# ============================================================
-# 💾 Apply updates
-# ============================================================
-removed_players, logged_changes = [], 0
-
-for _, row in edited_df.iterrows():
-    player = row["Player"]
-    colour = row.get("Colour", "")
-    comment = row.get("Comment", "")
-    visible = int(row.get("Visible", True))
-    remove_flag = bool(row.get("Remove", False))
-
-    prev = df.loc[df["Player"] == player].iloc[0]
-    changed = (
-        (colour != prev["Colour"]) or
-        (comment != prev["Comment"]) or
-        (int(prev["Visible"]) != visible)
+# --- Left: current list
+st.subheader("Current")
+if df.empty:
+    st.info("No favourites yet.")
+else:
+    st.dataframe(
+        df[["player","team","league","position","colour","comment","visible","updated_at"]]
+        .sort_values(["visible","player"], ascending=[False, True]),
+        use_container_width=True
     )
 
-    if remove_flag:
-        delete_favourite(player)
-        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, "Removed")
-        st.write(f"🗑️ Removed {player}")
-        removed_players.append(player)
-        st.rerun()
+# --- Right: editor
+st.subheader("Add / Edit")
+with st.form("fav_form", clear_on_submit=False):
+    player = st.text_input("Player*", "")
+    team = st.text_input("Team", "")
+    league = st.text_input("League", "")
+    position = st.text_input("Position", "")
+    colour = st.selectbox("Status / Colour", ["", "🟢 Go", "🟡 Monitor", "🟣 Needs Checked", "🔴 No Further Interest"])
+    comment = st.text_area("Comment", "")
+    visible = st.checkbox("Visible", value=True)
+    updated_by = st.text_input("Your initials (optional)", "")
 
-    update_favourite(player, colour, comment, visible)
+    submitted = st.form_submit_button("💾 Save Changes")
+    if submitted:
+        if not player.strip():
+            st.error("Player name is required.")
+        else:
+            upsert_favourite(
+                player=player.strip(),
+                team=team.strip(),
+                league=league.strip(),
+                position=position.strip(),
+                colour=colour.strip(),
+                comment=comment.strip(),
+                visible=visible,
+                updated_by=updated_by.strip() or None,
+                source="dev"
+            )
+            st.success(f"Saved '{player}'.")
+            st.rerun()
 
-    if changed:
-        action = "Hidden" if visible == 0 else "Updated"
-        st.write(f"🟨 Change detected for {player}: {action}")
-        log_to_sheet(player, row["Team"], row["League"], row["Position"], colour, comment, action)
-        logged_changes += 1
+# --- Quick actions
+st.subheader("Quick Actions")
+col1, col2, col3 = st.columns(3)
+with col1:
+    name_hide = st.text_input("Hide player", key="hide_name")
+    if st.button("Hide", type="secondary"):
+        if name_hide.strip():
+            set_visible(name_hide.strip(), False)
+            st.rerun()
+with col2:
+    name_show = st.text_input("Show player", key="show_name")
+    if st.button("Show", type="secondary"):
+        if name_show.strip():
+            set_visible(name_show.strip(), True)
+            st.rerun()
+with col3:
+    name_del = st.text_input("Delete player", key="delete_name")
+    if st.button("Delete", type="primary"):
+        if name_del.strip():
+            delete_favourite(name_del.strip())
+            st.rerun()
 
-st.info(f"Logged {logged_changes} change(s). Removed {len(removed_players)} player(s).")
+# --- Google Sheet log (optional; runs on save)
+def append_log_to_sheet(entry: dict):
+    try:
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"],
+                    scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(st.secrets.get("SHEET_ID", ""))  # put your Sheet ID in secrets if you want
+        ws = sh.worksheet("favourites_log")  # create if missing
+        ws.append_row([
+            entry.get("player",""),
+            entry.get("league",""),
+            entry.get("team",""),
+            entry.get("position",""),
+            entry.get("colour",""),
+            entry.get("comment",""),
+            entry.get("visible", True),
+            entry.get("updated_by",""),
+            datetime.utcnow().isoformat(timespec="seconds")+"Z",
+        ])
+    except Exception as e:
+        st.caption(f"Log to Sheet skipped: {e}")
