@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 import time
 import streamlit as st
 from supabase import create_client
@@ -44,7 +44,7 @@ def safe_execute(query, retries=3, delay=0.3):
 
 @st.cache_resource(show_spinner=False)
 def get_gsheet():
-    """Authorise and return the worksheet handle."""
+    """Authorize and return the Google Sheet worksheet handle."""
     try:
         creds_info = st.secrets["gcp_service_account"]
         creds = Credentials.from_service_account_info(
@@ -53,7 +53,9 @@ def get_gsheet():
         )
         gc = gspread.authorize(creds)
 
+        # Google Sheet ID
         spreadsheet_id = "1ESiZsk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
+
         try:
             sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
         except gspread.WorksheetNotFound:
@@ -64,7 +66,9 @@ def get_gsheet():
                 "Colour", "Comment", "Visible", "Updated_by", "Source"
             ], value_input_option="USER_ENTERED")
             print("[INFO] Created new 'favourites_log' worksheet")
+
         return sheet
+
     except Exception as e:
         print(f"[ERROR] Could not connect to Google Sheets: {e}")
         return None
@@ -79,7 +83,7 @@ def append_to_google_sheet(record):
 
     try:
         row = [
-            datetime.utcnow().isoformat(),
+            datetime.now(UTC).isoformat(),
             record.get("player", ""),
             record.get("team", ""),
             record.get("league", ""),
@@ -101,7 +105,7 @@ def append_to_google_sheet(record):
 # ============================================================
 
 def upsert_favourite(record, log_to_sheet=False):
-    """Insert or update a favourite in Supabase. Only logs to Google Sheets if requested."""
+    """Insert or update a favourite in Supabase. Logs to Google Sheets if log_to_sheet=True."""
     sb = get_supabase_client()
     if not sb:
         print("[ERROR] Supabase client not available.")
@@ -115,15 +119,18 @@ def upsert_favourite(record, log_to_sheet=False):
         "colour": record.get("colour", "🟣 Needs Checked"),
         "comment": record.get("comment", ""),
         "visible": bool(record.get("visible", True)),
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "updated_by": record.get("updated_by", "auto"),
         "source": record.get("source", "radar-page"),
     }
 
     try:
         safe_execute(sb.table(TABLE).upsert(payload, on_conflict="player"))
+
         if log_to_sheet:
             append_to_google_sheet(payload)
+            print(f"[LOG] ✅ Logged to Google Sheet for {payload['player']}")
+
         print(f"[INFO] ✅ Upserted favourite for {payload['player']}")
         return True
     except Exception as e:
@@ -132,6 +139,7 @@ def upsert_favourite(record, log_to_sheet=False):
 
 
 def list_favourites(only_visible=True):
+    """Return all favourites (optionally only visible ones)."""
     sb = get_supabase_client()
     if not sb:
         return []
@@ -149,6 +157,7 @@ def list_favourites(only_visible=True):
 
 
 def delete_favourite(player):
+    """Permanently delete a favourite."""
     sb = get_supabase_client()
     if not sb:
         return False
@@ -162,13 +171,17 @@ def delete_favourite(player):
 
 
 def hide_favourite(player):
+    """Hide a favourite without deleting it."""
     sb = get_supabase_client()
     if not sb:
         return False
     try:
         safe_execute(
             sb.table(TABLE)
-            .update({"visible": False, "updated_at": datetime.utcnow().isoformat()})
+            .update({
+                "visible": False,
+                "updated_at": datetime.now(UTC).isoformat()
+            })
             .eq("player", player)
         )
         print(f"[INFO] Hid favourite: {player}")
