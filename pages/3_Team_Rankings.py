@@ -152,7 +152,11 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 # ✅ Position-specific scoring logic (IDENTICAL TO RADAR PAGE)
 # ============================================================
 
-from pages.1_Player_Search_and_Radar import position_metrics, LOWER_IS_BETTER
+import importlib
+
+    radar_module = importlib.import_module("pages.1_Player_Search_and_Radar")
+    position_metrics = radar_module.position_metrics
+    LOWER_IS_BETTER = radar_module.LOWER_IS_BETTER
 
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     """
