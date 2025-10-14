@@ -12,7 +12,7 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 from supabase import create_client
-from lib.favourites_repo import upsert_favourite, hide_favourite
+from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 
 # --- Password protection ---
 from auth import check_password
@@ -1383,9 +1383,6 @@ z_ranking.index.name = "Row"
 
 # --- Load current favourites ---
 from lib.favourites_repo import get_supabase_client
-
-sb = get_supabase_client()
-TABLE = "favourites"
 
 @st.cache_data(ttl=5, show_spinner=False)
 def get_favourites_with_colours_live():
