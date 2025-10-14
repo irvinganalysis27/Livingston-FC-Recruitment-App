@@ -1121,6 +1121,7 @@ df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
 df_all["Rank (Global)"] = (
     df_all.groupby(pos_col)["Score (0–100)"]
           .rank(ascending=False, method="min")
+          .fillna(0)
           .astype(int)
 )
 
