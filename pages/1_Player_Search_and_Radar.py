@@ -1125,12 +1125,27 @@ df_all["Rank (Global)"] = (
           .astype(int)
 )
 
-# Filtered subset inherits global ranks
-df = df.merge(
-    df_all[["Player", pos_col, "Score (0–100)", "Rank (Global)"]],
-    on=["Player", pos_col, "Score (0–100)"],
-    how="left"
-)
+# Filtered subset inherits global ranks (safe merge)
+if "Score (0–100)" not in df_all.columns and "Score (0-100)" in df_all.columns:
+    df_all.rename(columns={"Score (0-100)": "Score (0–100)"}, inplace=True)
+if "Score (0–100)" not in df.columns and "Score (0-100)" in df.columns:
+    df.rename(columns={"Score (0-100)": "Score (0–100)"}, inplace=True)
+
+# Ensure the position column exists in both
+if pos_col not in df.columns and "Six-Group Position" in df.columns:
+    df[pos_col] = df["Six-Group Position"]
+if pos_col not in df_all.columns and "Six-Group Position" in df_all.columns:
+    df_all[pos_col] = df_all["Six-Group Position"]
+
+# Merge safely — only keep columns that definitely exist
+merge_cols = [c for c in ["Player", pos_col, "Score (0–100)"] if c in df.columns and c in df_all.columns]
+merge_right = [c for c in ["Player", pos_col, "Score (0–100)", "Rank (Global)"] if c in df_all.columns]
+
+if "Rank (Global)" in df_all.columns:
+    df = df.merge(df_all[merge_right], on=merge_cols, how="left")
+else:
+    df["Rank (Global)"] = np.nan
+
 plot_data = df.copy()
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
