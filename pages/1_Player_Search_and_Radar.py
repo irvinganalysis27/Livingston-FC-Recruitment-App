@@ -1425,9 +1425,7 @@ def colourize_player_name(name: str, favs_dict: dict) -> str:
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(lambda n: colourize_player_name(n, favs))
-z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
-    lambda n: bool(favs.get(n, {}).get("visible", False))
-)
+z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n, {}).get("visible", False)))
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
@@ -1439,23 +1437,23 @@ for col in required_cols:
 z_ranking = z_ranking[required_cols]
 
 # ============================================================
-# 📋 EDITABLE TABLE
+# 📋 EDITABLE TABLE (CACHED TO AVOID RERUNS)
 # ============================================================
+# Cache dataframe in session_state to avoid triggering reruns constantly
+if "ranking_df_cache" not in st.session_state:
+    st.session_state["ranking_df_cache"] = z_ranking.copy()
+
 edited_df = st.data_editor(
-    z_ranking,
+    st.session_state["ranking_df_cache"],
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
-            "Player",
-            help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
+            "Player", help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite",
-            help="Mark or unmark as favourite (shared to Supabase)"
+            "⭐ Favourite", help="Mark or unmark as favourite (shared to Supabase)"
         ),
         "Multiplier": st.column_config.NumberColumn(
-            "League Weight",
-            help="League weighting applied in ranking",
-            format="%.3f"
+            "League Weight", help="League weighting applied in ranking", format="%.3f"
         ),
     },
     hide_index=False,
@@ -1463,42 +1461,25 @@ edited_df = st.data_editor(
     key=f"ranking_editor_{selected_position_template}",
 )
 
-# ============================================================
-# 🔍 DEBUG: Detect what is happening on page load
-# ============================================================
-print("[DEBUG] === Sync section triggered ===")
-print("[DEBUG] Total rows in table:", len(edited_df))
-if "⭐ Favourite" in edited_df.columns:
-    print("[DEBUG] Starred players count:", int(edited_df["⭐ Favourite"].sum()))
-else:
-    print("[DEBUG] No '⭐ Favourite' column found")
-
-# Compare DataFrames if possible
-if "previous_df" not in st.session_state:
-    st.session_state.previous_df = edited_df.copy()
-    print("[DEBUG] No previous_df found (first run)")
-else:
-    diff_mask = edited_df.ne(st.session_state.previous_df)
-    changed_cells = diff_mask.sum().sum()
-    print(f"[DEBUG] Changed cells since last run: {changed_cells}")
-    if changed_cells > 0:
-        print("[DEBUG] Some cells changed, will sync later")
-    else:
-        print("[DEBUG] No change detected, skipping sync")
-    st.session_state.previous_df = edited_df.copy()
-
 print("[DEBUG_LOOP] ---- BEFORE FAVOURITES SYNC ----")
-    
+
 # ============================================================
 # 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
 # ============================================================
 import time
 
+# Cache favourites for smoother reloads (prevents needless reruns)
+@st.cache_data(ttl=30, show_spinner=False)
+def load_favourites_cached():
+    return get_favourites_with_colours_live()
+
+favs_live = load_favourites_cached()
+
 print("[DEBUG] === Sync section triggered ===")
 print(f"[DEBUG] Total rows in table: {len(edited_df)}")
 
-# --- Run guard (prevent continuous re-execution) ---
-if st.session_state.get("_last_sync_time") and time.time() - st.session_state["_last_sync_time"] < 2:
+# --- Run guard to stop immediate re-execution ---
+if st.session_state.get("_last_sync_time") and time.time() - st.session_state["_last_sync_time"] < 3:
     print("[DEBUG] Skipping sync — triggered too soon after last run")
 else:
     st.session_state["_last_sync_time"] = time.time()
@@ -1509,6 +1490,7 @@ else:
         favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
         print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
 
+        # ---- UPSERT NEW OR UPDATED FAVOURITES ----
         for _, row in favourite_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
             player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
@@ -1516,40 +1498,34 @@ else:
             league = row.get("League", "")
             position = row.get("Positions played", "")
 
-            current_favs = get_favourites_with_colours_live()
-            prev_data = current_favs.get(player_name, {})
-
-            prev_colour = prev_data.get("colour", "🟣 Needs Checked")
-            prev_comment = prev_data.get("comment", "")
+            prev_data = favs_live.get(player_name, {})
             prev_visible = bool(prev_data.get("visible", False))
 
-            colour = prev_colour or "🟣 Needs Checked"
-            comment = prev_comment
-            visible = True
+            # Skip identical rows (reduces noise + CPU)
+            if prev_visible:
+                continue
 
             payload = {
                 "player": player_name,
                 "team": team,
                 "league": league,
                 "position": position,
-                "colour": colour,
-                "comment": comment,
-                "visible": visible,
-                "updated_at": datetime.utcnow().isoformat(),
+                "colour": prev_data.get("colour", "🟣 Needs Checked"),
+                "comment": prev_data.get("comment", ""),
+                "visible": True,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
                 "source": "radar-page",
             }
 
-            changed = True  # still allows autosync
-            upsert_favourite(payload, log_to_sheet=changed)
+            upsert_favourite(payload, log_to_sheet=True)
+            print(f"[LOG] ✅ Logged {player_name} (new or updated)")
 
-        # --- Hide players that were previously favourites but now unstarred ---
+        # ---- HIDE UNSTARRED FAVOURITES ----
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
         for _, row in non_fav_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
             player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
-            current_favs = get_favourites_with_colours_live()
-            old_visible = current_favs.get(player_name, {}).get("visible", False)
-
+            old_visible = favs_live.get(player_name, {}).get("visible", False)
             if old_visible:
                 hide_favourite(player_name)
                 print(f"[INFO] Hid favourite: {player_name}")
