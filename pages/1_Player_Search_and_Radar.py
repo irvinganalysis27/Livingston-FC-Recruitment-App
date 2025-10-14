@@ -17,6 +17,7 @@ from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourite
 from datetime import datetime, timezone
 
 # ========= DEBUG MARKERS =========
+print("[DEBUG_LOOP] ---- PAGE START ----")
 print("[DEBUG] Run marker:", random.randint(1000, 9999))
 print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
 
@@ -1485,6 +1486,8 @@ else:
     else:
         print("[DEBUG] No change detected, skipping sync")
     st.session_state.previous_df = edited_df.copy()
+
+print("[DEBUG_LOOP] ---- BEFORE FAVOURITES SYNC ----")
     
 # ============================================================
 # 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
@@ -1550,3 +1553,5 @@ else:
             if old_visible:
                 hide_favourite(player_name)
                 print(f"[INFO] Hid favourite: {player_name}")
+
+print("[DEBUG_LOOP] ---- AFTER FAVOURITES SYNC ----")
