@@ -1437,14 +1437,22 @@ for col in required_cols:
 z_ranking = z_ranking[required_cols]
 
 # ============================================================
-# 📋 EDITABLE TABLE (CACHED TO AVOID RERUNS)
+# 📋 EDITABLE TABLE (NO CACHING SO FILTERS ALWAYS REFRESH)
 # ============================================================
-# Cache dataframe in session_state to avoid triggering reruns constantly
-if "ranking_df_cache" not in st.session_state:
-    st.session_state["ranking_df_cache"] = z_ranking.copy()
+
+# Build a stable signature so Streamlit resets editor state when filters change
+sig_parts = (
+    tuple(sorted(selected_leagues)),
+    int(min_minutes),
+    tuple(selected_groups),
+    selected_position_template,
+    len(z_ranking),                         # size change
+    float(z_ranking["Score (0–100)"].sum()) # quick content checksum
+)
+editor_key = f"ranking_editor_{hash(sig_parts)}"
 
 edited_df = st.data_editor(
-    st.session_state["ranking_df_cache"],
+    z_ranking,   # <- always the fresh, filtered table
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player", help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
@@ -1458,10 +1466,8 @@ edited_df = st.data_editor(
     },
     hide_index=False,
     width="stretch",
-    key=f"ranking_editor_{selected_position_template}",
+    key=editor_key,
 )
-
-print("[DEBUG_LOOP] ---- BEFORE FAVOURITES SYNC ----")
 
 # ============================================================
 # 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
