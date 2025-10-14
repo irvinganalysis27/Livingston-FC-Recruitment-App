@@ -1,3 +1,4 @@
+import random
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,142 +12,51 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+from supabase import create_client
+from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
+from datetime import datetime, timezone
 
-# ============================================================
-# 🧱 Favourites Database — Safe Schema Guarantee
-# ============================================================
-import sqlite3
-from pathlib import Path
+# ========= DEBUG MARKERS =========
+print("[DEBUG_LOOP] ---- PAGE START ----")
+print("[DEBUG] Run marker:", random.randint(1000, 9999))
+print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
 
-# Path to the database file (stored in the same folder as this page)
-DB_PATH = Path(__file__).parent / "favourites.db"
+# ========= PAGE CONFIG =========
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-def ensure_favourites_table():
-    """Ensure the favourites table exists and matches the correct schema."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # --- Create the table if it doesn't exist ---
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            colour TEXT DEFAULT '',
-            comment TEXT DEFAULT '',
-            visible INTEGER DEFAULT 1,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # --- Check existing columns and add any missing ones ---
-    existing_cols = [r[1] for r in c.execute("PRAGMA table_info(favourites)").fetchall()]
-    expected_cols = {
-        "player": "TEXT",
-        "team": "TEXT",
-        "league": "TEXT",
-        "position": "TEXT",
-        "colour": "TEXT DEFAULT ''",
-        "comment": "TEXT DEFAULT ''",
-        "visible": "INTEGER DEFAULT 1",
-        "timestamp": "DATETIME DEFAULT CURRENT_TIMESTAMP"
-    }
-
-    for col, dtype in expected_cols.items():
-        if col not in existing_cols:
-            c.execute(f"ALTER TABLE favourites ADD COLUMN {col} {dtype}")
-
-    conn.commit()
-    conn.close()
-
-# --- Run automatically on page load ---
-ensure_favourites_table()
-
-# ============================================================
-# ⚙️ Favourites Helper Functions
-# ============================================================
-def upsert_favourite(player, team, league, position, colour="", comment="", visible=1):
-    """Insert or update a favourite record."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(player) DO UPDATE SET
-            team=excluded.team,
-            league=excluded.league,
-            position=excluded.position,
-            colour=excluded.colour,
-            comment=excluded.comment,
-            visible=excluded.visible,
-            timestamp=CURRENT_TIMESTAMP
-    """, (player, team, league, position, colour, comment, visible))
-    conn.commit()
-    conn.close()
-
-@st.cache_data(ttl=2, show_spinner=False)
-def get_favourites_with_colours_live():
-    """Return dict of favourites and their attributes."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    try:
-        c.execute("SELECT player, colour, comment, visible FROM favourites")
-        rows = c.fetchall()
-    except sqlite3.OperationalError:
-        rows = []
-    conn.close()
-    return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
-
-def remove_favourite(player):
-    """Hard delete a favourite."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("DELETE FROM favourites WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
-
-def hide_favourite(player):
-    """Soft hide favourite."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
-
-# --- Password protection ---
+# ========= AUTH / BRANDING =========
 from auth import check_password
 from branding import show_branding
 
+# Password gate (single controlled rerun)
 if not check_password():
     st.stop()
 
 show_branding()
 st.title("Player Radar")
 
+# ========= PATHS =========
 APP_DIR = Path(__file__).parent          # pages/
 ROOT_DIR = APP_DIR.parent                # repo root
 ASSETS_DIR = ROOT_DIR / "assets"         # assets/ lives in root
 
+
 def open_image(path: Path):
+    """Safe image loader."""
     try:
         return Image.open(path)
     except Exception:
         return None
 
-# --- Basic password protection ---
-PASSWORD = "Livi2025"
 
-st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
-
-# ---------- Fixed group colours ----------
+# ========= FIXED GROUP COLOURS =========
 group_colors = {
-    "Attacking":   "crimson",
-    "Possession":  "seagreen",
-    "Defensive":   "royalblue",
+    "Attacking": "crimson",
+    "Possession": "seagreen",
+    "Defensive": "royalblue",
 }
 
-# ---------- Display name overrides for radar ----------
+# ========= DISPLAY NAME OVERRIDES =========
 DISPLAY_NAMES = {
     "Player Season Fhalf Pressures 90": "Pressures in Opposition Half",
     "Deep Completions": "Completed Passes Final 1/3",
@@ -156,32 +66,25 @@ DISPLAY_NAMES = {
     "Player Season Ball Recoveries 90": "Ball Recoveries",
 }
 
-# --- League name normalisation: StatsBomb -> your Opta names ---
+# ========= LEAGUE SYNONYMS (unchanged) =========
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
     "2. Liga": "Austria 2. Liga",
     "Challenger Pro League": "Belgium Challenger Pro League",
     "First League": "Bulgaria First League",
     "1. HNL": "Croatia 1. HNL",
-    "HNL": "Croatia 1. HNL",
     "Czech Liga": "Czech First Tier",
     "1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
-    "Denmark Superliga": "Denmark Superliga",
     "League One": "England League One",
     "League Two": "England League Two",
     "National League": "England National League",
-    "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
     "Championnat National": "France National 1",
     "Ligue 2": "Ligue 2",
-    "France Ligue 2": "Ligue 2",
-    "2. Bundesliga": "2. Bundesliga",
-    "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
     "Super League": "Greece Super League 1",
-    "Greece Super League": "Greece Super League 1",
     "NB I": "Hungary NB I",
     "Besta deild karla": "Iceland Besta Deild",
     "Serie C": "Italy Serie C",
@@ -190,45 +93,25 @@ LEAGUE_SYNONYMS = {
     "A Lyga": "Lithuania A Lyga",
     "Botola Pro": "Morocco Botola Pro",
     "Eredivisie": "Eredivisie",
-    "Netherlands Eredivisie": "Eredivisie",
     "Eerste Divisie": "Netherlands Eerste Divisie",
     "1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
     "I Liga": "Poland 1 Liga",
     "Ekstraklasa": "Poland Ekstraklasa",
     "Segunda Liga": "Portugal Segunda Liga",
-    "Liga Pro": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
-    "Ireland Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
     "Championship": "Scotland Championship",
     "Premiership": "Scotland Premiership",
     "Super Liga": "Serbia Super Liga",
-    "Slovakia Super Liga": "Slovakia 1. Liga",
-    "Slovakia First League": "Slovakia 1. Liga",
-    "1. Liga": "Slovakia 1. Liga",
     "1. Liga (SVN)": "Slovenia 1. Liga",
     "PSL": "South Africa Premier Division",
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
-    "Denmark 1. Division": "Denmark 1st Division",
-    "Slovenia 1. SNL": "Slovenia 1. Liga",
-
-    # --- Tunisia fixes ---
-    "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
-    "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
-    "France Ligue 1": "Tunisia Ligue 1",
-
-    # --- USA ---
     "USL Championship": "USA USL Championship",
-
-    # --- Belgium top flight fixes ---
     "Jupiler Pro League": "Jupiler Pro League",
-    "Belgium Pro League": "Jupiler Pro League",
-    "Belgian Pro League": "Jupiler Pro League",
-    "Belgium Jupiler Pro League": "Jupiler Pro League",
 }
 
 # ========== Role groups shown in filters ==========
@@ -686,7 +569,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
-def load_data_once(_sig=None):
+def load_data_once():
     """Load and preprocess StatsBomb data once per session."""
     path = DATA_PATH
     sig = _data_signature(path)
@@ -719,7 +602,7 @@ def load_data_once(_sig=None):
     return df_preprocessed
     
 # ---------- Load & preprocess ----------
-df_all_raw = load_data_once(_sig=_data_signature(DATA_PATH))
+df_all_raw = load_data_once()
 
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
@@ -1294,6 +1177,7 @@ print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
     from matplotlib import colormaps as mcm
+    import matplotlib.colors as mcolors
 
     if not isinstance(group_colors, dict) or len(group_colors) == 0:
         group_colors = {
@@ -1477,32 +1361,43 @@ z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
 
-from pathlib import Path
-import sqlite3
+# ============================================================
+# 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
+# ============================================================
 
-# ============================================================
-# 🟢 LOAD FAVOURITES AND APPLY COLOURS
-# ============================================================
-DB_PATH = Path(__file__).parent / "favourites.db"
+# --- Load current favourites ---
+from lib.favourites_repo import get_supabase_client
 
 def get_favourites_with_colours_live():
-    """Fetch all favourites with their colour/comment/visibility."""
-    if not DB_PATH.exists():
+    """Fetch favourites (shared cloud data) — no caching, no globals."""
+    sb = get_supabase_client()
+    if sb is None:
         return {}
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    try:
-        c.execute("SELECT player, colour, comment, visible FROM favourites")
-        rows = c.fetchall()
-    except Exception:
-        rows = []
-    conn.close()
-    return {r[0]: {"colour": r[1], "comment": r[2], "visible": r[3]} for r in rows}
 
-# ✅ Create global favourites dictionary before use
+    try:
+        res = sb.table("favourites").select("*").execute()
+        if not res.data:
+            return {}
+        return {
+            r.get("player"): {
+                "colour": r.get("colour", ""),
+                "comment": r.get("comment", ""),
+                "visible": bool(r.get("visible", True)),
+            }
+            for r in res.data
+            if r.get("player")
+        }
+    except Exception as e:
+        st.warning(f"⚠️ Could not load favourites: {e}")
+        return {}
+
+# --- Build local dictionary for colouring ---
 favs = get_favourites_with_colours_live()
 
-# Colour emoji map
+print("[DEBUG] Sample favs from Supabase:")
+print({k: v for k, v in list(favs.items())[:5]})
+
+# --- Colour emoji map ---
 COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
@@ -1519,7 +1414,7 @@ COLOUR_EMOJI = {
 }
 
 def colourize_player_name(name: str, favs_dict: dict) -> str:
-    """Attach the correct emoji to the player name based on their status."""
+    """Attach correct emoji to player name."""
     data = favs_dict.get(name)
     if not data:
         return name
@@ -1530,9 +1425,7 @@ def colourize_player_name(name: str, favs_dict: dict) -> str:
 # 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
 # ============================================================
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(lambda n: colourize_player_name(n, favs))
-z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(
-    lambda n: bool(favs.get(n, {}).get("visible", 0))
-)
+z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n, {}).get("visible", False)))
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
@@ -1541,92 +1434,106 @@ required_cols = [
 for col in required_cols:
     if col not in z_ranking.columns:
         z_ranking[col] = np.nan
-
 z_ranking = z_ranking[required_cols]
 
 # ============================================================
-# 📋 EDITABLE TABLE
+# 📋 EDITABLE TABLE (CACHED TO AVOID RERUNS)
 # ============================================================
+# Cache dataframe in session_state to avoid triggering reruns constantly
+if "ranking_df_cache" not in st.session_state:
+    st.session_state["ranking_df_cache"] = z_ranking.copy()
+
 edited_df = st.data_editor(
-    z_ranking,
+    st.session_state["ranking_df_cache"],
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
-            "Player",
-            help="Shows Favourites colour (🟢🟡🔴🟣 only if marked)"
+            "Player", help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
         ),
         "⭐ Favourite": st.column_config.CheckboxColumn(
-            "⭐ Favourite",
-            help="Mark or unmark as favourite (auto-syncs with Favourites page)"
+            "⭐ Favourite", help="Mark or unmark as favourite (shared to Supabase)"
         ),
         "Multiplier": st.column_config.NumberColumn(
-            "League Weight",
-            help="League weighting applied in ranking",
-            format="%.3f"
+            "League Weight", help="League weighting applied in ranking", format="%.3f"
         ),
     },
     hide_index=False,
     width="stretch",
-    key=f"ranking_editor_{selected_position_template}",  # ✅ unique key avoids all duplication
+    key=f"ranking_editor_{selected_position_template}",
 )
 
+print("[DEBUG_LOOP] ---- BEFORE FAVOURITES SYNC ----")
+
 # ============================================================
-# 💾 APPLY CHANGES TO favourites.db  (fully corrected version)
+# 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
 # ============================================================
-# 1️⃣ Only process rows where the star is ticked
-if "⭐ Favourite" not in edited_df.columns:
-    st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
+import time
+
+# Cache favourites for smoother reloads (prevents needless reruns)
+@st.cache_data(ttl=5, show_spinner=False)
+def load_favourites_cached():
+    return get_favourites_with_colours_live()
+
+favs_live = load_favourites_cached()
+
+print("[DEBUG] === Sync section triggered ===")
+print(f"[DEBUG] Total rows in table: {len(edited_df)}")
+
+# --- Run guard to stop immediate re-execution ---
+if st.session_state.get("_last_sync_time") and time.time() - st.session_state["_last_sync_time"] < 3:
+    print("[DEBUG] Skipping sync — triggered too soon after last run")
 else:
-    favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
-    print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
+    st.session_state["_last_sync_time"] = time.time()
 
-    for _, row in favourite_rows.iterrows():
-        player_raw = str(row.get("Player (coloured)", "")).strip()
-        player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+    if "⭐ Favourite" not in edited_df.columns:
+        st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
+    else:
+        favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
+        print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
 
-        team = row.get("Team", "")
-        league = row.get("League", "")
-        position = row.get("Positions played", "")
+        # ---- UPSERT NEW OR UPDATED FAVOURITES ----
+        deleted_players = {p for p, d in favs_live.items() if not d.get("visible", True)}
 
-        current_data = favs.get(player_name, {})
-        colour = current_data.get("colour", "")
-        comment = current_data.get("comment", "")
-        visible = 1  # always visible if starred
+        for _, row in favourite_rows.iterrows():
+            player_raw = str(row.get("Player (coloured)", "")).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+            team = row.get("Team", "")
+            league = row.get("League", "")
+            position = row.get("Positions played", "")
 
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM favourites WHERE player=?", (player_name,))
-        exists = c.fetchone() is not None
+            prev_data = favs_live.get(player_name, {})
+            prev_visible = bool(prev_data.get("visible", False))
 
-        if exists:
-            c.execute("""
-                UPDATE favourites
-                SET team=?, league=?, position=?, colour=?, comment=?, visible=1, timestamp=CURRENT_TIMESTAMP
-                WHERE player=?
-            """, (team, league, position, colour, comment, player_name))
-        else:
-            c.execute("""
-                INSERT INTO favourites (player, team, league, position, colour, comment, visible, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-            """, (player_name, team, league, position, colour, comment))
+            # 🧠 Skip if player was deleted (hidden) and not manually re-starred
+            if player_name in deleted_players and not prev_visible:
+                print(f"[DEBUG] Skipping {player_name} — hidden in Supabase (won’t auto-revive)")
+                continue
 
-        conn.commit()
-        conn.close()
+            # 🧠 Only upsert if not already visible in Supabase
+            if not prev_visible:
+                payload = {
+                    "player": player_name,
+                    "team": team,
+                    "league": league,
+                    "position": position,
+                    "colour": prev_data.get("colour", "🟣 Needs Checked"),
+                    "comment": prev_data.get("comment", ""),
+                    "visible": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "radar-page",
+                }
 
-    # 2️⃣ Hide any players whose star was unticked
-    if "⭐ Favourite" in edited_df.columns:
+                upsert_favourite(payload, log_to_sheet=True)
+                print(f"[LOG] ✅ Added or reactivated {player_name}")
+            else:
+                print(f"[DEBUG] Skipping {player_name} — already visible in Supabase")
+
+        # ---- HIDE UNSTARRED FAVOURITES ----
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
-        if not non_fav_rows.empty:
-            non_fav_names = non_fav_rows["Player (coloured)"].apply(
-                lambda n: re.sub(r"^[🟢🟡🔴🟣]\s*", "", str(n)).strip()
-            ).tolist()
+        for _, row in non_fav_rows.iterrows():
+            player_raw = str(row.get("Player (coloured)", "")).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
-            print(f"[DEBUG] Hiding {len(non_fav_names)} non-favourites")
-
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.executemany(
-                "UPDATE favourites SET visible=0, timestamp=CURRENT_TIMESTAMP WHERE player=?",
-                [(n,) for n in non_fav_names]
-            )
-            conn.commit()
-            conn.close()
+            old_visible = favs_live.get(player_name, {}).get("visible", False)
+            if old_visible:
+                hide_favourite(player_name)
+                print(f"[INFO] Hid favourite: {player_name}")
