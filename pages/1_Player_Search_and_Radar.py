@@ -5,8 +5,15 @@ import matplotlib.pyplot as plt
 import re
 from pathlib import Path
 from PIL import Image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+from datetime import datetime
+from auth import check_password
+from branding import show_branding
+from supabase import create_client
+from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
-import random
 
 # ========= DEBUG MARKERS =========
 print("[DEBUG] Run marker:", random.randint(1000, 9999))
