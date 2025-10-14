@@ -1,4 +1,4 @@
-# pages/4_Team_Rankings.py
+# pages/3_Team_Rankings.py
 
 import streamlit as st
 import pandas as pd
