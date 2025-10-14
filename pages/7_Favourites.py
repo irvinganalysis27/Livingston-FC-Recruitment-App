@@ -88,13 +88,13 @@ else:
                     "Initial Watch",
                     value=row.get("initial_watch_comment") or "",
                     key=f"initial_{player}",
-                    placeholder="Initials + short note…",
+                    placeholder="Initials + first comment…",
                 )
                 second_comment = st.text_input(
                     "Second Watch",
                     value=row.get("second_watch_comment") or "",
                     key=f"second_{player}",
-                    placeholder="Follow-up thoughts or agreement…",
+                    placeholder="Initials + second comment…",
                 )
 
             # --- Visibility + Actions ---
