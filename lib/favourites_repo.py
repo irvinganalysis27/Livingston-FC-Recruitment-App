@@ -5,6 +5,17 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
+@st.cache_resource(show_spinner=False)
+def get_supabase_client():
+    """Return a cached Supabase client instance."""
+    try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["service_key"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"❌ Failed to connect to Supabase: {e}")
+        return None
+
 def append_to_google_sheet(record):
     """Append a new favourite or update to the Google Sheet log."""
     try:
