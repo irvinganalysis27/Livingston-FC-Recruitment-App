@@ -1514,13 +1514,18 @@ else:
         except Exception as e:
             st.error(f"❌ Failed to save favourite for {player_name}: {e}")
 
-    # --- Hide players unstarred ---
-    non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
-    for _, row in non_fav_rows.iterrows():
-        player_raw = str(row.get("Player (coloured)", "")).strip()
-        player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+# --- Hide players that were previously favourites but now unstarred ---
+non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
+for _, row in non_fav_rows.iterrows():
+    player_raw = str(row.get("Player (coloured)", "")).strip()
+    player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+
+    # Only hide if the player was previously marked as visible
+    old_visible = favs.get(player_name, {}).get("visible", False)
+    if old_visible:
         try:
             hide_favourite(player_name)
+            print(f"[INFO] Hid favourite: {player_name}")
         except Exception as e:
             st.error(f"❌ Failed to hide {player_name}: {e}")
 
