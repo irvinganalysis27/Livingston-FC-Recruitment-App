@@ -57,7 +57,7 @@ def get_gsheet():
         gc = gspread.authorize(creds)
 
         # Use your actual sheet ID here
-        spreadsheet_id = "1ESizSk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
+        spreadsheet_id = "1ESiZsk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
 
         try:
             sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
