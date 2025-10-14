@@ -1532,7 +1532,7 @@ else:
                 "colour": colour,
                 "comment": comment,
                 "visible": visible,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
                 "source": "radar-page",
             }
 
