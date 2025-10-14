@@ -13,6 +13,7 @@ from auth import check_password
 from branding import show_branding
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
+from datetime import datetime, timezone
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -1518,7 +1519,7 @@ else:
             "colour": colour,
             "comment": comment,
             "visible": visible,
-            "updated_at": datetime.now(datetime.UTC).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "source": "radar-page",
         }
 
