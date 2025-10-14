@@ -1,31 +1,25 @@
 import streamlit as st
 
-st.set_page_config(page_title="Livingston FC Recruitment App", layout="wide")
+PASSWORD = "Livi2025"
 
 def check_password():
-    """Return True if the user entered the correct password, False otherwise."""
+    """Return True if correct password entered, remember in session."""
     if "password_ok" not in st.session_state:
-        st.session_state["password_ok"] = False
+        st.session_state.password_ok = False
 
-    if not st.session_state["password_ok"]:
-        st.markdown("## Welcome to the Livingston FC Recruitment App")
-        password = st.text_input("Enter password:", type="password")
-        if st.button("Login"):
-            if password == "Livi2025":  # <--- change here if you want a new password
-                st.session_state["password_ok"] = True
-                st.rerun()
-            else:
-                st.warning("Please enter the correct password to access the app.")
-        st.stop()
+    if st.session_state.password_ok:
+        return True
 
-    # ✅ Hide "app.py" sidebar entry once logged in
-    st.markdown(
-        """
-        <style>
-            section[data-testid="stSidebar"] ul li:first-child {display: none;}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("## Welcome to the Livingston FC Recruitment App")
+    password = st.text_input("Enter password:", type="password")
 
-    return True
+    if password == PASSWORD:
+        st.session_state.password_ok = True
+        st.success("Access granted.")
+        st.rerun()
+        return True
+    elif password:
+        st.warning("Incorrect password.")
+        return False
+
+    return False
