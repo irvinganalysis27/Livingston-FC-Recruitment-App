@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime
 import time
 import streamlit as st
 from supabase import create_client
@@ -82,7 +82,7 @@ def append_to_google_sheet(record):
 
     try:
         row = [
-            datetime.now(UTC).isoformat(),
+            datetime.utcnow().isoformat(),
             record.get("player", ""),
             record.get("team", ""),
             record.get("league", ""),
@@ -127,7 +127,7 @@ def upsert_favourite(record, log_to_sheet=False):
         "colour": record.get("colour", "🟣 Needs Checked"),
         "comment": record.get("comment", ""),
         "visible": bool(record.get("visible", True)),
-        "updated_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
         "updated_by": record.get("updated_by", "auto"),
         "source": record.get("source", "radar-page"),
     }
@@ -153,7 +153,6 @@ def upsert_favourite(record, log_to_sheet=False):
 
         if log_to_sheet:
             append_to_google_sheet(payload)
-            print(f"[LOG] ✅ Logged to Google Sheet for {player}")
 
         return True
 
@@ -204,7 +203,7 @@ def hide_favourite(player):
             sb.table(TABLE)
             .update({
                 "visible": False,
-                "updated_at": datetime.now(UTC).isoformat()
+                "updated_at": datetime.utcnow().isoformat()
             })
             .eq("player", player)
         )
