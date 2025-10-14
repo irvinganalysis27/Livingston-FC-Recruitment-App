@@ -1482,22 +1482,13 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO SUPABASE + LOG ONLY NEW FAVOURITES
+# 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
 # ============================================================
 if "⭐ Favourite" not in edited_df.columns:
     st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
 else:
     favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
     print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
-
-    # Track what was already visible before this update
-    existing_visible = {
-        k for k, v in favs.items()
-        if v.get("visible") is True
-    }
-
-    # Track what we’ve already logged this session (avoid double-logging)
-    new_favourites_logged = set()
 
     for _, row in favourite_rows.iterrows():
         player_raw = str(row.get("Player (coloured)", "")).strip()
@@ -1506,8 +1497,16 @@ else:
         league = row.get("League", "")
         position = row.get("Positions played", "")
 
-        colour = favs.get(player_name, {}).get("colour", "🟣 Needs Checked")
-        comment = favs.get(player_name, {}).get("comment", "")
+        # Get previous record from Supabase cache
+        prev_data = favs.get(player_name, {})
+        prev_colour = prev_data.get("colour", "🟣 Needs Checked")
+        prev_comment = prev_data.get("comment", "")
+        prev_visible = bool(prev_data.get("visible", False))
+
+        # Current values (new input)
+        colour = prev_colour or "🟣 Needs Checked"
+        comment = prev_comment
+        visible = True
 
         payload = {
             "player": player_name,
@@ -1516,38 +1515,38 @@ else:
             "position": position,
             "colour": colour,
             "comment": comment,
-            "visible": True,
+            "visible": visible,
             "updated_at": datetime.utcnow().isoformat(),
             "source": "radar-page",
         }
 
-        # ✅ Only log to Google Sheet if it's a brand new favourite this session
-        if player_name not in existing_visible and player_name not in new_favourites_logged:
-            try:
-                upsert_favourite(payload, log_to_sheet=True)
-                new_favourites_logged.add(player_name)
-                print(f"[INFO] ✅ Upserted and logged new favourite: {player_name}")
-            except Exception as e:
-                st.error(f"❌ Failed to save favourite for {player_name}: {e}")
-        else:
-            # Already known favourite — just update Supabase silently
-            try:
-                upsert_favourite(payload)
-            except Exception as e:
-                print(f"[WARN] Could not update favourite {player_name}: {e}")
+        # 🧠 Decide when to log: if brand new OR visible was previously False OR comment/colour changed
+        changed = (
+            player_name not in favs
+            or prev_visible is False
+            or prev_comment != comment
+            or prev_colour != colour
+        )
 
-# ============================================================
-# 🚫 HIDE PLAYERS THAT WERE PREVIOUSLY FAVOURITES BUT NOW UNSTARRED
-# ============================================================
-non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
-for _, row in non_fav_rows.iterrows():
-    player_raw = str(row.get("Player (coloured)", "")).strip()
-    player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
-
-    # Only hide if previously visible
-    if favs.get(player_name, {}).get("visible", False):
         try:
-            hide_favourite(player_name)
-            print(f"[INFO] Hid favourite: {player_name}")
+            upsert_favourite(payload, log_to_sheet=changed)
+            if changed:
+                print(f"[LOG] ✅ Logged {player_name} (new or updated)")
+            else:
+                print(f"[DEBUG] No change detected for {player_name}, skipped log")
         except Exception as e:
-            st.error(f"❌ Failed to hide {player_name}: {e}")
+            st.error(f"❌ Failed to save favourite for {player_name}: {e}")
+
+    # --- Hide players that were previously favourites but now unstarred ---
+    non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
+    for _, row in non_fav_rows.iterrows():
+        player_raw = str(row.get("Player (coloured)", "")).strip()
+        player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+
+        old_visible = favs.get(player_name, {}).get("visible", False)
+        if old_visible:
+            try:
+                hide_favourite(player_name)
+                print(f"[INFO] Hid favourite: {player_name}")
+            except Exception as e:
+                st.error(f"❌ Failed to hide {player_name}: {e}")
