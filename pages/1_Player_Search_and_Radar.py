@@ -1535,6 +1535,3 @@ for _, row in non_fav_rows.iterrows():
             print(f"[INFO] Hid favourite: {player_name}")
         except Exception as e:
             st.error(f"❌ Failed to hide {player_name}: {e}")
-
-print("[DEBUG] ✅ Radar page finished rendering completely.")
-st.success("✅ Page fully loaded")
