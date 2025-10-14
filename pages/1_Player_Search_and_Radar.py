@@ -14,6 +14,8 @@ from branding import show_branding
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
 # --- Password protection ---
 from auth import check_password
 from branding import show_branding
@@ -1384,20 +1386,21 @@ z_ranking.index.name = "Row"
 # --- Load current favourites ---
 from lib.favourites_repo import get_supabase_client
 
-@st.cache_data(ttl=5, show_spinner=False)
 def get_favourites_with_colours_live():
-    """Fetch favourites (shared cloud data)."""
-    if not sb:
+    """Fetch favourites (shared cloud data) — no caching, no globals."""
+    sb = get_supabase_client()
+    if sb is None:
         return {}
+
     try:
-        res = sb.table(TABLE).select("*").execute()
+        res = sb.table("favourites").select("*").execute()
         if not res.data:
             return {}
         return {
-            r["player"]: {
+            r.get("player"): {
                 "colour": r.get("colour", ""),
                 "comment": r.get("comment", ""),
-                "visible": r.get("visible", True),
+                "visible": bool(r.get("visible", True)),
             }
             for r in res.data
             if r.get("player")
