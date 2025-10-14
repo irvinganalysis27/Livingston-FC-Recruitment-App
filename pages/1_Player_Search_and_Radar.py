@@ -1463,6 +1463,30 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
+# 🔍 DEBUG: Detect what is happening on page load
+# ============================================================
+print("[DEBUG] === Sync section triggered ===")
+print("[DEBUG] Total rows in table:", len(edited_df))
+if "⭐ Favourite" in edited_df.columns:
+    print("[DEBUG] Starred players count:", int(edited_df["⭐ Favourite"].sum()))
+else:
+    print("[DEBUG] No '⭐ Favourite' column found")
+
+# Compare DataFrames if possible
+if "previous_df" not in st.session_state:
+    st.session_state.previous_df = edited_df.copy()
+    print("[DEBUG] No previous_df found (first run)")
+else:
+    diff_mask = edited_df.ne(st.session_state.previous_df)
+    changed_cells = diff_mask.sum().sum()
+    print(f"[DEBUG] Changed cells since last run: {changed_cells}")
+    if changed_cells > 0:
+        print("[DEBUG] Some cells changed, will sync later")
+    else:
+        print("[DEBUG] No change detected, skipping sync")
+    st.session_state.previous_df = edited_df.copy()
+    
+# ============================================================
 # 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
 # ============================================================
 if "⭐ Favourite" not in edited_df.columns:
