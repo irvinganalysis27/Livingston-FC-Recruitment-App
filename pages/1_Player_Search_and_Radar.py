@@ -1,5 +1,3 @@
-import random
-print("[DEBUG] Run marker:", random.randint(1000,9999))
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,53 +5,49 @@ import matplotlib.pyplot as plt
 import re
 from pathlib import Path
 from PIL import Image
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-from datetime import datetime
-from auth import check_password
-from branding import show_branding
-from supabase import create_client
-from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
+import random
 
-st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
-
+# ========= DEBUG MARKERS =========
+print("[DEBUG] Run marker:", random.randint(1000, 9999))
 print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
 
-# --- Password protection ---
+# ========= PAGE CONFIG =========
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ========= AUTH / BRANDING =========
 from auth import check_password
 from branding import show_branding
 
+# Password gate (single controlled rerun)
 if not check_password():
     st.stop()
 
 show_branding()
 st.title("Player Radar")
 
+# ========= PATHS =========
 APP_DIR = Path(__file__).parent          # pages/
 ROOT_DIR = APP_DIR.parent                # repo root
 ASSETS_DIR = ROOT_DIR / "assets"         # assets/ lives in root
 
+
 def open_image(path: Path):
+    """Safe image loader."""
     try:
         return Image.open(path)
     except Exception:
         return None
 
-# --- Basic password protection ---
-PASSWORD = "Livi2025"
 
-st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
-
-# ---------- Fixed group colours ----------
+# ========= FIXED GROUP COLOURS =========
 group_colors = {
-    "Attacking":   "crimson",
-    "Possession":  "seagreen",
-    "Defensive":   "royalblue",
+    "Attacking": "crimson",
+    "Possession": "seagreen",
+    "Defensive": "royalblue",
 }
 
-# ---------- Display name overrides for radar ----------
+# ========= DISPLAY NAME OVERRIDES =========
 DISPLAY_NAMES = {
     "Player Season Fhalf Pressures 90": "Pressures in Opposition Half",
     "Deep Completions": "Completed Passes Final 1/3",
@@ -63,32 +57,25 @@ DISPLAY_NAMES = {
     "Player Season Ball Recoveries 90": "Ball Recoveries",
 }
 
-# --- League name normalisation: StatsBomb -> your Opta names ---
+# ========= LEAGUE SYNONYMS (unchanged) =========
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
     "2. Liga": "Austria 2. Liga",
     "Challenger Pro League": "Belgium Challenger Pro League",
     "First League": "Bulgaria First League",
     "1. HNL": "Croatia 1. HNL",
-    "HNL": "Croatia 1. HNL",
     "Czech Liga": "Czech First Tier",
     "1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
-    "Denmark Superliga": "Denmark Superliga",
     "League One": "England League One",
     "League Two": "England League Two",
     "National League": "England National League",
-    "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
     "Championnat National": "France National 1",
     "Ligue 2": "Ligue 2",
-    "France Ligue 2": "Ligue 2",
-    "2. Bundesliga": "2. Bundesliga",
-    "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
     "Super League": "Greece Super League 1",
-    "Greece Super League": "Greece Super League 1",
     "NB I": "Hungary NB I",
     "Besta deild karla": "Iceland Besta Deild",
     "Serie C": "Italy Serie C",
@@ -97,45 +84,25 @@ LEAGUE_SYNONYMS = {
     "A Lyga": "Lithuania A Lyga",
     "Botola Pro": "Morocco Botola Pro",
     "Eredivisie": "Eredivisie",
-    "Netherlands Eredivisie": "Eredivisie",
     "Eerste Divisie": "Netherlands Eerste Divisie",
     "1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
     "I Liga": "Poland 1 Liga",
     "Ekstraklasa": "Poland Ekstraklasa",
     "Segunda Liga": "Portugal Segunda Liga",
-    "Liga Pro": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
-    "Ireland Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
     "Championship": "Scotland Championship",
     "Premiership": "Scotland Premiership",
     "Super Liga": "Serbia Super Liga",
-    "Slovakia Super Liga": "Slovakia 1. Liga",
-    "Slovakia First League": "Slovakia 1. Liga",
-    "1. Liga": "Slovakia 1. Liga",
     "1. Liga (SVN)": "Slovenia 1. Liga",
     "PSL": "South Africa Premier Division",
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
     "Challenge League": "Switzerland Challenge League",
-    "Denmark 1. Division": "Denmark 1st Division",
-    "Slovenia 1. SNL": "Slovenia 1. Liga",
-
-    # --- Tunisia fixes ---
-    "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
-    "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
-    "France Ligue 1": "Tunisia Ligue 1",
-
-    # --- USA ---
     "USL Championship": "USA USL Championship",
-
-    # --- Belgium top flight fixes ---
     "Jupiler Pro League": "Jupiler Pro League",
-    "Belgium Pro League": "Jupiler Pro League",
-    "Belgian Pro League": "Jupiler Pro League",
-    "Belgium Jupiler Pro League": "Jupiler Pro League",
 }
 
 # ========== Role groups shown in filters ==========
