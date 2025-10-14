@@ -58,8 +58,8 @@ def append_to_google_sheet(record):
             )
 
             gc = gspread.authorize(creds)
-            sh = gc.open("Livingston_Favourites_Log")
-            sheet = sh.worksheet("favourites_log")
+            spreadsheet_id = "1ESizSk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"  # your sheet ID from the URL
+            sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
 
             row = [
                 datetime.utcnow().isoformat(),
