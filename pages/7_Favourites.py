@@ -3,7 +3,7 @@ from datetime import datetime
 
 # ========= Basic page chrome =========
 st.set_page_config(page_title="⭐ Watch List", layout="centered")
-st.title("⭐ Watch List (DEV)")
+st.title("⭐ Watch List")
 
 # ========= Toast helpers =========
 def toast_ok(msg: str):
