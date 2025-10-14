@@ -1,5 +1,4 @@
 # pages/3_Team_Rankings.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,7 +6,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 import sqlite3
-
+import random
 from auth import check_password
 from branding import show_branding
 
@@ -67,191 +66,167 @@ def remove_favourite(player):
 # Data Loading
 # ============================================================
 def load_one_file(p: Path) -> pd.DataFrame:
-    return pd.read_excel(p) if p.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(p)
+    """Load CSV or Excel safely."""
+    if p.suffix.lower() in {".xlsx", ".xls"}:
+        return pd.read_excel(p)
+    return pd.read_csv(p)
 
 def load_statsbomb(path: Path) -> pd.DataFrame:
+    """Load a single file or merge folder."""
     if path.is_file():
         return load_one_file(path)
     frames = [load_one_file(f) for f in sorted(p for p in path.iterdir() if p.is_file())]
     return pd.concat(frames, ignore_index=True, sort=False)
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute age if birth date present."""
     if "Birth Date" in df.columns:
         today = datetime.today()
         df["Age"] = pd.to_datetime(df["Birth Date"], errors="coerce").apply(
             lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
             if pd.notna(dob) else np.nan
         )
+    elif "birth_date" in df.columns:
+        today = datetime.today()
+        df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+            lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if pd.notna(dob) else np.nan
+        )
+    else:
+        df["Age"] = np.nan
     return df
 
 # ============================================================
 # Position & League Mapping
 # ============================================================
-RAW_TO_GROUP = {
-    "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
-    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
-    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8",
-    "LEFTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
-    "LEFTWING": "Winger", "LEFTMIDFIELDER": "Winger",
-    "RIGHTWING": "Winger", "RIGHTMIDFIELDER": "Winger",
-    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper",
-}
 def _clean_pos_token(tok: str) -> str:
-    if pd.isna(tok): return ""
+    if pd.isna(tok):
+        return ""
     t = str(tok).upper().strip()
     t = re.sub(r"[.\-_/]", " ", t)
     return re.sub(r"\s+", "", t)
 
+RAW_TO_SIX = {
+    # Full backs & wing backs
+    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
+    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    # Centre backs
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    # Defensive mids
+    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    # Central & attacking mids
+    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8",
+    # Wingers
+    "LEFTWING": "Winger", "RIGHTWING": "Winger",
+    "LEFTMIDFIELDER": "Winger", "RIGHTMIDFIELDER": "Winger",
+    # Strikers
+    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
+    # GK
+    "GOALKEEPER": "Goalkeeper",
+}
 def map_first_position_to_group(primary_pos_cell) -> str:
-    return RAW_TO_GROUP.get(_clean_pos_token(primary_pos_cell), None)
+    return RAW_TO_SIX.get(_clean_pos_token(primary_pos_cell), None)
 
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
 # ============================================================
-# Preprocessing (League + Multiplier + Position)
+# Preprocessing (IDENTICAL TO RADAR PAGE)
 # ============================================================
-def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
+    df = df_in.copy()
 
-    rename_map = {}
-    if "Name" in df.columns: rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
-    if rename_map: df.rename(columns=rename_map, inplace=True)
+    # Normalise competition names
+    if "Competition" in df.columns:
+        df["Competition_norm"] = df["Competition"].astype(str).str.strip()
+    else:
+        df["Competition_norm"] = np.nan
 
-    if "Competition_norm" not in df.columns and "Competition" in df.columns:
-        df["Competition_norm"] = df["Competition"].astype(str)
-
-    # merge multipliers
+    # Merge multipliers if file exists
     try:
-        mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
-        if {"League", "Multiplier"}.issubset(mult.columns):
-            df = df.merge(mult, left_on="Competition_norm", right_on="League", how="left")
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
+        m = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
+        m.columns = m.columns.str.lower().str.strip()
+        if "league" in m.columns and "multiplier" in m.columns:
+            df = df.merge(m, left_on="Competition_norm", right_on="league", how="left")
+            df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
         else:
             df["Multiplier"] = 1.0
     except Exception:
         df["Multiplier"] = 1.0
 
-    if "Secondary Position" in df.columns:
-        df["Positions played"] = df["Position"].fillna("") + np.where(
-            df["Secondary Position"].notna(), ", " + df["Secondary Position"].astype(str), ""
-        )
-    else:
-        df["Positions played"] = df["Position"]
+    rename_map = {}
+    if "Name" in df.columns: rename_map["Name"] = "Player"
+    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
+    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+    df.rename(columns=rename_map, inplace=True)
 
-    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+    if "Position" in df.columns:
+        df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+    else:
+        df["Six-Group Position"] = np.nan
+
     return df
 
 # ============================================================
-# ✅ Position-specific scoring logic (IDENTICAL TO RADAR PAGE)
+# Scoring Logic (copied from radar pipeline)
 # ============================================================
-
-import importlib
-
-radar_module = importlib.import_module("pages.1_Player_Search_and_Radar")
-position_metrics = radar_module.position_metrics
-LOWER_IS_BETTER = radar_module.LOWER_IS_BETTER
-
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
-    """
-    Compute position-specific 0–100 scores identical to the Radar Page logic.
-    - Uses metrics defined in position_metrics.
-    - Z-scores calculated within Six-Group Position.
-    - League multiplier applied before scaling.
-    - Anchors (min/max) come from players ≥ min_minutes.
-    """
+    """Replicate radar Z-score → Weighted Z → 0–100 scale."""
     df_all = df_all.copy()
     pos_col = "Six-Group Position"
 
-    # Ensure numeric conversion for relevant columns
-    for col in df_all.columns:
-        if not pd.api.types.is_numeric_dtype(df_all[col]):
-            try:
-                df_all[col] = pd.to_numeric(df_all[col], errors="coerce")
-            except Exception:
-                pass
+    # Ensure numeric
+    numeric_cols = [c for c in df_all.columns if pd.api.types.is_numeric_dtype(df_all[c])]
+    df_all[numeric_cols] = df_all[numeric_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
 
-    df_all["Avg Z Score"] = np.nan
-    df_all["Weighted Z Score"] = np.nan
+    # Compute Z-scores per position
+    df_num = df_all.select_dtypes(include=[np.number]).copy()
+    metric_cols = [c for c in df_num.columns if c not in ["Age", "Height", "Minutes played", "Multiplier"]]
+    raw_z = pd.DataFrame(index=df_all.index, columns=metric_cols, dtype=float)
+    for m in metric_cols:
+        z = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() else 0)
+        if m in LOWER_IS_BETTER:
+            z *= -1
+        raw_z[m] = z.fillna(0)
 
-    results = []
+    df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
+    df_all["Weighted Z Score"] = df_all["Avg Z Score"] * pd.to_numeric(df_all["Multiplier"], errors="coerce").fillna(1.0)
 
-    # Loop through each position group using the radar’s metric sets
-    for pos, meta in position_metrics.items():
-        metrics = [m for m in meta["metrics"] if m in df_all.columns]
-        subset = df_all[df_all[pos_col] == pos].copy()
-        if subset.empty or len(metrics) == 0:
-            continue
-
-        raw_z = pd.DataFrame(index=subset.index, columns=metrics, dtype=float)
-        for m in metrics:
-            subset[m] = pd.to_numeric(subset[m], errors="coerce").fillna(0)
-            z = subset[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
-            if m in LOWER_IS_BETTER:
-                z *= -1
-            raw_z[m] = z.fillna(0)
-
-        subset["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
-        subset["Multiplier"] = pd.to_numeric(subset.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-        subset["Weighted Z Score"] = subset["Avg Z Score"] * subset["Multiplier"]
-
-        results.append(subset)
-
-    if results:
-        df_all = pd.concat(results, ignore_index=True)
-    else:
-        st.warning("No valid positional data to compute scores.")
-        return df_all
-
-    # --- Anchor scaling (same as radar) ---
+    # Anchor scaling (>= min_minutes)
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
 
-    anchors = (
-        eligible.groupby(pos_col)["Weighted Z Score"]
-                .agg(_scale_min="min", _scale_max="max")
-                .fillna(0)
-    )
-
+    anchors = eligible.groupby(pos_col)["Weighted Z Score"].agg(_scale_min="min", _scale_max="max").fillna(0)
     df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
-    # --- Scale Weighted Z Score → 0–100 (identical to radar) ---
     def _to100(v, lo, hi):
-        try:
-            v, lo, hi = float(v), float(lo), float(hi)
-            if np.isnan(v) or np.isnan(lo) or np.isnan(hi) or hi <= lo:
-                return 50.0
-            return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
-        except Exception:
+        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
+        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df_all["Score (0–100)"] = [
         _to100(v, lo, hi)
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
-
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
-
     return df_all
 
 # ============================================================
 # Main UI
 # ============================================================
 try:
-    df_all_raw = load_statsbomb(DATA_PATH)
-    df_all_raw = add_age_column(df_all_raw)
-    df_all = preprocess(df_all_raw)
+    df_raw = load_statsbomb(DATA_PATH)
+    df_raw = add_age_column(df_raw)
+    df_all = preprocess_df(df_raw)
     df_all = compute_scores(df_all, min_minutes=600)
 
+    # League + Club selectors
     league_col = "Competition_norm"
     leagues = sorted(df_all[league_col].dropna().unique())
     selected_league = st.selectbox("Select League", leagues)
@@ -264,15 +239,11 @@ try:
         st.warning("No players found for this team.")
         st.stop()
 
-    # ---------- Minutes filter ----------
+    # Minutes filter identical to radar
     st.markdown("#### ⏱ Filter by Minutes Played")
-
-    # Ensure the column exists and is numeric
     df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
-
-    # Persist the minutes filter across reruns
     if "team_min_minutes" not in st.session_state:
-        st.session_state.team_min_minutes = 600  # default like radar page
+        st.session_state.team_min_minutes = 600
 
     st.session_state.team_min_minutes = st.number_input(
         "Minimum minutes to include",
@@ -282,27 +253,25 @@ try:
         step=50,
         key="team_min_minutes_input"
     )
-
-    # Apply the filter
     min_minutes = st.session_state.team_min_minutes
     df_team = df_team[df_team["Minutes played"] >= min_minutes].copy()
-
     if df_team.empty:
         st.warning(f"No players with ≥ {min_minutes} minutes.")
         st.stop()
-        
+
+    # Rank in team
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-    # ---------- Table ----------
+    # Table
     st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
-
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
         "Team", league_col, "Multiplier",
         "Score (0–100)", "Age", "Minutes played", "Rank in Team"
     ]
     for c in cols_for_table:
-        if c not in df_team.columns: df_team[c] = np.nan
+        if c not in df_team.columns:
+            df_team[c] = np.nan
 
     z_ranking = df_team[cols_for_table].copy()
     z_ranking.rename(columns={
@@ -310,7 +279,6 @@ try:
         league_col: "League",
         "Multiplier": "League Weight"
     }, inplace=True)
-
     z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
     z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
     z_ranking["League Weight"] = pd.to_numeric(z_ranking["League Weight"], errors="coerce").fillna(1.0).round(3)
