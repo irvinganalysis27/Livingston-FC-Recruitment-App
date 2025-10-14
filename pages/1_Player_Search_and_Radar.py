@@ -1469,7 +1469,7 @@ print("[DEBUG_LOOP] ---- BEFORE FAVOURITES SYNC ----")
 import time
 
 # Cache favourites for smoother reloads (prevents needless reruns)
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=5, show_spinner=False)
 def load_favourites_cached():
     return get_favourites_with_colours_live()
 
