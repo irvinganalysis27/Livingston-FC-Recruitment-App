@@ -215,37 +215,31 @@ try:
         st.warning("No players found for this team.")
         st.stop()
 
-        # ---------- Minutes filter ----------
+    # ---------- Minutes filter ----------
     st.markdown("#### ⏱ Filter by Minutes Played")
 
     # Ensure the column exists and is numeric
     df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
 
-    # Get the min and max minutes for slider bounds
-    min_mins = int(df_team["Minutes played"].min())
-    max_mins = int(df_team["Minutes played"].max())
-
-    # Use session_state to remember the last slider value
+    # Persist the minutes filter across reruns
     if "team_min_minutes" not in st.session_state:
-        st.session_state.team_min_minutes = min(600, max_mins)
+        st.session_state.team_min_minutes = 600  # default like radar page
 
-    selected_min_mins = st.slider(
-        "Minimum minutes to include in ranking",
-        min_value=min_mins,
-        max_value=max_mins,
+    st.session_state.team_min_minutes = st.number_input(
+        "Minimum minutes to include",
+        min_value=0,
+        max_value=int(df_team["Minutes played"].max()),
         value=st.session_state.team_min_minutes,
         step=50,
-        help="Only show players with at least this many minutes played"
+        key="team_min_minutes_input"
     )
 
     # Apply the filter
-    df_team = df_team[df_team["Minutes played"] >= selected_min_mins].copy()
-
-    # Update session state for next rerun
-    st.session_state.team_min_minutes = selected_min_mins
+    min_minutes = st.session_state.team_min_minutes
+    df_team = df_team[df_team["Minutes played"] >= min_minutes].copy()
 
     if df_team.empty:
-        st.warning(f"No players with ≥ {selected_min_mins} minutes.")
+        st.warning(f"No players with ≥ {min_minutes} minutes.")
         st.stop()
         
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
