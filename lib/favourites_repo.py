@@ -58,7 +58,8 @@ def append_to_google_sheet(record):
             )
 
             gc = gspread.authorize(creds)
-            sheet = gc.open("Livingston_Favourites_Log").worksheet("favourites_log")
+            sh = gc.open("Livingston_Favourites_Log")
+            sheet = sh.worksheet("favourites_log")
 
             row = [
                 datetime.utcnow().isoformat(),
@@ -78,7 +79,6 @@ def append_to_google_sheet(record):
         except Exception as e:
             print(f"[ERROR] Google Sheet log failed: {e}")
 
-    # Run in background thread so it never blocks Streamlit
     threading.Thread(target=_worker, args=(record,), daemon=True).start()
 # ============================================================
 # 💾 Supabase CRUD Functions
