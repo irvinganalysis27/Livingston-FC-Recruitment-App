@@ -53,7 +53,6 @@ def get_gsheet():
         )
         gc = gspread.authorize(creds)
 
-        # Google Sheet ID
         spreadsheet_id = "1ESiZsk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
 
         try:
@@ -105,14 +104,23 @@ def append_to_google_sheet(record):
 # ============================================================
 
 def upsert_favourite(record, log_to_sheet=False):
-    """Insert or update a favourite in Supabase. Logs to Google Sheets if log_to_sheet=True."""
+    """
+    Insert or update a favourite in Supabase.
+    Only performs an update if something has actually changed.
+    Logs to Google Sheets if log_to_sheet=True.
+    """
     sb = get_supabase_client()
     if not sb:
         print("[ERROR] Supabase client not available.")
         return False
 
+    player = record.get("player")
+    if not player:
+        print("[WARN] No player provided in record.")
+        return False
+
     payload = {
-        "player": record.get("player"),
+        "player": player,
         "team": record.get("team"),
         "league": record.get("league"),
         "position": record.get("position"),
@@ -125,16 +133,32 @@ def upsert_favourite(record, log_to_sheet=False):
     }
 
     try:
+        # --- 1️⃣ Fetch existing record ---
+        existing = sb.table(TABLE).select("*").eq("player", player).execute()
+        existing_row = existing.data[0] if existing.data else None
+
+        # --- 2️⃣ Skip identical data ---
+        if existing_row:
+            changed = any(
+                str(existing_row.get(k, "")).strip() != str(payload.get(k, "")).strip()
+                for k in ["team", "league", "position", "colour", "comment", "visible"]
+            )
+            if not changed:
+                print(f"[DEBUG] Skipping {player} — no change detected")
+                return True
+
+        # --- 3️⃣ Perform upsert if new/changed ---
         safe_execute(sb.table(TABLE).upsert(payload, on_conflict="player"))
+        print(f"[INFO] ✅ Upserted favourite for {player}")
 
         if log_to_sheet:
             append_to_google_sheet(payload)
-            print(f"[LOG] ✅ Logged to Google Sheet for {payload['player']}")
+            print(f"[LOG] ✅ Logged to Google Sheet for {player}")
 
-        print(f"[INFO] ✅ Upserted favourite for {payload['player']}")
         return True
+
     except Exception as e:
-        print(f"[ERROR] Failed to upsert favourite {payload['player']}: {e}")
+        print(f"[ERROR] Failed to upsert favourite {player}: {e}")
         return False
 
 
