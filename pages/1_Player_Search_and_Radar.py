@@ -1493,11 +1493,10 @@ else:
         team = row.get("Team", "")
         league = row.get("League", "")
         position = row.get("Positions played", "")
-
-        # Default to 🟡 Monitor if not set
+    
         colour = favs.get(player_name, {}).get("colour", "🟣 Needs Checked")
         comment = favs.get(player_name, {}).get("comment", "")
-
+    
         payload = {
             "player": player_name,
             "team": team,
@@ -1509,10 +1508,18 @@ else:
             "updated_at": datetime.utcnow().isoformat(),
             "source": "radar-page",
         }
-        try:
+    
+        # 🧠 Only log if this favourite is new or changed
+        if player_name not in favs or favs[player_name].get("visible") is False:
+            try:
+                upsert_favourite(payload)
+                append_to_google_sheet(payload)  # log only once when added
+                print(f"[INFO] ✅ Upserted and logged new favourite: {player_name}")
+            except Exception as e:
+                st.error(f"❌ Failed to save favourite for {player_name}: {e}")
+        else:
+            # Already in Supabase and visible, no need to re-log
             upsert_favourite(payload)
-        except Exception as e:
-            st.error(f"❌ Failed to save favourite for {player_name}: {e}")
 
 # --- Hide players that were previously favourites but now unstarred ---
 non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
