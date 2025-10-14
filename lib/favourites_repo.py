@@ -7,7 +7,6 @@ from google.oauth2.service_account import Credentials
 
 TABLE = "favourites"
 
-
 # ============================================================
 # 🔗 Supabase Connection (fresh client per call)
 # ============================================================
@@ -42,8 +41,6 @@ def safe_execute(query, retries=3, delay=0.3):
 # ============================================================
 # 🧾 Google Sheet Logging (auto-create + safe append)
 # ============================================================
-import gspread
-from google.oauth2.service_account import Credentials
 
 @st.cache_resource(show_spinner=False)
 def get_gsheet():
@@ -56,9 +53,7 @@ def get_gsheet():
         )
         gc = gspread.authorize(creds)
 
-        # Use your actual sheet ID here
         spreadsheet_id = "1ESiZsk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
-
         try:
             sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
         except gspread.WorksheetNotFound:
@@ -69,7 +64,6 @@ def get_gsheet():
                 "Colour", "Comment", "Visible", "Updated_by", "Source"
             ], value_input_option="USER_ENTERED")
             print("[INFO] Created new 'favourites_log' worksheet")
-
         return sheet
     except Exception as e:
         print(f"[ERROR] Could not connect to Google Sheets: {e}")
@@ -77,7 +71,7 @@ def get_gsheet():
 
 
 def append_to_google_sheet(record):
-    """Append a favourite change to Google Sheet log (non-blocking)."""
+    """Append a favourite change to Google Sheet log."""
     sheet = get_gsheet()
     if not sheet:
         print("[WARN] No sheet handle, skipping log.")
@@ -100,11 +94,14 @@ def append_to_google_sheet(record):
         print(f"[LOG] ✅ Logged to Google Sheet for {record.get('player')}")
     except Exception as e:
         print(f"[ERROR] Google Sheet log failed: {e}")
+
+
 # ============================================================
 # 💾 Supabase CRUD Functions
 # ============================================================
 
-def upsert_favourite(record):
+def upsert_favourite(record, log_to_sheet=False):
+    """Insert or update a favourite in Supabase. Only logs to Google Sheets if requested."""
     sb = get_supabase_client()
     if not sb:
         print("[ERROR] Supabase client not available.")
@@ -125,7 +122,8 @@ def upsert_favourite(record):
 
     try:
         safe_execute(sb.table(TABLE).upsert(payload, on_conflict="player"))
-        append_to_google_sheet(payload)
+        if log_to_sheet:
+            append_to_google_sheet(payload)
         print(f"[INFO] ✅ Upserted favourite for {payload['player']}")
         return True
     except Exception as e:
