@@ -1523,12 +1523,7 @@ else:
         }
 
         # 🧠 Decide when to log: if brand new OR visible was previously False OR comment/colour changed
-        changed = (
-            player_name not in current_favs
-            or prev_visible is False
-            or prev_comment != comment
-            or prev_colour != colour
-        )
+        changed = True  # Always log when saving from radar page
 
         try:
             upsert_favourite(payload, log_to_sheet=changed)
