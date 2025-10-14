@@ -1495,7 +1495,7 @@ else:
         position = row.get("Positions played", "")
 
         # Default to 🟡 Monitor if not set
-        colour = favs.get(player_name, {}).get("colour", "🟡 Monitor")
+        colour = favs.get(player_name, {}).get("colour", "🟣 Needs Checked")
         comment = favs.get(player_name, {}).get("comment", "")
 
         payload = {
