@@ -153,44 +153,64 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
-    if pos_col not in df_all.columns: df_all[pos_col] = np.nan
+    if pos_col not in df_all.columns:
+        df_all[pos_col] = np.nan
 
-    # Ensure numeric
+    # Ensure numeric columns only
     df_num = df_all.select_dtypes(include=[np.number]).copy()
     metric_cols = [c for c in df_num.columns if c not in ["Age", "Height", "Minutes played"]]
     raw_z = pd.DataFrame(index=df_all.index, columns=metric_cols, dtype=float)
 
+    # --- 1. Compute Z-scores per position group (same as radar page) ---
     for m in metric_cols:
-        z = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() else 0)
+        df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+        z_per_pos = df_all.groupby(pos_col)[m].transform(
+            lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
+        )
         if m in LOWER_IS_BETTER:
-            z *= -1
-        raw_z[m] = z.fillna(0)
+            z_per_pos *= -1
+        raw_z[m] = z_per_pos.fillna(0)
 
+    # --- 2. Average across all metrics per player ---
     df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
+
+    # --- 3. Apply league multiplier (if available) ---
     df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
+    # --- 4. Restrict scaling anchors to eligible players per position ---
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
 
+    # Compute per-position min and max of Weighted Z Score
     anchors = (
         eligible.groupby(pos_col)["Weighted Z Score"]
                 .agg(_scale_min="min", _scale_max="max")
                 .fillna(0)
     )
+
+    # Merge back into main df
     df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
+    # --- 5. Convert Weighted Z to 0–100 scale (same as radar) ---
     def _to100(v, lo, hi):
-        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo: return 50.0
-        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+        try:
+            v, lo, hi = float(v), float(lo), float(hi)
+            if np.isnan(v) or np.isnan(lo) or np.isnan(hi) or hi <= lo:
+                return 50.0
+            return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+        except Exception:
+            return 50.0
 
     df_all["Score (0–100)"] = [
         _to100(v, lo, hi)
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
+
+    # Cleanup
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
     return df_all
 
