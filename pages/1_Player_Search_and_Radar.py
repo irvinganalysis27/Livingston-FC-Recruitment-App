@@ -593,7 +593,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
-def load_data_once(_sig=None):
+def load_data_once():
     """Load and preprocess StatsBomb data once per session."""
     path = DATA_PATH
     sig = _data_signature(path)
@@ -626,7 +626,7 @@ def load_data_once(_sig=None):
     return df_preprocessed
     
 # ---------- Load & preprocess ----------
-df_all_raw = load_data_once(_sig=_data_signature(DATA_PATH))
+df_all_raw = load_data_once()
 
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
