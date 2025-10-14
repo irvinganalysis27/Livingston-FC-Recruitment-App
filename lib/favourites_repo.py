@@ -40,46 +40,66 @@ def safe_execute(query, retries=3, delay=0.3):
 
 
 # ============================================================
-# 🧾 Google Sheet Logging (non-blocking + correct scopes)
+# 🧾 Google Sheet Logging (auto-create + safe append)
 # ============================================================
-import threading
+import gspread
+from google.oauth2.service_account import Credentials
+
+@st.cache_resource(show_spinner=False)
+def get_gsheet():
+    """Authorise and return the worksheet handle."""
+    try:
+        creds_info = st.secrets["gcp_service_account"]
+        creds = Credentials.from_service_account_info(
+            creds_info,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        gc = gspread.authorize(creds)
+
+        # Use your actual sheet ID here
+        spreadsheet_id = "1ESizSk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"
+
+        try:
+            sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
+        except gspread.WorksheetNotFound:
+            sh = gc.open_by_key(spreadsheet_id)
+            sheet = sh.add_worksheet(title="favourites_log", rows=1000, cols=10)
+            sheet.append_row([
+                "Timestamp", "Player", "Team", "League", "Position",
+                "Colour", "Comment", "Visible", "Updated_by", "Source"
+            ], value_input_option="USER_ENTERED")
+            print("[INFO] Created new 'favourites_log' worksheet")
+
+        return sheet
+    except Exception as e:
+        print(f"[ERROR] Could not connect to Google Sheets: {e}")
+        return None
+
 
 def append_to_google_sheet(record):
-    """Append a favourite change to the Google Sheet log asynchronously."""
-    def _worker(data):
-        try:
-            creds_info = st.secrets["gcp_service_account"]
-            creds = Credentials.from_service_account_info(
-                creds_info,
-                scopes=[
-                    "https://www.googleapis.com/auth/spreadsheets",
-                    "https://www.googleapis.com/auth/drive"
-                ]
-            )
+    """Append a favourite change to Google Sheet log (non-blocking)."""
+    sheet = get_gsheet()
+    if not sheet:
+        print("[WARN] No sheet handle, skipping log.")
+        return
 
-            gc = gspread.authorize(creds)
-            spreadsheet_id = "1ESizSk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0"  # your sheet ID from the URL
-            sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
-
-            row = [
-                datetime.utcnow().isoformat(),
-                data.get("player", ""),
-                data.get("team", ""),
-                data.get("league", ""),
-                data.get("position", ""),
-                data.get("colour", ""),
-                data.get("comment", ""),
-                data.get("visible", True),
-                data.get("updated_by", "auto"),
-                data.get("source", "radar-page"),
-            ]
-
-            sheet.append_row(row, value_input_option="USER_ENTERED")
-            print(f"[LOG] ✅ Logged {data.get('player')} to Google Sheet")
-        except Exception as e:
-            print(f"[ERROR] Google Sheet log failed: {e}")
-
-    threading.Thread(target=_worker, args=(record,), daemon=True).start()
+    try:
+        row = [
+            datetime.utcnow().isoformat(),
+            record.get("player", ""),
+            record.get("team", ""),
+            record.get("league", ""),
+            record.get("position", ""),
+            record.get("colour", ""),
+            record.get("comment", ""),
+            record.get("visible", True),
+            record.get("updated_by", "auto"),
+            record.get("source", "radar-page"),
+        ]
+        sheet.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOG] ✅ Logged to Google Sheet for {record.get('player')}")
+    except Exception as e:
+        print(f"[ERROR] Google Sheet log failed: {e}")
 # ============================================================
 # 💾 Supabase CRUD Functions
 # ============================================================
