@@ -1491,6 +1491,8 @@ else:
         print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
 
         # ---- UPSERT NEW OR UPDATED FAVOURITES ----
+        deleted_players = {p for p, d in favs_live.items() if not d.get("visible", True)}
+
         for _, row in favourite_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
             player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
@@ -1501,33 +1503,37 @@ else:
             prev_data = favs_live.get(player_name, {})
             prev_visible = bool(prev_data.get("visible", False))
 
-            # Skip identical rows (reduces noise + CPU)
-            if prev_visible:
+            # 🧠 Skip if player was deleted (hidden) and not manually re-starred
+            if player_name in deleted_players and not prev_visible:
+                print(f"[DEBUG] Skipping {player_name} — hidden in Supabase (won’t auto-revive)")
                 continue
 
-            payload = {
-                "player": player_name,
-                "team": team,
-                "league": league,
-                "position": position,
-                "colour": prev_data.get("colour", "🟣 Needs Checked"),
-                "comment": prev_data.get("comment", ""),
-                "visible": True,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "source": "radar-page",
-            }
+            # 🧠 Only upsert if not already visible in Supabase
+            if not prev_visible:
+                payload = {
+                    "player": player_name,
+                    "team": team,
+                    "league": league,
+                    "position": position,
+                    "colour": prev_data.get("colour", "🟣 Needs Checked"),
+                    "comment": prev_data.get("comment", ""),
+                    "visible": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "radar-page",
+                }
 
-            upsert_favourite(payload, log_to_sheet=True)
-            print(f"[LOG] ✅ Logged {player_name} (new or updated)")
+                upsert_favourite(payload, log_to_sheet=True)
+                print(f"[LOG] ✅ Added or reactivated {player_name}")
+            else:
+                print(f"[DEBUG] Skipping {player_name} — already visible in Supabase")
 
         # ---- HIDE UNSTARRED FAVOURITES ----
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
         for _, row in non_fav_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
             player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+
             old_visible = favs_live.get(player_name, {}).get("visible", False)
             if old_visible:
                 hide_favourite(player_name)
                 print(f"[INFO] Hid favourite: {player_name}")
-
-print("[DEBUG_LOOP] ---- AFTER FAVOURITES SYNC ----")
