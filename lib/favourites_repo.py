@@ -40,40 +40,46 @@ def safe_execute(query, retries=3, delay=0.3):
 
 
 # ============================================================
-# 🧾 Google Sheet Logging (optional, non-blocking placeholder)
+# 🧾 Google Sheet Logging (non-blocking + correct scopes)
 # ============================================================
+import threading
 
 def append_to_google_sheet(record):
-    """Append a favourite change to Google Sheet log (optional)."""
-    try:
-        creds_info = st.secrets["gcp_service_account"]
-        creds = Credentials.from_service_account_info(
-            creds_info,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        gc = gspread.authorize(creds)
-        sheet = gc.open("Livingston_Favourites_Log").worksheet("favourites_log")
+    """Append a favourite change to the Google Sheet log asynchronously."""
+    def _worker(data):
+        try:
+            creds_info = st.secrets["gcp_service_account"]
+            creds = Credentials.from_service_account_info(
+                creds_info,
+                scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive"
+                ]
+            )
 
-        row = [
-            datetime.utcnow().isoformat(),
-            record.get("player", ""),
-            record.get("team", ""),
-            record.get("league", ""),
-            record.get("position", ""),
-            record.get("colour", ""),
-            record.get("comment", ""),
-            record.get("visible", True),
-            record.get("updated_by", "auto"),
-            record.get("source", "radar-page"),
-        ]
+            gc = gspread.authorize(creds)
+            sheet = gc.open("Livingston_Favourites_Log").worksheet("favourites_log")
 
-        # Currently disabled for speed/debugging
-        # sheet.append_row(row, value_input_option="USER_ENTERED")
-        print(f"[LOG] (simulated) Added record for {record.get('player')}")
-    except Exception as e:
-        print(f"[ERROR] Google Sheet log failed: {e}")
+            row = [
+                datetime.utcnow().isoformat(),
+                data.get("player", ""),
+                data.get("team", ""),
+                data.get("league", ""),
+                data.get("position", ""),
+                data.get("colour", ""),
+                data.get("comment", ""),
+                data.get("visible", True),
+                data.get("updated_by", "auto"),
+                data.get("source", "radar-page"),
+            ]
 
+            sheet.append_row(row, value_input_option="USER_ENTERED")
+            print(f"[LOG] ✅ Logged {data.get('player')} to Google Sheet")
+        except Exception as e:
+            print(f"[ERROR] Google Sheet log failed: {e}")
 
+    # Run in background thread so it never blocks Streamlit
+    threading.Thread(target=_worker, args=(record,), daemon=True).start()
 # ============================================================
 # 💾 Supabase CRUD Functions
 # ============================================================
