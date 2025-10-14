@@ -1497,13 +1497,15 @@ else:
         league = row.get("League", "")
         position = row.get("Positions played", "")
 
-        # Get previous record from Supabase cache
-        prev_data = favs.get(player_name, {})
+        # 🔄 Always get a fresh copy of favourites from Supabase before comparing
+        current_favs = get_favourites_with_colours_live()
+        prev_data = current_favs.get(player_name, {})
+
         prev_colour = prev_data.get("colour", "🟣 Needs Checked")
         prev_comment = prev_data.get("comment", "")
         prev_visible = bool(prev_data.get("visible", False))
 
-        # Current values (new input)
+        # Current (new) values
         colour = prev_colour or "🟣 Needs Checked"
         comment = prev_comment
         visible = True
@@ -1516,13 +1518,13 @@ else:
             "colour": colour,
             "comment": comment,
             "visible": visible,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(datetime.UTC).isoformat(),
             "source": "radar-page",
         }
 
         # 🧠 Decide when to log: if brand new OR visible was previously False OR comment/colour changed
         changed = (
-            player_name not in favs
+            player_name not in current_favs
             or prev_visible is False
             or prev_comment != comment
             or prev_colour != colour
@@ -1543,7 +1545,10 @@ else:
         player_raw = str(row.get("Player (coloured)", "")).strip()
         player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
 
-        old_visible = favs.get(player_name, {}).get("visible", False)
+        # Load latest Supabase data to confirm it’s visible before hiding
+        current_favs = get_favourites_with_colours_live()
+        old_visible = current_favs.get(player_name, {}).get("visible", False)
+
         if old_visible:
             try:
                 hide_favourite(player_name)
