@@ -1168,6 +1168,7 @@ print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
     from matplotlib import colormaps as mcm
+    import matplotlib.colors as mcolors
 
     if not isinstance(group_colors, dict) or len(group_colors) == 0:
         group_colors = {
