@@ -1524,8 +1524,7 @@ else:
         # ✅ Only log to Google Sheet if it's a brand new favourite this session
         if player_name not in existing_visible and player_name not in new_favourites_logged:
             try:
-                upsert_favourite(payload)
-                append_to_google_sheet(payload)
+                upsert_favourite(payload, log_to_sheet=True)
                 new_favourites_logged.add(player_name)
                 print(f"[INFO] ✅ Upserted and logged new favourite: {player_name}")
             except Exception as e:
