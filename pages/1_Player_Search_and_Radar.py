@@ -1412,6 +1412,9 @@ def get_favourites_with_colours_live():
 # --- Build local dictionary for colouring ---
 favs = get_favourites_with_colours_live()
 
+print("[DEBUG] Sample favs from Supabase:")
+print({k: v for k, v in list(favs.items())[:5]})
+
 # --- Colour emoji map ---
 COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
