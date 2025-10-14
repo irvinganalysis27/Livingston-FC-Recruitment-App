@@ -90,3 +90,15 @@ def delete_favourite(player):
     except Exception as e:
         print(f"[ERROR] delete_favourite failed: {e}")
         return False
+
+def hide_favourite(player):
+    """Mark a favourite as hidden (visible=False) instead of deleting it."""
+    if not sb:
+        return False
+    try:
+        sb.table(TABLE).update({"visible": False, "updated_at": datetime.utcnow().isoformat()}).eq("player", player).execute()
+        print(f"[INFO] Hid favourite: {player}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] hide_favourite failed for {player}: {e}")
+        return False
