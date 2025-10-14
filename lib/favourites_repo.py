@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 import streamlit as st
 from supabase import create_client
@@ -59,10 +59,11 @@ def get_gsheet():
             sheet = gc.open_by_key(spreadsheet_id).worksheet("favourites_log")
         except gspread.WorksheetNotFound:
             sh = gc.open_by_key(spreadsheet_id)
-            sheet = sh.add_worksheet(title="favourites_log", rows=1000, cols=10)
+            sheet = sh.add_worksheet(title="favourites_log", rows=1000, cols=11)
             sheet.append_row([
                 "Timestamp", "Player", "Team", "League", "Position",
-                "Colour", "Comment", "Visible", "Updated_by", "Source"
+                "Colour", "Initial Watch", "Second Watch",
+                "Visible", "Updated_by", "Source"
             ], value_input_option="USER_ENTERED")
             print("[INFO] Created new 'favourites_log' worksheet")
 
@@ -82,13 +83,14 @@ def append_to_google_sheet(record):
 
     try:
         row = [
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
             record.get("player", ""),
             record.get("team", ""),
             record.get("league", ""),
             record.get("position", ""),
             record.get("colour", ""),
-            record.get("comment", ""),
+            record.get("initial_watch_comment", ""),
+            record.get("second_watch_comment", ""),
             record.get("visible", True),
             record.get("updated_by", "auto"),
             record.get("source", "radar-page"),
@@ -125,9 +127,10 @@ def upsert_favourite(record, log_to_sheet=False):
         "league": record.get("league"),
         "position": record.get("position"),
         "colour": record.get("colour", "🟣 Needs Checked"),
-        "comment": record.get("comment", ""),
+        "initial_watch_comment": record.get("initial_watch_comment", ""),
+        "second_watch_comment": record.get("second_watch_comment", ""),
         "visible": bool(record.get("visible", True)),
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "updated_by": record.get("updated_by", "auto"),
         "source": record.get("source", "radar-page"),
     }
@@ -141,7 +144,10 @@ def upsert_favourite(record, log_to_sheet=False):
         if existing_row:
             changed = any(
                 str(existing_row.get(k, "")).strip() != str(payload.get(k, "")).strip()
-                for k in ["team", "league", "position", "colour", "comment", "visible"]
+                for k in [
+                    "team", "league", "position", "colour",
+                    "initial_watch_comment", "second_watch_comment", "visible"
+                ]
             )
             if not changed:
                 print(f"[DEBUG] Skipping {player} — no change detected")
@@ -203,7 +209,7 @@ def hide_favourite(player):
             sb.table(TABLE)
             .update({
                 "visible": False,
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             })
             .eq("player", player)
         )
