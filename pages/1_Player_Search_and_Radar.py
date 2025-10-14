@@ -1239,7 +1239,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     team = row.get("Team within selected timeframe", "") or ""
     mins = row.get("Minutes played", np.nan)
     role = row.get("Six-Group Position", "") or ""
-    rank_v = int(row.get("Rank", 0)) if pd.notnull(row.get("Rank", 0)) else None
+    rank_v = int(row.get("Rank (Global)", 0)) if pd.notnull(row.get("Rank (Global)")) else None
 
     comp = row.get("Competition_norm") or row.get("Competition") or ""
 
