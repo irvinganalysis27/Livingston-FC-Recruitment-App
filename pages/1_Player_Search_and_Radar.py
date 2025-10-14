@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
+print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
+
 # --- Password protection ---
 from auth import check_password
 from branding import show_branding
