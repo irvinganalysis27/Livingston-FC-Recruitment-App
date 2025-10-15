@@ -1095,22 +1095,30 @@ anchors = (
 )
 
 # --- Step 4: Merge anchors and compute 0–100 score for radar dataset ---
+# Ensure position column exists
 if pos_col not in plot_data.columns:
     plot_data[pos_col] = np.nan
 
+# Merge scaling anchors on position
 plot_data = plot_data.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
-# 🔧 FIX: Ensure Weighted Z Score exists in plot_data
-if "Weighted Z Score" not in plot_data.columns:
-    plot_data = plot_data.merge(df_all[["Player", "Weighted Z Score"]], on="Player", how="left")
-    print("[DEBUG] Added Weighted Z Score column to plot_data from df_all")
+# --- 🔧 Attach the Z-score data for this player from df_all ---
+merge_cols = ["Player", "Avg Z Score", "Weighted Z Score", "Multiplier"]
+for c in merge_cols:
+    if c not in df_all.columns:
+        df_all[c] = np.nan
+if "Player" not in plot_data.columns:
+    plot_data["Player"] = np.nan
 
-# Handle missing anchors gracefully
-if "_scale_min" not in plot_data.columns or "_scale_max" not in plot_data.columns:
-    plot_data["_scale_min"] = 0.0
-    plot_data["_scale_max"] = 1.0
-    print("[DEBUG] ⚠️ Anchor columns missing after merge; using fallback 0–1 range")
+plot_data = plot_data.merge(df_all[merge_cols], on="Player", how="left", suffixes=("", "_from_df_all"))
 
+# Fallbacks if columns missing
+for col in ["_scale_min", "_scale_max"]:
+    if col not in plot_data.columns:
+        plot_data[col] = 0.0
+        print(f"[DEBUG] ⚠️ Added missing column {col} with fallback 0.0")
+
+# --- Compute final 0–100 scores ---
 def _minmax_score(v, lo, hi):
     if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
         return 50.0
@@ -1118,9 +1126,22 @@ def _minmax_score(v, lo, hi):
 
 plot_data["Score (0–100)"] = [
     _minmax_score(v, lo, hi)
-    for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
+    for v, lo, hi in zip(
+        plot_data["Weighted Z Score"],
+        plot_data["_scale_min"],
+        plot_data["_scale_max"]
+    )
 ]
 plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
+
+# --- Step 5: Rank players globally within this filtered dataset ---
+plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+# --- Step 6: Debug summary ---
+print("[DEBUG] ✅ Unified Z-Score + Merge block executed")
+print("[DEBUG] Z-score columns in plot_data:", [c for c in plot_data.columns if 'Z Score' in c])
+print("[DEBUG] Example rows:")
+print(plot_data[["Player", "Avg Z Score", "Weighted Z Score", "Score (0–100)"]].head(5).to_string())
 
 # --- Step 5: Rank players globally within this filtered dataset ---
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
