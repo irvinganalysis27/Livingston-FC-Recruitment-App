@@ -265,7 +265,7 @@ try:
         st.stop()
 
     # ---------- Table ----------
-    st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
+    st.markdown(f"### {selected_club} ({selected_league})")
 
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
