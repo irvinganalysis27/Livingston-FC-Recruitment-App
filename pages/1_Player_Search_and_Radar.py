@@ -1067,14 +1067,10 @@ percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics]
 # --- Unified Z-Score and 0–100 Scaling (Simplified + Matched)
 # ============================================================
 
-# --- Step 1: Use ≥600 mins only for anchor scaling, not for dropping players ---
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
-anchor_source = df_all[_mins_all >= 600].copy()
-if anchor_source.empty:
-    st.warning("No players with ≥600 mins found. Using full dataset for anchors.")
-    anchor_source = df_all.copy()
+# --- Step 1: Compute per-position Z-scores for ALL players ---
+df_all = df_all.copy()
+pos_col = "Six-Group Position"
 
-# --- Step 2: Compute per-position Z-scores for all metrics ---
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
@@ -1087,11 +1083,12 @@ df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-# --- DEBUG: verify Z-score generation ---
-print("[DEBUG] Z-score verification sample:")
-z_debug_cols = ["Player", "Six-Group Position", "Avg Z Score", "Weighted Z Score", "Multiplier"]
-print(df_all[z_debug_cols].head(10).to_string(index=False))
-print("[DEBUG] Non-null Weighted Z count:", df_all["Weighted Z Score"].notna().sum())
+# --- Step 2: Create anchor source (≥600 min) for scaling only ---
+_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
+anchor_source = df_all[_mins_all >= 600].copy()
+if anchor_source.empty:
+    st.warning("No players with ≥600 mins found. Using full dataset for anchors.")
+    anchor_source = df_all.copy()
 
 # --- Step 3: Build 0–100 scoring anchors (min/max per position) ---
 anchors = (
