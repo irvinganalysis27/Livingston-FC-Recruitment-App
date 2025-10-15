@@ -1087,6 +1087,12 @@ df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
+# --- DEBUG: verify Z-score generation ---
+print("[DEBUG] Z-score verification sample:")
+z_debug_cols = ["Player", "Six-Group Position", "Avg Z Score", "Weighted Z Score", "Multiplier"]
+print(df_all[z_debug_cols].head(10).to_string(index=False))
+print("[DEBUG] Non-null Weighted Z count:", df_all["Weighted Z Score"].notna().sum())
+
 # --- Step 3: Build 0–100 scoring anchors (min/max per position) ---
 anchors = (
     df_all.groupby(pos_col)["Weighted Z Score"]
