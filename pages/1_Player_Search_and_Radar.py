@@ -1173,6 +1173,32 @@ print("[DEBUG] Sample anchor ranges:",
                    .to_dict(orient="records"))
 print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
 print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
+# ============================================================
+# 🔍 DEBUG PLAYER SCORE DETAILS
+# ============================================================
+
+def debug_player_score(player_name: str, df_source: pd.DataFrame, pos_col="Six-Group Position"):
+    """Print the key numbers affecting a player's 0–100 score."""
+    row = df_source.loc[df_source["Player"] == player_name]
+    if row.empty:
+        st.warning(f"No player found: {player_name}")
+        return
+
+    r = row.iloc[0]
+
+    st.markdown("### 🔍 Debug Player Score Details")
+    st.text(f"Player: {r.get('Player')}")
+    st.text(f"Position: {r.get(pos_col)}")
+    st.text(f"League: {r.get('Competition_norm') or r.get('Competition')}")
+    st.text(f"Minutes played: {r.get('Minutes played')}")
+    st.text(f"Multiplier: {r.get('Multiplier')}")
+    st.text(f"Avg Z Score: {r.get('Avg Z Score')}")
+    st.text(f"Weighted Z Score: {r.get('Weighted Z Score')}")
+    st.text(f"Scale Min: {r.get('_scale_min')}")
+    st.text(f"Scale Max: {r.get('_scale_max')}")
+    st.text(f"Final Score (0–100): {r.get('Score (0–100)')}")
+    st.divider()
+
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
@@ -1315,6 +1341,12 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         pass
 
     st.pyplot(fig, width="stretch")
+
+# ---------- Debug one player ----------
+if "Player" in plot_data.columns:
+    debug_name = st.text_input("🔍 Debug player name (optional)")
+    if debug_name:
+        debug_player_score(debug_name, plot_data)
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
