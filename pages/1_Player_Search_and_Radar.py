@@ -1095,16 +1095,15 @@ anchors = (
 )
 
 # --- Step 4: Merge anchors and compute 0–100 score for radar dataset ---
-# Ensure 'Six-Group Position' exists and aligns
 if pos_col not in plot_data.columns:
     plot_data[pos_col] = np.nan
 
-# Debug check: show missing positions
-if plot_data[pos_col].isna().all():
-    print("[DEBUG] ⚠️ plot_data has no Six-Group Position values before merge")
-
-# Merge anchors on position
 plot_data = plot_data.merge(anchors, left_on=pos_col, right_index=True, how="left")
+
+# 🔧 FIX: Ensure Weighted Z Score exists in plot_data
+if "Weighted Z Score" not in plot_data.columns:
+    plot_data = plot_data.merge(df_all[["Player", "Weighted Z Score"]], on="Player", how="left")
+    print("[DEBUG] Added Weighted Z Score column to plot_data from df_all")
 
 # Handle missing anchors gracefully
 if "_scale_min" not in plot_data.columns or "_scale_max" not in plot_data.columns:
