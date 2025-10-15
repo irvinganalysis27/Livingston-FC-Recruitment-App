@@ -265,7 +265,13 @@ try:
         st.stop()
 
     # ---------- Table ----------
-    st.markdown(f"### {selected_club} ({selected_league})")
+    avg_score = (
+        df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
+    )
+    if not np.isnan(avg_score):
+        st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
+    else:
+        st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
