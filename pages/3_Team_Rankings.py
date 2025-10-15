@@ -174,7 +174,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         mean_col = f"{m}_mean"
         std_col = f"{m}_std"
         if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
-            continue  # skip metrics missing from baseline
+            continue
         mean_map = baseline_stats[mean_col]
         std_map = baseline_stats[std_col].replace(0, 1)
         mean_vals = df_all[pos_col].map(mean_map)
@@ -184,29 +184,43 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             z *= -1
         raw_z[m] = z.fillna(0)
 
+    # --- Ensure Z-score + weighted columns exist ---
     df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
     df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
+
+    # --- Ensure fallback (avoid missing column errors) ---
+    if "Weighted Z Score" not in df_all.columns:
+        df_all["Weighted Z Score"] = df_all["Avg Z Score"]
 
     # --- LFC weighted score override for Scotland Premiership ---
     df_all["LFC Multiplier"] = df_all["Multiplier"]
     df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
     df_all["LFC Weighted Z"] = df_all["Avg Z Score"] * df_all["LFC Multiplier"]
 
-    # --- Anchors from eligible ---
+    # --- Compute anchors using available Weighted Z Score ---
+    if "Weighted Z Score" not in df_all.columns:
+        df_all["Weighted Z Score"] = 0.0
+
     anchors = (
         eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
                 .agg(_scale_min="min", _scale_max="max")
                 .fillna(0)
     )
-    df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
+    # Merge safely
+    if not anchors.empty:
+        df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
+    else:
+        df_all["_scale_min"] = 0.0
+        df_all["_scale_max"] = 1.0
+
+    # --- Convert to 0–100 scales ---
     def _to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
         return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
-    # --- Compute both standard and LFC 0–100 scores ---
     df_all["Score (0–100)"] = [
         _to100(v, lo, hi)
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
