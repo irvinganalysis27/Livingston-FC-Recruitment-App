@@ -156,18 +156,20 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # --- Identify eligible players for baseline ---
+    # --- Compute numeric Z-scores per position ---
+    df_all = df_all.copy()
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
+
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
 
     # --- Compute per-position mean/std using eligible only ---
-    baseline_stats = eligible.groupby(pos_col).agg({c: ["mean", "std"] for c in df_all.select_dtypes(include=[np.number]).columns})
+    num_cols = df_all.select_dtypes(include=[np.number]).columns.tolist()
+    baseline_stats = eligible.groupby(pos_col)[num_cols].agg(["mean", "std"]).fillna(0)
     baseline_stats.columns = baseline_stats.columns.map("_".join)
 
-    df_all = df_all.copy()
-    metric_cols = [c for c in df_all.select_dtypes(include=[np.number]).columns if c not in ["Age", "Height", "Minutes played", "Multiplier"]]
+    metric_cols = [c for c in num_cols if c not in ["Age", "Height", "Minutes played", "Multiplier"]]
     raw_z = pd.DataFrame(index=df_all.index, columns=metric_cols, dtype=float)
 
     for m in metric_cols:
@@ -175,64 +177,63 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         std_col = f"{m}_std"
         if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
             continue
-        mean_map = baseline_stats[mean_col]
-        std_map = baseline_stats[std_col].replace(0, 1)
-        mean_vals = df_all[pos_col].map(mean_map)
-        std_vals = df_all[pos_col].map(std_map)
+        mean_vals = df_all[pos_col].map(baseline_stats[mean_col])
+        std_vals = df_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
         z = (df_all[m] - mean_vals) / std_vals
         if m in LOWER_IS_BETTER:
             z *= -1
         raw_z[m] = z.fillna(0)
 
-    # --- Ensure Z-score + weighted columns exist ---
+    # --- Ensure Avg Z + Weighted columns exist BEFORE anchors ---
     df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
     df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
+    df_all["Weighted Z Score"] = pd.to_numeric(df_all["Weighted Z Score"], errors="coerce").fillna(0.0)
 
-    # --- Ensure fallback (avoid missing column errors) ---
-    if "Weighted Z Score" not in df_all.columns:
-        df_all["Weighted Z Score"] = df_all["Avg Z Score"]
-
-    # --- LFC weighted score override for Scotland Premiership ---
+    # --- LFC weighted variant ---
     df_all["LFC Multiplier"] = df_all["Multiplier"]
     df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
     df_all["LFC Weighted Z"] = df_all["Avg Z Score"] * df_all["LFC Multiplier"]
 
-    # --- Compute anchors using available Weighted Z Score ---
-    if "Weighted Z Score" not in df_all.columns:
-        df_all["Weighted Z Score"] = 0.0
+    # --- Compute anchors using eligible (now guaranteed to have Weighted Z) ---
+    eligible = df_all[mins >= min_minutes].copy()
+    if eligible.empty:
+        eligible = df_all.copy()
+
+    if "Weighted Z Score" not in eligible.columns:
+        eligible["Weighted Z Score"] = 0.0
 
     anchors = (
         eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
-                .agg(_scale_min="min", _scale_max="max")
-                .fillna(0)
+        .agg(_scale_min="min", _scale_max="max")
+        .fillna(0)
     )
 
-    # Merge safely
     if not anchors.empty:
         df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
     else:
         df_all["_scale_min"] = 0.0
         df_all["_scale_max"] = 1.0
 
-    # --- Convert to 0–100 scales ---
+    # --- Convert both versions to 0–100 scale ---
     def _to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
         return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df_all["Score (0–100)"] = [
-        _to100(v, lo, hi)
-        for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
+        _to100(v, lo, hi) for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["LFC Score (0–100)"] = [
-        _to100(v, lo, hi)
-        for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
+        _to100(v, lo, hi) for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
     ]
 
-    df_all[["Score (0–100)", "LFC Score (0–100)"]] = df_all[
-        ["Score (0–100)", "LFC Score (0–100)"]
-    ].apply(pd.to_numeric, errors="coerce").round(1).fillna(0)
+    df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
+        df_all[["Score (0–100)", "LFC Score (0–100)"]]
+        .apply(pd.to_numeric, errors="coerce")
+        .round(1)
+        .fillna(0)
+    )
 
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
     return df_all
