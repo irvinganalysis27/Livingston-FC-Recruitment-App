@@ -1067,12 +1067,12 @@ percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics]
 # --- Unified Z-Score and 0–100 Scaling (Simplified + Matched)
 # ============================================================
 
-# --- Step 1: Filter baseline to ≥600 minutes (same as Team Rankings page) ---
+# --- Step 1: Use ≥600 mins only for anchor scaling, not for dropping players ---
 _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
-df_all = df_all[_mins_all >= 600].copy()
-if df_all.empty:
-    st.warning("No players meet the 600-minute threshold. Using all players instead.")
-    df_all = df_all_raw.copy()
+anchor_source = df_all[_mins_all >= 600].copy()
+if anchor_source.empty:
+    st.warning("No players with ≥600 mins found. Using full dataset for anchors.")
+    anchor_source = df_all.copy()
 
 # --- Step 2: Compute per-position Z-scores for all metrics ---
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
@@ -1095,9 +1095,9 @@ print("[DEBUG] Non-null Weighted Z count:", df_all["Weighted Z Score"].notna().s
 
 # --- Step 3: Build 0–100 scoring anchors (min/max per position) ---
 anchors = (
-    df_all.groupby(pos_col)["Weighted Z Score"]
-          .agg(_scale_min="min", _scale_max="max")
-          .fillna(0)
+    anchor_source.groupby(pos_col)["Weighted Z Score"]
+                 .agg(_scale_min="min", _scale_max="max")
+                 .fillna(0)
 )
 
 # --- Normalize player names for safe merging ---
