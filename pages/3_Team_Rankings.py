@@ -311,9 +311,16 @@ try:
         st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
     # ---------- Table ----------
+    avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
+    if not np.isnan(avg_score):
+        st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
+    else:
+        st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
+
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
         "Team", league_col, "Multiplier",
+        "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
         "Score (0–100)", "LFC Score (0–100)",
         "Age", "Minutes played", "Rank in Team"
     ]
@@ -325,7 +332,10 @@ try:
     z_ranking.rename(columns={
         "Six-Group Position": "Position",
         league_col: "League",
-        "Multiplier": "League Weight"
+        "Multiplier": "League Weight",
+        "Avg Z Score": "Z Avg",
+        "Weighted Z Score": "Z Weighted",
+        "LFC Weighted Z": "Z LFC Weighted"
     }, inplace=True)
 
     z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
@@ -340,6 +350,9 @@ try:
         column_config={
             "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Mark as favourite"),
             "League Weight": st.column_config.NumberColumn("League Weight", help="League weighting applied in ranking", format="%.3f"),
+            "Z Avg": st.column_config.NumberColumn("Z Avg", format="%.3f"),
+            "Z Weighted": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
+            "Z LFC Weighted": st.column_config.NumberColumn("Z LFC Weighted", format="%.3f"),
             "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
             "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
         },
