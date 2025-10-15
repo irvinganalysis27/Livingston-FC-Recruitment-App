@@ -5,6 +5,15 @@ from datetime import datetime
 st.set_page_config(page_title="⭐ Watch List", layout="centered")
 st.title("⭐ Watch List")
 
+# ========= External Links =========
+st.markdown(
+    """
+    📊 [**Open Google Watch List Sheet**](https://docs.google.com/spreadsheets/d/1ESiZsk7W-LrotYs7hpznJB4K-dHgKA0bWE1oUCJ8Pf0/edit?gid=0#gid=0)
+    """,
+    unsafe_allow_html=True,
+)
+st.divider()
+
 # ========= Toast helpers =========
 def toast_ok(msg: str):
     st.toast(msg, icon="✅")
