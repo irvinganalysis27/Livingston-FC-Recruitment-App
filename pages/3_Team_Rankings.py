@@ -149,17 +149,17 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# Position-specific ranking logic (same as radar)
+# Position-specific ranking logic (with LFC variant + improved weighting logic)
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
 
-    # --- Compute numeric Z-scores per position ---
     df_all = df_all.copy()
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
 
+    # --- Eligible baseline set ---
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
@@ -184,24 +184,48 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             z *= -1
         raw_z[m] = z.fillna(0)
 
-    # --- Ensure Avg Z + Weighted columns exist BEFORE anchors ---
+    # --- Average Z-scores ---
     df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
-    df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-    df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
-    df_all["Weighted Z Score"] = pd.to_numeric(df_all["Weighted Z Score"], errors="coerce").fillna(0.0)
 
-    # --- LFC weighted variant ---
-    df_all["LFC Multiplier"] = df_all["Multiplier"]
+    # --- Apply league multipliers with correct logic ---
+    mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+    avg_z = df_all["Avg Z Score"]
+
+    df_all["Weighted Z Score"] = np.select(
+        [
+            avg_z > 0,
+            avg_z < 0
+        ],
+        [
+            avg_z * mult,   # strong leagues boost positives; weak leagues dampen positives
+            avg_z / mult    # strong leagues soften negatives; weak leagues amplify negatives
+        ],
+        default=0.0
+    )
+
+    # --- LFC weighted variant (Scotland Premiership = 1.20) ---
+    lfc_mult = mult.copy()
+    df_all["LFC Multiplier"] = lfc_mult
     df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
-    df_all["LFC Weighted Z"] = df_all["Avg Z Score"] * df_all["LFC Multiplier"]
 
-    # --- Compute anchors using eligible (now guaranteed to have Weighted Z) ---
+    lfc_mult = df_all["LFC Multiplier"]
+
+    df_all["LFC Weighted Z"] = np.select(
+        [
+            avg_z > 0,
+            avg_z < 0
+        ],
+        [
+            avg_z * lfc_mult,
+            avg_z / lfc_mult
+        ],
+        default=0.0
+    )
+
+    # --- Anchors (based on standard weighted scores) ---
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
-
-    if "Weighted Z Score" not in eligible.columns:
-        eligible["Weighted Z Score"] = 0.0
 
     anchors = (
         eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
@@ -222,10 +246,12 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df_all["Score (0–100)"] = [
-        _to100(v, lo, hi) for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
     df_all["LFC Score (0–100)"] = [
-        _to100(v, lo, hi) for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
     ]
 
     df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
