@@ -1095,7 +1095,22 @@ anchors = (
 )
 
 # --- Step 4: Merge anchors and compute 0–100 score for radar dataset ---
+# Ensure 'Six-Group Position' exists and aligns
+if pos_col not in plot_data.columns:
+    plot_data[pos_col] = np.nan
+
+# Debug check: show missing positions
+if plot_data[pos_col].isna().all():
+    print("[DEBUG] ⚠️ plot_data has no Six-Group Position values before merge")
+
+# Merge anchors on position
 plot_data = plot_data.merge(anchors, left_on=pos_col, right_index=True, how="left")
+
+# Handle missing anchors gracefully
+if "_scale_min" not in plot_data.columns or "_scale_max" not in plot_data.columns:
+    plot_data["_scale_min"] = 0.0
+    plot_data["_scale_max"] = 1.0
+    print("[DEBUG] ⚠️ Anchor columns missing after merge; using fallback 0–1 range")
 
 def _minmax_score(v, lo, hi):
     if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
