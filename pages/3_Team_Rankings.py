@@ -304,9 +304,15 @@ try:
         st.warning(f"No players with ≥ {selected_min_display} minutes in this team.")
         st.stop()
 
-    avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
+    # ---------- Team average scores ----------
+    avg_score = df_team["Score (0–100)"].mean() if "Score (0–100)" in df_team.columns else np.nan
+    avg_lfc = df_team["LFC Score (0–100)"].mean() if "LFC Score (0–100)" in df_team.columns else np.nan
+
     if not np.isnan(avg_score):
-        st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
+        if not np.isnan(avg_lfc):
+            st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f} ({avg_lfc:.1f} LFC Score)")
+        else:
+            st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
     else:
         st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
