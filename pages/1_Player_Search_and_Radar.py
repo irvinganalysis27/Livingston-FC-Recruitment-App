@@ -1151,8 +1151,23 @@ df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
     .fillna(0)
 )
 
-# --- Subset view for radar page (same logic but only filtered players) ---
-plot_data = df_all.loc[df_all["Player"].isin(df["Player"])].copy()
+# --- Merge the radar metrics and new scores correctly ---
+plot_data = plot_data.merge(
+    df_all[
+        [
+            "Player",
+            "Avg Z Score",
+            "Weighted Z Score",
+            "LFC Weighted Z",
+            "Score (0–100)",
+            "LFC Score (0–100)",
+            "Rank",
+            "Multiplier",
+        ]
+    ],
+    on="Player",
+    how="left",
+)
 
 # --- Rank filtered players ---
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
