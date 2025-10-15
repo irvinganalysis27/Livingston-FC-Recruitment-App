@@ -184,23 +184,16 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             z *= -1
         raw_z[m] = z.fillna(0)
 
-    # --- Guarantee Z-score columns exist ---
-    if "Avg Z Score" not in df_all.columns:
-        df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
-    else:
-        df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
-
+    df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
     df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-    if "Weighted Z Score" not in df_all.columns:
-        df_all["Weighted Z Score"] = df_all["Avg Z Score"]  # emergency fallback if merge fails
+    # --- LFC weighted score override for Scotland Premiership ---
+    df_all["LFC Multiplier"] = df_all["Multiplier"]
+    df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
+    df_all["LFC Weighted Z"] = df_all["Avg Z Score"] * df_all["LFC Multiplier"]
 
     # --- Anchors from eligible ---
-    eligible = df_all[mins >= min_minutes].copy()
-    if eligible.empty:
-        eligible = df_all.copy()
-
     anchors = (
         eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
                 .agg(_scale_min="min", _scale_max="max")
@@ -213,11 +206,20 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             return 50.0
         return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
+    # --- Compute both standard and LFC 0–100 scores ---
     df_all["Score (0–100)"] = [
         _to100(v, lo, hi)
         for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
     ]
-    df_all["Score (0–100)"] = pd.to_numeric(df_all["Score (0–100)"], errors="coerce").round(1).fillna(0)
+    df_all["LFC Score (0–100)"] = [
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
+    ]
+
+    df_all[["Score (0–100)", "LFC Score (0–100)"]] = df_all[
+        ["Score (0–100)", "LFC Score (0–100)"]
+    ].apply(pd.to_numeric, errors="coerce").round(1).fillna(0)
+
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
     return df_all
 
@@ -244,11 +246,9 @@ try:
 
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-        # ---------- Optional minutes filter (table display only) ----------
+    # ---------- Optional minutes filter ----------
     st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
     df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
-
-    # Default value for convenience
     default_display_min = 600
     selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
@@ -258,28 +258,27 @@ try:
         step=50,
         key="display_minutes_input"
     )
-
     df_team = df_team[df_team["Minutes played"] >= selected_min_display].copy()
     if df_team.empty:
         st.warning(f"No players with ≥ {selected_min_display} minutes in this team.")
         st.stop()
 
-    # ---------- Table ----------
-    avg_score = (
-        df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
-    )
+    avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
     if not np.isnan(avg_score):
         st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
     else:
         st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
+    # ---------- Table ----------
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
         "Team", league_col, "Multiplier",
-        "Score (0–100)", "Age", "Minutes played", "Rank in Team"
+        "Score (0–100)", "LFC Score (0–100)",
+        "Age", "Minutes played", "Rank in Team"
     ]
     for c in cols_for_table:
-        if c not in df_team.columns: df_team[c] = np.nan
+        if c not in df_team.columns:
+            df_team[c] = np.nan
 
     z_ranking = df_team[cols_for_table].copy()
     z_ranking.rename(columns={
@@ -301,6 +300,7 @@ try:
             "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Mark as favourite"),
             "League Weight": st.column_config.NumberColumn("League Weight", help="League weighting applied in ranking", format="%.3f"),
             "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
+            "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
         },
         hide_index=False,
         width="stretch",
