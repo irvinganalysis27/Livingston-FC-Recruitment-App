@@ -309,10 +309,10 @@ try:
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
     # ---------- Debug one player ----------
-if "Player" in df_all.columns:
-    debug_name = st.text_input("🔍 Debug player name (optional)")
-    if debug_name:
-        debug_player_score(debug_name, df_all)
+    if "Player" in df_all.columns:
+        debug_name = st.text_input("🔍 Debug player name (optional)")
+        if debug_name:
+            debug_player_score(debug_name, df_all)
 
     # ---------- Table ----------
     st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
