@@ -240,6 +240,32 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     return df_all
 
 # ============================================================
+# 🔍 DEBUG PLAYER SCORE DETAILS
+# ============================================================
+
+def debug_player_score(player_name: str, df_source: pd.DataFrame, pos_col="Six-Group Position"):
+    """Print the key numbers affecting a player's 0–100 score."""
+    row = df_source.loc[df_source["Player"] == player_name]
+    if row.empty:
+        st.warning(f"No player found: {player_name}")
+        return
+
+    r = row.iloc[0]
+
+    st.markdown("### 🔍 Debug Player Score Details")
+    st.text(f"Player: {r.get('Player')}")
+    st.text(f"Position: {r.get(pos_col)}")
+    st.text(f"League: {r.get('Competition_norm') or r.get('League')}")
+    st.text(f"Minutes played: {r.get('Minutes played')}")
+    st.text(f"Multiplier: {r.get('Multiplier')}")
+    st.text(f"Avg Z Score: {r.get('Avg Z Score')}")
+    st.text(f"Weighted Z Score: {r.get('Weighted Z Score')}")
+    st.text(f"Scale Min: {r.get('_scale_min')}")
+    st.text(f"Scale Max: {r.get('_scale_max')}")
+    st.text(f"Final Score (0–100): {r.get('Score (0–100)')}")
+    st.divider()
+
+# ============================================================
 # Main UI
 # ============================================================
 try:
@@ -281,6 +307,12 @@ try:
         st.stop()
 
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+    # ---------- Debug one player ----------
+if "Player" in df_all.columns:
+    debug_name = st.text_input("🔍 Debug player name (optional)")
+    if debug_name:
+        debug_player_score(debug_name, df_all)
 
     # ---------- Table ----------
     st.markdown(f"### {selected_club} ({selected_league}) — Players Ranked by Score (0–100)")
