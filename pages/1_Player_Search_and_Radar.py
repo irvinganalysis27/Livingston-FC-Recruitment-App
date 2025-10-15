@@ -1063,93 +1063,44 @@ for m in sel_metrics:
     )
 percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
 
-# --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
-# Compute Z per metric: (raw - mean)/std per position; invert lower-better
+# ============================================================
+# --- Unified Z-Score and 0–100 Scaling (Simplified + Matched)
+# ============================================================
+
+# --- Step 1: Filter baseline to ≥600 minutes (same as Team Rankings page) ---
+_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
+df_all = df_all[_mins_all >= 600].copy()
+if df_all.empty:
+    st.warning("No players meet the 600-minute threshold. Using all players instead.")
+    df_all = df_all_raw.copy()
+
+# --- Step 2: Compute per-position Z-scores for all metrics ---
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
-    # Ensure metric is numeric
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    # Manual Z-score: (x - mean)/std per position group
-    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
-    z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
+    z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() else 0)
     if m in LOWER_IS_BETTER:
-        z_per_group *= -1  # Invert: lower raw → higher Z
-    raw_z_all[m] = z_per_group.fillna(0)  # Fill NaN Z as 0 (neutral)
+        z_per_group *= -1
+    raw_z_all[m] = z_per_group.fillna(0)
 
-avg_z_all = raw_z_all.mean(axis=1)  # Average Z across metrics
-
-# Apply to full df_all
-df_all["Avg Z Score"] = pd.to_numeric(avg_z_all, errors="coerce").fillna(0)
+df_all["Avg Z Score"] = raw_z_all.mean(axis=1).fillna(0)
 df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
 
-print("[DEBUG] Multiplier stats:")
-print("   Unique multipliers found:", sorted(df_all["Multiplier"].dropna().unique())[:15])
-print("   Weighted Z Score range:", df_all["Weighted Z Score"].min(), "→", df_all["Weighted Z Score"].max())
-
-# Show a few sample rows to confirm multiplier usage
-print(df_all[["Competition_norm", "Multiplier", "Avg Z Score", "Weighted Z Score"]].head(10).to_string())
-
-# For current view (plot_data): subset the raw Z's and avg
-raw_z_view = raw_z_all.loc[df.index, sel_metrics]
-avg_z_view = raw_z_view.mean(axis=1)
-plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
-plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
-plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
-
-# Flag eligibility
-plot_data["_mins_numeric"] = pd.to_numeric(plot_data["Minutes played"], errors="coerce")
-plot_data["Eligible Mins?"] = plot_data["_mins_numeric"] >= 600
-
-# 3) Anchors from eligible (>=600 mins) on weighted Z (full dataset)
-anchor_minutes_floor = 600
-user_min_minutes = max(anchor_minutes_floor, min_minutes)
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
-eligible = df_all[_mins_all >= user_min_minutes].copy()
-if eligible.empty:
-    st.warning(f"No players with >= {user_min_minutes} mins for anchors. Falling back to full dataset.")
-    eligible = df_all.copy()
-
-anchor_minmax = (
-    eligible.groupby(pos_col)["Weighted Z Score"]
-            .agg(_scale_min="min", _scale_max="max")
-            .fillna(0)
+# --- Step 3: Build 0–100 scoring anchors (min/max per position) ---
+anchors = (
+    df_all.groupby(pos_col)["Weighted Z Score"]
+          .agg(_scale_min="min", _scale_max="max")
+          .fillna(0)
 )
 
-# Warn on small pools
-eligible_counts = eligible.groupby(pos_col).size()
-small_positions = eligible_counts[eligible_counts < 5].index.tolist()
-if small_positions:
-    st.warning(f"Small eligible pools (<5 players) for anchors in positions: {', '.join(small_positions)}. Scores may bunch up.")
+# --- Step 4: Merge anchors and compute 0–100 score for radar dataset ---
+plot_data = plot_data.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
-# 4) Scale to 0-100 for all in plot_data
-plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
-
-def _minmax_score(val, lo, hi):
-    # Convert inputs to float, handle non-numeric cases
-    try:
-        val = float(val)
-    except (TypeError, ValueError):
-        val = 0.0
-    try:
-        lo = float(lo)
-    except (TypeError, ValueError):
-        lo = 0.0
-    try:
-        hi = float(hi)
-    except (TypeError, ValueError):
-        hi = 1.0
-    if pd.isna(val) or pd.isna(lo) or pd.isna(hi):
-        return 0.0
-    if not np.isfinite(val):
-        val = 0.0
-    if not np.isfinite(lo):
-        lo = 0.0
-    if not np.isfinite(hi):
-        hi = 1.0
-    if hi <= lo:
+def _minmax_score(v, lo, hi):
+    if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
         return 50.0
-    return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+    return float(np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0))
 
 plot_data["Score (0–100)"] = [
     _minmax_score(v, lo, hi)
@@ -1157,22 +1108,18 @@ plot_data["Score (0–100)"] = [
 ]
 plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
 
-# 5) Rank all filtered players
+# --- Step 5: Rank players globally within this filtered dataset ---
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-# Clean up
-plot_data.drop(columns=["_scale_min", "_scale_max", "_mins_numeric"], inplace=True, errors="ignore")
+# --- Step 6: Clean up and print quick debug ---
+plot_data.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
 
-# Debug
-print("[DEBUG] Anchor minutes floor =", user_min_minutes)
-print("[DEBUG] Eligible counts per pos:", dict(eligible_counts))
+print("[DEBUG] ✅ Unified Z-Score block executed")
+print("[DEBUG] Rows used for Z baseline:", len(df_all))
 print("[DEBUG] Sample anchor ranges:",
-      anchor_minmax.reset_index()
-                   .rename(columns={pos_col: "Pos"})
-                   .head(6)
-                   .to_dict(orient="records"))
-print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
-print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
+      anchors.reset_index().rename(columns={pos_col: "Pos"}).head(6).to_dict(orient="records"))
+print("[DEBUG] Sample Scores:",
+      plot_data[["Player", "Weighted Z Score", "Score (0–100)"]].head().to_dict())
 # ============================================================
 # 🔍 DEBUG PLAYER SCORE DETAILS
 # ============================================================
