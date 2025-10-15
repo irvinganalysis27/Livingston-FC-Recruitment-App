@@ -1100,7 +1100,16 @@ anchors = (
           .fillna(0)
 )
 
+# --- Normalize player names for safe merging ---
+df_all["Player"] = df_all["Player"].astype(str).str.strip().str.lower()
+plot_data["Player"] = plot_data["Player"].astype(str).str.strip().str.lower()
+
 # --- Step 4: Merge anchors and compute 0–100 score for radar dataset ---
+
+# --- Normalize player names for safe merging (case + whitespace) ---
+df_all["Player"] = df_all["Player"].astype(str).str.strip().str.lower()
+plot_data["Player"] = plot_data["Player"].astype(str).str.strip().str.lower()
+
 # Ensure position column exists
 if pos_col not in plot_data.columns:
     plot_data[pos_col] = np.nan
@@ -1108,7 +1117,7 @@ if pos_col not in plot_data.columns:
 # Merge scaling anchors on position
 plot_data = plot_data.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
-# --- 🔧 Attach the Z-score data for this player from df_all ---
+# --- 🔧 Attach the Z-score data for each player from df_all ---
 merge_cols = ["Player", "Avg Z Score", "Weighted Z Score", "Multiplier"]
 for c in merge_cols:
     if c not in df_all.columns:
@@ -1116,9 +1125,20 @@ for c in merge_cols:
 if "Player" not in plot_data.columns:
     plot_data["Player"] = np.nan
 
-plot_data = plot_data.merge(df_all[merge_cols], on="Player", how="left", suffixes=("", "_from_df_all"))
+plot_data = plot_data.merge(
+    df_all[merge_cols],
+    on="Player",
+    how="left",
+    suffixes=("", "_from_df_all")
+)
 
-# Fallbacks if columns missing
+# --- Debug player match coverage ---
+print("[DEBUG] Player match check — Radar vs df_all")
+missing = plot_data[plot_data["Weighted Z Score"].isna()]["Player"].head(10).tolist()
+print("First unmatched players:", missing)
+print(f"[DEBUG] Non-null Weighted Z after merge: {plot_data['Weighted Z Score'].notna().sum()} of {len(plot_data)}")
+
+# --- Fallbacks if columns missing ---
 for col in ["_scale_min", "_scale_max"]:
     if col not in plot_data.columns:
         plot_data[col] = 0.0
@@ -1138,7 +1158,9 @@ plot_data["Score (0–100)"] = [
         plot_data["_scale_max"]
     )
 ]
-plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
+plot_data["Score (0–100)"] = (
+    pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
+)
 
 # --- Step 5: Rank players globally within this filtered dataset ---
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
