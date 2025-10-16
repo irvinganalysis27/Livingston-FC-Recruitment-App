@@ -1402,6 +1402,7 @@ COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
     "🟢 Go": "🟢",
+    "🟠 Out Of Reach": "🟠",
     "🔴 No Further Interest": "🔴",
     "Needs Checked": "🟣",
     "Monitor": "🟡",
@@ -1410,6 +1411,7 @@ COLOUR_EMOJI = {
     "🟣": "🟣",
     "🟡": "🟡",
     "🟢": "🟢",
+    "🟠": "🟠",
     "🔴": "🔴",
 }
 
