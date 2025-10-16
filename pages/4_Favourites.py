@@ -34,6 +34,7 @@ COLOUR_CHOICES = [
     "🟣 Needs Checked",
     "🟡 Monitor",
     "🟢 Go",
+    "🟠 Out Of Reach",
     "🔴 No Further Interest",
 ]
 COLOUR_EMOJI = {c.split(" ", 1)[0]: c for c in COLOUR_CHOICES}
