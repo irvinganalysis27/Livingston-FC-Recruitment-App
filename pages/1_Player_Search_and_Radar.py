@@ -1359,13 +1359,17 @@ print("[DEBUG] Sample of LFC Score:", plot_data["LFC Score (0–100)"].head().to
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Include key columns
+# Normalise any en-dashes to plain hyphens so Streamlit recognises the columns
+plot_data.rename(columns=lambda x: x.replace("–", "-"), inplace=True)
+
+# Include key columns (using standard hyphens)
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0–100)", "LFC Score (0–100)",  # <— added
+    "Score (0-100)", "LFC Score (0-100)",  # fixed dash
     "Age", "Minutes played", "Rank"
 ]
 
+# Ensure all columns exist
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
