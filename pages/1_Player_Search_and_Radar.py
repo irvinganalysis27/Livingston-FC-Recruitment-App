@@ -1359,43 +1359,53 @@ print("[DEBUG] Sample of LFC Score:", plot_data["LFC Score (0–100)"].head().to
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Normalise any en-dashes to plain hyphens so Streamlit recognises the columns
-plot_data.rename(columns=lambda x: x.replace("–", "-"), inplace=True)
+# --- Normalise all dash variants in column names ---
+plot_data.columns = plot_data.columns.str.replace("–", "-", regex=False)
 
-# Include key columns (using standard hyphens)
+# --- Ensure both Score columns exist and match naming used globally ---
+if "LFC Score (0-100)" not in plot_data.columns and "LFC Score (0–100)" in plot_data.columns:
+    plot_data["LFC Score (0-100)"] = plot_data["LFC Score (0–100)"]
+if "Score (0-100)" not in plot_data.columns and "Score (0–100)" in plot_data.columns:
+    plot_data["Score (0-100)"] = plot_data["Score (0–100)"]
+
+# --- Build table columns ---
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0-100)", "LFC Score (0-100)",  # fixed dash
+    "Score (0-100)", "LFC Score (0-100)",
     "Age", "Minutes played", "Rank"
 ]
 
-# Ensure all columns exist
-for c in cols_for_table:
-    if c not in plot_data.columns:
-        plot_data[c] = np.nan
+# --- Filter to only existing columns ---
+existing_cols = [c for c in cols_for_table if c in plot_data.columns]
+z_ranking = plot_data[existing_cols].copy()
 
-z_ranking = plot_data[cols_for_table].copy()
-
-# Clean up columns
+# --- Column cleanup & formatting ---
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
 
 if "Age" in z_ranking.columns:
     z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
-z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
+z_ranking["Minutes played"] = pd.to_numeric(z_ranking.get("Minutes played"), errors="coerce").fillna(0).astype(int)
+z_ranking["Multiplier"] = pd.to_numeric(z_ranking.get("Multiplier"), errors="coerce").fillna(1.0).round(3)
 
-# Deduplicate and rank
+# --- Deduplicate and rank globally ---
 z_ranking = (
-    z_ranking.sort_values("Score (0–100)", ascending=False)
+    z_ranking.sort_values("Score (0-100)", ascending=False)
              .groupby("Player", as_index=False)
              .first()
 )
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+z_ranking["Rank"] = z_ranking["Score (0-100)"].rank(ascending=False, method="min").astype(int)
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
+
+# --- Display the data ---
+st.data_editor(
+    z_ranking,
+    hide_index=False,
+    width="stretch",
+)
 
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
