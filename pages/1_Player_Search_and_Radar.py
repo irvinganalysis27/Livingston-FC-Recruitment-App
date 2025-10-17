@@ -1037,15 +1037,24 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     line1 = " | ".join(top_parts)
 
     bottom_parts = []
-    if team: bottom_parts.append(team)
-    if comp: bottom_parts.append(comp)
-    if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
-    if rank_v: bottom_parts.append(f"Rank #{rank_v}")
-    if score_100 is not None and not np.isnan(score_100) and score_100 > 0:
+    if isinstance(team, str) and team.strip():
+        bottom_parts.append(team.strip())
+    if isinstance(comp, str) and comp.strip():
+        bottom_parts.append(comp.strip())
+    
+    # safely handle numeric values
+    if pd.notnull(mins) and np.isfinite(mins):
+        bottom_parts.append(f"{int(mins)} mins")
+    if pd.notnull(rank_v) and np.isfinite(rank_v) and int(rank_v) > 0:
+        bottom_parts.append(f"Rank #{int(rank_v)}")
+    
+    if score_100 is not None and np.isfinite(score_100) and score_100 > 0:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
-    line2 = " | ".join(bottom_parts)
+    
+    # always ensure only string entries
+    line2 = " | ".join(map(str, [bp for bp in bottom_parts if isinstance(bp, (str, int, float))]))
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
