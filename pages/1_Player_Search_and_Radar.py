@@ -448,9 +448,17 @@ def load_data_once():
         print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
 
     df_raw = add_age_column(df_raw)
-    df_preprocessed = preprocess_df(df_raw)
+    
+    df_preprocessed = preprocess_for_scoring(
+        df_raw,
+        PreprocessConfig(root_dir=ROOT_DIR)
+    )
+    df_preprocessed = scoring_compute_scores(
+        df_preprocessed,
+        ScoringConfig(min_minutes_for_baseline=600)
+    )
     print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
-
+    
     return df_preprocessed
     
 # ---------- Load & preprocess ----------
