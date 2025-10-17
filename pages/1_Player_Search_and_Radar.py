@@ -1043,9 +1043,6 @@ plot_data = pd.concat(
     axis=1
 )
 
-# ✅ Normalise dashes immediately after building plot_data
-plot_data.columns = plot_data.columns.str.replace("–", "-", regex=False)
-
 # ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
 
 # Metrics for scoring (same as chart)
@@ -1193,6 +1190,9 @@ plot_data["LFC Score (0–100)"] = pd.to_numeric(plot_data["LFC Score (0–100)"
 
 # Clean up
 plot_data.drop(columns=["_scale_min", "_scale_max", "_mins_numeric"], inplace=True, errors="ignore")
+
+# ✅ Fix: normalise dash variants at the very end so all new columns match
+plot_data.columns = plot_data.columns.str.replace("–", "-", regex=False)
 
 # Debug
 print("[DEBUG] Anchor minutes floor =", user_min_minutes)
