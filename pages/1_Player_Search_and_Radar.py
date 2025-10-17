@@ -16,6 +16,14 @@ from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
 
+# ===== NEW SHARED SCORING IMPORTS =====
+from lib.scoring import (
+    preprocess_for_scoring,
+    compute_scores as scoring_compute_scores,
+    PreprocessConfig,
+    ScoringConfig,
+)
+
 # ========= DEBUG MARKERS =========
 print("[DEBUG_LOOP] ---- PAGE START ----")
 print("[DEBUG] Run marker:", random.randint(1000, 9999))
@@ -410,163 +418,7 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     )
     print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
     return df
-
-
-def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
-    """Clean, normalise, and enrich the StatsBomb player dataset."""
-    df = df_in.copy()
-
-    # ============================================================
-    # 🏆 1. Normalise Competition names
-    # ============================================================
-    if "Competition" in df.columns:
-        df["Competition_norm"] = (
-            df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
-        )
-    else:
-        df["Competition_norm"] = np.nan
-
-    # ============================================================
-    # ⚖️ 2. Merge League Multipliers (using Competition_ID first)
-    # ============================================================
-    try:
-        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        m = pd.read_excel(multipliers_path)
-
-        # Normalise Excel headers
-        m.columns = m.columns.str.strip().str.lower()  # -> competition_id, league, multiplier
-        df.columns = df.columns.str.strip()  # ensure consistency
-
-        merged = False
-
-        if "competition_id" in df.columns and "competition_id" in m.columns:
-            df = df.merge(m, on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_ID")
-            merged = True
-        elif "Competition_norm" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_norm")
-            merged = True
-        elif "Competition" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition", right_on="league", how="left")
-            print("[DEBUG] ⚠️ Fallback merge on raw Competition name")
-            merged = True
-        else:
-            print("[DEBUG] ⚠️ No matching key found for league multipliers; using 1.0 for all.")
-            df["multiplier"] = 1.0
-
-        # Safely assign numeric multiplier
-        if "multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-        elif "Multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-        else:
-            df["Multiplier"] = 1.0
-
-        # Debug output
-        print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
-
-        if merged:
-            sample = (
-                df[["Competition_norm", "Multiplier"]]
-                .drop_duplicates()
-                .sort_values("Competition_norm")
-                .head(15)
-            )
-            print("[DEBUG] Sample multiplier matches:")
-            print(sample.to_string(index=False))
-
-            unmatched = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique()
-            if len(unmatched) > 0:
-                print("[DEBUG] ⚠️ Competitions missing multipliers (first 10):", unmatched[:10])
-
-    except Exception as e:
-        print(f"[DEBUG] ⚠️ Failed to merge league multipliers: {e}")
-        df["Multiplier"] = 1.0
-
-    # ============================================================
-    # 🪪 3. Rename Identifiers to Match Radar Columns
-    # ============================================================
-    rename_map = {}
-    if "Name" in df.columns:
-        rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns:
-        rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns:
-        rename_map["Minutes"] = "Minutes played"
-
-    rename_map.update({
-        "Successful Box Cross %": "Successful Box Cross%",
-        "Player Season Box Cross Ratio": "Successful Box Cross%",
-        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-        "Player Season Xgbuildup 90": "xGBuildup",
-        "Player Season F3 Pressures 90": "Pressures in Final 1/3",
-        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
-        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
-    })
-
-    df.rename(columns=rename_map, inplace=True)
-
-    # ============================================================
-    # ⚙️ 4. Derived / Calculated Metrics
-    # ============================================================
-    cross_cols = [c for c in df.columns if "crosses" in c.lower()]
-    crossperc_cols = [c for c in df.columns if "crossing%" in c.lower()]
-    if cross_cols and crossperc_cols:
-        df["Successful Crosses"] = (
-            pd.to_numeric(df[cross_cols[0]], errors="coerce") *
-            (pd.to_numeric(df[crossperc_cols[0]], errors="coerce") / 100.0)
-        )
-
-    if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
-        df["Successful Dribbles"] = (
-            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
-            - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
-        )
-
-    # ============================================================
-    # 🧩 5. Position Handling & Mapping
-    # ============================================================
-    if "Position" in df.columns:
-        if "Secondary Position" in df.columns:
-            df["Positions played"] = df["Position"].fillna("").astype(str) + np.where(
-                df["Secondary Position"].notna() & (df["Secondary Position"].astype(str) != ""),
-                ", " + df["Secondary Position"].astype(str),
-                ""
-            )
-        else:
-            df["Positions played"] = df["Position"].astype(str)
-    else:
-        df["Positions played"] = np.nan
-
-    # Fallbacks
-    if "Team within selected timeframe" not in df.columns:
-        df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
-    if "Height" not in df.columns:
-        df["Height"] = np.nan
-
-    # Map to six positional groups
-    if "Position" in df.columns:
-        df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-    else:
-        df["Six-Group Position"] = np.nan
-
-    # Duplicate generic CMs into both 6 & 8
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"] == "Centre Midfield"
-        if cm_mask.any():
-            cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy()
-            cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy()
-            cm_as_8["Six-Group Position"] = "Number 8"
-            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-
-    # ============================================================
-    # ✅ 6. Return Cleaned Data
-    # ============================================================
-    return df
-
+    
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
 def load_data_once():
@@ -638,14 +490,21 @@ if "Birth Date" in df_all_raw.columns:
     print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
 
 # ---------- Preprocess ----------
-df_all = preprocess_df(df_all_raw)
+df_all = preprocess_for_scoring(
+    df_all_raw,
+    PreprocessConfig(root_dir=ROOT_DIR)
+)
+df_all = scoring_compute_scores(
+    df_all,
+    ScoringConfig(min_minutes_for_baseline=600)
+)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
 print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
-df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (filtered by UI)
+
+df = df_all.copy()  # working copy (filtered by UI)
 
 # ---------- League filter ----------
 league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
@@ -1043,136 +902,6 @@ plot_data = pd.concat(
     axis=1
 )
 
-# ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
-
-# Metrics for scoring (same as chart)
-sel_metrics = list(metric_groups.keys())
-
-# --- A) Percentiles for SCORE BASELINE (full dataset by position, for reference) ---
-pos_col = "Six-Group Position"
-if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns: df[pos_col] = np.nan
-
-percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    percentile_df_globalpos_all[m] = (
-        df_all.groupby(pos_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-    )
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
-
-# --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
-# Compute Z per metric: (raw - mean)/std per position; invert lower-better
-raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    # Manual Z-score: (x - mean)/std per position group
-    group_stats = df_all.groupby(pos_col)[m].agg(['mean', 'std']).fillna(0)
-    z_per_group = df_all.groupby(pos_col)[m].transform(lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0)
-    if m in LOWER_IS_BETTER:
-        z_per_group *= -1  # Invert: lower raw → higher Z
-    raw_z_all[m] = z_per_group.fillna(0)  # Fill NaN Z as 0 (neutral)
-
-avg_z_all = raw_z_all.mean(axis=1)  # Average Z across metrics
-
-# Apply to full df_all
-df_all["Avg Z Score"] = pd.to_numeric(avg_z_all, errors="coerce").fillna(0)
-df_all["Multiplier"] = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-df_all["Weighted Z Score"] = df_all["Avg Z Score"] * df_all["Multiplier"]
-
-print("[DEBUG] Multiplier stats:")
-print("   Unique multipliers found:", sorted(df_all["Multiplier"].dropna().unique())[:15])
-print("   Weighted Z Score range:", df_all["Weighted Z Score"].min(), "→", df_all["Weighted Z Score"].max())
-
-# Show a few sample rows to confirm multiplier usage
-print(df_all[["Competition_norm", "Multiplier", "Avg Z Score", "Weighted Z Score"]].head(10).to_string())
-
-# For current view (plot_data): subset the raw Z's and avg
-raw_z_view = raw_z_all.loc[df.index, sel_metrics]
-avg_z_view = raw_z_view.mean(axis=1)
-plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
-plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
-plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
-
-# Flag eligibility
-plot_data["_mins_numeric"] = pd.to_numeric(plot_data["Minutes played"], errors="coerce")
-plot_data["Eligible Mins?"] = plot_data["_mins_numeric"] >= 600
-
-# 3) Anchors from eligible (>=600 mins) on weighted Z (full dataset)
-anchor_minutes_floor = 600
-user_min_minutes = max(anchor_minutes_floor, min_minutes)
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
-eligible = df_all[_mins_all >= user_min_minutes].copy()
-if eligible.empty:
-    st.warning(f"No players with >= {user_min_minutes} mins for anchors. Falling back to full dataset.")
-    eligible = df_all.copy()
-
-anchor_minmax = (
-    eligible.groupby(pos_col)["Weighted Z Score"]
-            .agg(_scale_min="min", _scale_max="max")
-            .fillna(0)
-)
-
-# Warn on small pools
-eligible_counts = eligible.groupby(pos_col).size()
-small_positions = eligible_counts[eligible_counts < 5].index.tolist()
-if small_positions:
-    st.warning(f"Small eligible pools (<5 players) for anchors in positions: {', '.join(small_positions)}. Scores may bunch up.")
-
-# 4) Scale to 0-100 for all in plot_data
-plot_data = plot_data.merge(anchor_minmax, left_on=pos_col, right_index=True, how="left")
-
-def _minmax_score(val, lo, hi):
-    # Convert inputs to float, handle non-numeric cases
-    try:
-        val = float(val)
-    except (TypeError, ValueError):
-        val = 0.0
-    try:
-        lo = float(lo)
-    except (TypeError, ValueError):
-        lo = 0.0
-    try:
-        hi = float(hi)
-    except (TypeError, ValueError):
-        hi = 1.0
-    if pd.isna(val) or pd.isna(lo) or pd.isna(hi):
-        return 0.0
-    if not np.isfinite(val):
-        val = 0.0
-    if not np.isfinite(lo):
-        lo = 0.0
-    if not np.isfinite(hi):
-        hi = 1.0
-    if hi <= lo:
-        return 50.0
-    return float(np.clip((val - lo) / (hi - lo) * 100.0, 0.0, 100.0))
-
-plot_data["Score (0–100)"] = [
-    _minmax_score(v, lo, hi)
-    for v, lo, hi in zip(plot_data["Weighted Z Score"], plot_data["_scale_min"], plot_data["_scale_max"])
-]
-plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], errors="coerce").round(1).fillna(0)
-
-# 5) Rank all filtered players
-plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-
-# Clean up
-plot_data.drop(columns=["_scale_min", "_scale_max", "_mins_numeric"], inplace=True, errors="ignore")
-
-# Debug
-print("[DEBUG] Anchor minutes floor =", user_min_minutes)
-print("[DEBUG] Eligible counts per pos:", dict(eligible_counts))
-print("[DEBUG] Sample anchor ranges:",
-      anchor_minmax.reset_index()
-                   .rename(columns={pos_col: "Pos"})
-                   .head(6)
-                   .to_dict(orient="records"))
-print("[DEBUG] Sample Weighted Z Scores:", plot_data[["Player", "Weighted Z Score"]].head().to_dict())
-print("[DEBUG] Sample Score (0-100):", plot_data[["Player", "Score (0–100)"]].head().to_dict())
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
