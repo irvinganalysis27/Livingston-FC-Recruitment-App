@@ -448,6 +448,24 @@ def load_data_once():
         print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
 
     df_raw = add_age_column(df_raw)
+
+        # --- Ensure consistent ID column for weighting ---
+    id_candidates = ["Competition_ID", "Competition Id", "Competition id", "competition_id"]
+    found_id = next((c for c in id_candidates if c in df_raw.columns), None)
+    if found_id:
+        df_raw.rename(columns={found_id: "competition_id"}, inplace=True)
+        df_raw["competition_id"] = pd.to_numeric(df_raw["competition_id"], errors="coerce").fillna(0).astype(int)
+        print(f"[DEBUG] Normalised '{found_id}' to 'competition_id' — {df_raw['competition_id'].nunique()} unique IDs found.")
+    else:
+        print("[DEBUG] ⚠️ No Competition ID column found in data!")
+    
+    # --- Add normalised competition name for readability (synonyms as backup) ---
+    if "Competition" in df_raw.columns:
+        df_raw["Competition_norm"] = (
+            df_raw["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+        )
+    else:
+        df_raw["Competition_norm"] = np.nan
     
     df_preprocessed = preprocess_for_scoring(
         df_raw,
