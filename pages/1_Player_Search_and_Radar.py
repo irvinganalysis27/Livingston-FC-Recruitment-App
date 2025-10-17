@@ -1353,6 +1353,9 @@ if st.session_state.selected_player:
         group_colors
     )
 
+print("[DEBUG] Columns in plot_data:", list(plot_data.columns))
+print("[DEBUG] Sample of LFC Score:", plot_data["LFC Score (0–100)"].head().to_dict())
+
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
