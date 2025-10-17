@@ -1087,6 +1087,66 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     st.pyplot(fig, width="stretch")
 
+def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
+    """Generate a short scout-style summary based on radar metrics (no AI API)."""
+    try:
+        row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
+        row.index = row.index.str.strip()
+    except IndexError:
+        return "No data available to summarise this player."
+
+    # 1. Pull all metric percentiles
+    metric_percentiles = {
+        m: row.get(f"{m} (percentile)", np.nan)
+        for m in metrics.keys()
+        if f"{m} (percentile)" in row.index
+    }
+
+    # 2. Identify strengths (top 3) and weaknesses (bottom 3)
+    valid_metrics = {k: v for k, v in metric_percentiles.items() if pd.notnull(v)}
+    if not valid_metrics:
+        return "Insufficient data to generate summary."
+
+    sorted_metrics = sorted(valid_metrics.items(), key=lambda x: x[1], reverse=True)
+    strengths = [m for m, v in sorted_metrics[:3]]
+    weaknesses = [m for m, v in sorted_metrics[-3:]]
+
+    # 3. Friendly labels for readability
+    label_map = {
+        "xG": "expected goals",
+        "NP Goals": "non-penalty goals",
+        "OBV": "overall on-ball value",
+        "Pass OBV": "progressive passing",
+        "Deep Progressions": "forward passing and ball carrying",
+        "Deep Completions": "final-third link play",
+        "Pressure Regains": "defensive pressing recoveries",
+        "PAdj Tackles": "tackling",
+        "PAdj Interceptions": "interceptions",
+        "Aggressive Actions": "defensive aggression",
+        "Aerial Win%": "aerial ability",
+        "Successful Dribbles": "dribbling",
+        "Fouls": "discipline",
+        "Turnovers": "ball retention",
+        "Passing%": "passing accuracy",
+        "xGBuildup": "involvement in buildup play",
+        "xG Assisted": "chance creation",
+    }
+
+    def label(metric):
+        return label_map.get(metric, metric.lower().replace("_", " "))
+
+    # 4. Build simple text summary
+    strengths_text = ", ".join(label(m) for m in strengths)
+    weaknesses_text = ", ".join(label(m) for m in weaknesses)
+    role = str(row.get("Six-Group Position", "player"))
+    league = str(row.get("Competition_norm", ""))
+
+    summary = (
+        f"This {role.lower()} from {league} shows standout ability in {strengths_text}, "
+        f"while having scope to improve in {weaknesses_text}."
+    )
+    return summary
+
 # ---------- Plot ----------
 if st.session_state.selected_player:
     plot_radial_bar_grouped(
@@ -1095,6 +1155,15 @@ if st.session_state.selected_player:
         metric_groups,
         group_colors
     )
+
+    # --- Auto summary below the radar ---
+    summary_text = generate_player_summary(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups
+    )
+    st.markdown("#### 🧠 Player Summary")
+    st.write(summary_text)
 
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
