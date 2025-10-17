@@ -897,8 +897,15 @@ keep_cols = [
 ]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
+extra_cols = ["Score (0–100)", "Weighted Z Score", "Global Rank"]
+for col in extra_cols:
+    if col not in df.columns and col in df_all.columns:
+        df[col] = df_all[col]
+    if col not in df.columns:
+        df[col] = np.nan
+
 plot_data = pd.concat(
-    [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
+    [df[keep_cols + extra_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
     axis=1
 )
 
