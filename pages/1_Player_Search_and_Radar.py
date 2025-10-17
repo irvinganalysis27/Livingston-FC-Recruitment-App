@@ -1026,7 +1026,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if comp: bottom_parts.append(comp)
     if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
     if rank_v: bottom_parts.append(f"Rank #{rank_v}")
-    if score_100 is not None:
+    if score_100 is not None and not np.isnan(score_100) and score_100 > 0:
         bottom_parts.append(f"{score_100:.0f}/100")
     else:
         bottom_parts.append(f"Z {weighted_z:.2f}")
@@ -1085,7 +1085,12 @@ z_ranking = (
              .groupby("Player", as_index=False)
              .first()
 )
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+z_ranking["Rank"] = (
+    z_ranking["Score (0–100)"]
+    .rank(ascending=False, method="min")
+    .fillna(0)
+    .astype(int)
+)
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
