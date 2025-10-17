@@ -1375,6 +1375,15 @@ cols_for_table = [
     "Age", "Minutes played", "Rank"
 ]
 
+print("[DEBUG] Columns currently in plot_data:")
+print(sorted(plot_data.columns.tolist()))
+print("[DEBUG] Sample score values:")
+print(plot_data[["Player", "Score (0-100)"]].head(5).to_string(index=False))
+if "LFC Score (0-100)" in plot_data.columns:
+    print(plot_data[["Player", "LFC Score (0-100)"]].head(5).to_string(index=False))
+else:
+    print("[DEBUG] LFC Score (0-100) column not found at this stage!")
+    
 # --- Filter to only existing columns ---
 existing_cols = [c for c in cols_for_table if c in plot_data.columns]
 z_ranking = plot_data[existing_cols].copy()
