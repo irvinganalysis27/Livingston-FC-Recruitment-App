@@ -1043,6 +1043,9 @@ plot_data = pd.concat(
     axis=1
 )
 
+# ✅ Normalise dashes immediately after building plot_data
+plot_data.columns = plot_data.columns.str.replace("–", "-", regex=False)
+
 # ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
 
 # Metrics for scoring (same as chart)
@@ -1358,9 +1361,6 @@ print("[DEBUG] Sample of LFC Score:", plot_data["LFC Score (0–100)"].head().to
 
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
-
-# --- Normalise all dash variants in column names ---
-plot_data.columns = plot_data.columns.str.replace("–", "-", regex=False)
 
 # --- Ensure both Score columns exist and match naming used globally ---
 if "LFC Score (0-100)" not in plot_data.columns and "LFC Score (0–100)" in plot_data.columns:
