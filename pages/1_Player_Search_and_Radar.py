@@ -1088,63 +1088,106 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, width="stretch")
 
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a short scout-style summary based on radar metrics (no AI API)."""
+    """Generate a longer scout-style summary based on radar percentiles (no AI API)."""
     try:
         row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
         row.index = row.index.str.strip()
     except IndexError:
         return "No data available to summarise this player."
 
-    # 1. Pull all metric percentiles
+    # 1. Extract metric percentiles
     metric_percentiles = {
         m: row.get(f"{m} (percentile)", np.nan)
         for m in metrics.keys()
         if f"{m} (percentile)" in row.index
     }
-
-    # 2. Identify strengths (top 3) and weaknesses (bottom 3)
     valid_metrics = {k: v for k, v in metric_percentiles.items() if pd.notnull(v)}
     if not valid_metrics:
         return "Insufficient data to generate summary."
 
+    # 2. Sort top / bottom metrics
     sorted_metrics = sorted(valid_metrics.items(), key=lambda x: x[1], reverse=True)
-    strengths = [m for m, v in sorted_metrics[:3]]
-    weaknesses = [m for m, v in sorted_metrics[-3:]]
+    top3 = sorted_metrics[:3]
+    bottom3 = sorted_metrics[-3:]
 
-    # 3. Friendly labels for readability
+    # 3. Friendly labels
     label_map = {
         "xG": "expected goals",
         "NP Goals": "non-penalty goals",
         "OBV": "overall on-ball value",
         "Pass OBV": "progressive passing",
-        "Deep Progressions": "forward passing and ball carrying",
+        "Deep Progressions": "forward passes and carries",
         "Deep Completions": "final-third link play",
-        "Pressure Regains": "defensive pressing recoveries",
+        "Pressure Regains": "pressing recoveries",
         "PAdj Tackles": "tackling",
         "PAdj Interceptions": "interceptions",
         "Aggressive Actions": "defensive aggression",
-        "Aerial Win%": "aerial ability",
+        "Aerial Win%": "aerial duels",
         "Successful Dribbles": "dribbling",
         "Fouls": "discipline",
         "Turnovers": "ball retention",
         "Passing%": "passing accuracy",
         "xGBuildup": "involvement in buildup play",
         "xG Assisted": "chance creation",
+        "Goal Conversion%": "finishing efficiency",
+        "Shots": "shooting volume",
     }
 
     def label(metric):
         return label_map.get(metric, metric.lower().replace("_", " "))
 
-    # 4. Build simple text summary
-    strengths_text = ", ".join(label(m) for m in strengths)
-    weaknesses_text = ", ".join(label(m) for m in weaknesses)
+    # 4. Build narrative text
     role = str(row.get("Six-Group Position", "player"))
     league = str(row.get("Competition_norm", ""))
+    age = row.get("Age", np.nan)
+    intro = f"This {role.lower()} from {league}"
 
+    if pd.notnull(age):
+        intro += f", aged {int(age)},"
+
+    intro += " demonstrates a well-rounded performance profile."
+
+    # Strength details
+    strength_lines = []
+    for m, val in top3:
+        descriptor = ""
+        if val >= 85:
+            descriptor = "elite level"
+        elif val >= 70:
+            descriptor = "strong"
+        elif val >= 55:
+            descriptor = "above average"
+        else:
+            descriptor = "solid"
+        strength_lines.append(
+            f"{label(m)} ({val:.0f}th percentile, {descriptor} for his position)"
+        )
+
+    # Weakness details
+    weakness_lines = []
+    for m, val in bottom3:
+        descriptor = ""
+        if val <= 15:
+            descriptor = "very low"
+        elif val <= 30:
+            descriptor = "below average"
+        else:
+            descriptor = "slightly below par"
+        weakness_lines.append(
+            f"{label(m)} ({val:.0f}th percentile, {descriptor})"
+        )
+
+    strengths_text = "; ".join(strength_lines)
+    weaknesses_text = "; ".join(weakness_lines)
+
+    # 5. Construct final paragraph
     summary = (
-        f"This {role.lower()} from {league} shows standout ability in {strengths_text}, "
-        f"while having scope to improve in {weaknesses_text}."
+        f"{intro} He excels particularly in {strengths_text}. "
+        f"However, there is room for improvement in {weaknesses_text}. "
+        f"Overall, his statistical profile suggests a player with clear strengths in {label(top3[0][0])} "
+        f"and {label(top3[1][0])}, while {label(bottom3[0][0])} could be an area to focus on for future development."
     )
+
     return summary
 
 # ---------- Plot ----------
