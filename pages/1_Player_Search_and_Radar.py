@@ -1088,14 +1088,14 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, width="stretch")
 
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a longer scout-style summary based on radar percentiles (no AI API)."""
+    """Generate an extended scout-style player summary with final player-type sentence."""
     try:
         row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
         row.index = row.index.str.strip()
     except IndexError:
         return "No data available to summarise this player."
 
-    # 1. Extract metric percentiles
+    # --- Extract percentiles for all radar metrics ---
     metric_percentiles = {
         m: row.get(f"{m} (percentile)", np.nan)
         for m in metrics.keys()
@@ -1105,12 +1105,12 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
     if not valid_metrics:
         return "Insufficient data to generate summary."
 
-    # 2. Sort top / bottom metrics
+    # --- Rank metrics ---
     sorted_metrics = sorted(valid_metrics.items(), key=lambda x: x[1], reverse=True)
     top3 = sorted_metrics[:3]
     bottom3 = sorted_metrics[-3:]
 
-    # 3. Friendly labels
+    # --- Metric label mappings ---
     label_map = {
         "xG": "expected goals",
         "NP Goals": "non-penalty goals",
@@ -1136,56 +1136,94 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
     def label(metric):
         return label_map.get(metric, metric.lower().replace("_", " "))
 
-    # 4. Build narrative text
+    # --- Basic profile info ---
     role = str(row.get("Six-Group Position", "player"))
     league = str(row.get("Competition_norm", ""))
     age = row.get("Age", np.nan)
-    intro = f"This {role.lower()} from {league}"
 
+    intro = f"This {role.lower()} from {league}"
     if pd.notnull(age):
         intro += f", aged {int(age)},"
+    intro += " demonstrates a performance profile built around his key strengths."
 
-    intro += " demonstrates a well-rounded performance profile."
-
-    # Strength details
-    strength_lines = []
-    for m, val in top3:
-        descriptor = ""
+    # --- Strengths and weaknesses detail ---
+    def describe_metric(m, val):
         if val >= 85:
-            descriptor = "elite level"
+            return f"{label(m)} ({val:.0f}th percentile, elite)"
         elif val >= 70:
-            descriptor = "strong"
+            return f"{label(m)} ({val:.0f}th percentile, strong)"
         elif val >= 55:
-            descriptor = "above average"
-        else:
-            descriptor = "solid"
-        strength_lines.append(
-            f"{label(m)} ({val:.0f}th percentile, {descriptor} for his position)"
-        )
-
-    # Weakness details
-    weakness_lines = []
-    for m, val in bottom3:
-        descriptor = ""
-        if val <= 15:
-            descriptor = "very low"
+            return f"{label(m)} ({val:.0f}th percentile, above average)"
+        elif val <= 15:
+            return f"{label(m)} ({val:.0f}th percentile, very low)"
         elif val <= 30:
-            descriptor = "below average"
+            return f"{label(m)} ({val:.0f}th percentile, below average)"
         else:
-            descriptor = "slightly below par"
-        weakness_lines.append(
-            f"{label(m)} ({val:.0f}th percentile, {descriptor})"
-        )
+            return f"{label(m)} ({val:.0f}th percentile, slightly below par)"
 
-    strengths_text = "; ".join(strength_lines)
-    weaknesses_text = "; ".join(weakness_lines)
+    strengths_text = "; ".join(describe_metric(m, v) for m, v in top3)
+    weaknesses_text = "; ".join(describe_metric(m, v) for m, v in bottom3)
 
-    # 5. Construct final paragraph
+    # --- Final player-type sentence ---
+    avg_score = np.nanmean(list(valid_metrics.values()))
+    role_lower = role.lower()
+
+    # Simple heuristic: evaluate player type based on metric themes
+    if "Aggressive Actions" in valid_metrics or "PAdj Tackles" in valid_metrics:
+        defensive_bias = np.nanmean([
+            valid_metrics.get("Aggressive Actions", 50),
+            valid_metrics.get("PAdj Tackles", 50),
+            valid_metrics.get("PAdj Interceptions", 50)
+        ])
+    else:
+        defensive_bias = 50
+
+    attacking_bias = np.nanmean([
+        valid_metrics.get("xG", 50),
+        valid_metrics.get("Shots", 50),
+        valid_metrics.get("xG Assisted", 50),
+        valid_metrics.get("NP Goals", 50)
+    ])
+    possession_bias = np.nanmean([
+        valid_metrics.get("Passing%", 50),
+        valid_metrics.get("OBV", 50),
+        valid_metrics.get("Deep Progressions", 50)
+    ])
+
+    # Determine dominant style
+    style_sentence = ""
+    if role_lower in ["number 6", "number 8"]:
+        if defensive_bias > attacking_bias + 10:
+            style_sentence = "Overall, he profiles as a ball-winning midfielder who thrives out of possession."
+        elif attacking_bias > defensive_bias + 10:
+            style_sentence = "Overall, he profiles as an advanced, box-to-box midfielder who supports attacks from deep."
+        else:
+            style_sentence = "Overall, he appears to be a balanced central midfielder capable on both sides of the ball."
+    elif role_lower == "winger":
+        if attacking_bias > 70:
+            style_sentence = "Overall, he profiles as a direct attacking winger who creates danger through dribbles and goal threat."
+        else:
+            style_sentence = "Overall, he profiles as a possession-oriented wide player focused on combination play and chance creation."
+    elif role_lower == "striker":
+        if attacking_bias > 70:
+            style_sentence = "Overall, he looks like a high-impact striker with consistent goal threat and strong box presence."
+        elif defensive_bias > 60:
+            style_sentence = "Overall, he profiles as a hard-working forward who contributes through pressing and link-up play."
+        else:
+            style_sentence = "Overall, he profiles as a traditional striker with steady attacking metrics."
+    elif role_lower in ["centre back", "full back"]:
+        if defensive_bias > 70:
+            style_sentence = "Overall, he profiles as a defensively solid player who excels in duels and recoveries."
+        else:
+            style_sentence = "Overall, he shows good balance between defensive reliability and contribution in possession."
+    else:
+        style_sentence = "Overall, his profile suggests a versatile player with balanced strengths across phases of play."
+
+    # --- Build the full paragraph ---
     summary = (
-        f"{intro} He excels particularly in {strengths_text}. "
-        f"However, there is room for improvement in {weaknesses_text}. "
-        f"Overall, his statistical profile suggests a player with clear strengths in {label(top3[0][0])} "
-        f"and {label(top3[1][0])}, while {label(bottom3[0][0])} could be an area to focus on for future development."
+        f"{intro} He excels in {strengths_text}. "
+        f"Areas for improvement include {weaknesses_text}. "
+        f"{style_sentence}"
     )
 
     return summary
