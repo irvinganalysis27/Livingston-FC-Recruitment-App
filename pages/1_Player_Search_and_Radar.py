@@ -1097,6 +1097,27 @@ plot_data["Avg Z Score"] = pd.to_numeric(avg_z_view, errors="coerce").fillna(0)
 plot_data["Multiplier"] = pd.to_numeric(plot_data["Multiplier"], errors="coerce").fillna(1.0)
 plot_data["Weighted Z Score"] = plot_data["Avg Z Score"] * plot_data["Multiplier"]
 
+# --- LFC variant settings (same as Team Rankings) ---
+LFC_LEAGUE = "Scotland Premiership"
+LFC_MULT_VALUE = 1.20
+
+# Compute LFC Weighted Z on the full dataset (df_all), then map down to the filtered view (plot_data)
+# We already have avg_z_all (Series on df_all) and df_all["Multiplier"]
+lfc_mult_all = np.where(
+    (df_all.get("Competition_norm") == LFC_LEAGUE),
+    float(LFC_MULT_VALUE),
+    pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+)
+
+df_all["LFC Weighted Z"] = np.select(
+    [avg_z_all > 0, avg_z_all < 0],
+    [avg_z_all * lfc_mult_all, avg_z_all / lfc_mult_all],
+    default=0.0
+)
+
+# Bring LFC Weighted Z into the current filtered set
+plot_data["LFC Weighted Z"] = df_all.loc[df.index, "LFC Weighted Z"].astype(float)
+
 # Flag eligibility
 plot_data["_mins_numeric"] = pd.to_numeric(plot_data["Minutes played"], errors="coerce")
 plot_data["Eligible Mins?"] = plot_data["_mins_numeric"] >= 600
@@ -1159,6 +1180,13 @@ plot_data["Score (0–100)"] = pd.to_numeric(plot_data["Score (0–100)"], error
 
 # 5) Rank all filtered players
 plot_data["Rank"] = plot_data["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+# Compute LFC Score (0–100) using the SAME anchors as the normal score
+plot_data["LFC Score (0–100)"] = [
+    _minmax_score(v, lo, hi)
+    for v, lo, hi in zip(plot_data["LFC Weighted Z"], plot_data["_scale_min"], plot_data["_scale_max"])
+]
+plot_data["LFC Score (0–100)"] = pd.to_numeric(plot_data["LFC Score (0–100)"], errors="coerce").round(1).fillna(0)
 
 # Clean up
 plot_data.drop(columns=["_scale_min", "_scale_max", "_mins_numeric"], inplace=True, errors="ignore")
@@ -1331,7 +1359,8 @@ st.markdown("### Players Ranked by Score (0–100)")
 # Include key columns
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Score (0–100)", "LFC Score (0–100)",  # <— added
+    "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
@@ -1431,7 +1460,8 @@ z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
-    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Multiplier", "Score (0–100)", "LFC Score (0–100)",  # <— added
+    "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
