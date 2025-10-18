@@ -295,7 +295,10 @@ def generate_ai_summary(player_name: str):
         Each metric belongs to one of these categories — Work Rate, Running Load, Explosiveness,
         Top Speed, and Intensity — so use that structure to describe the player’s strengths and weaknesses.
     
-        - Focus your comments around those groups (e.g. "strong running load", "limited top speed").
+        - Focus your comments around those groups (Work Rate, Running Load, Explosiveness, Top Speed, Intensity).
+        - When a metric group is below the 40th percentile, describe it as a clear limitation (e.g. "struggles to cover ground", "lacks top-end speed").
+        - When a group is around average (40–70th), describe it neutrally (e.g. "steady work rate", "adequate running load").
+        - When a group is above 70th, highlight it positively (e.g. "exceptional stamina", "strong acceleration profile").
         - Avoid quoting the exact numeric values or percentile scores.
         - Use natural football analysis language.
         - Finish with one sentence that sums up his physical type or suitability.
