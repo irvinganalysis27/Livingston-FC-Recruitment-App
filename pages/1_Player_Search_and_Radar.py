@@ -15,6 +15,7 @@ from branding import show_branding
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
+from openai import OpenAI
 
 # ===== NEW SHARED SCORING IMPORTS =====
 from lib.scoring import (
@@ -23,6 +24,8 @@ from lib.scoring import (
     PreprocessConfig,
     ScoringConfig,
 )
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ========= DEBUG MARKERS =========
 print("[DEBUG_LOOP] ---- PAGE START ----")
@@ -1087,114 +1090,50 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     st.pyplot(fig, width="stretch")
 
-# ---------- Player summary generator (Tom’s scout tone, position-specific version) ----------
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """
-    Generates a natural, scout-style written summary of the player based on radar data.
-    The tone mirrors Tom Irving’s reports: detailed, confident, and football-specific.
-    Includes a role-aware closing line for realism.
-    """
+    """Generate a scout-style summary using OpenAI (GPT-4o-mini)."""
     try:
         row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
     except IndexError:
-        return "No data available to summarise this player."
+        return "No data available for this player."
 
-    # --- Collect percentiles for all radar metrics ---
+    role = str(row.get("Six-Group Position", "player"))
+    league = str(row.get("Competition_norm", ""))
+    age = row.get("Age", "")
+    team = str(row.get("Team", ""))
+    mins = row.get("Minutes played", 0)
+    
+    # Collect numeric metrics
     metric_percentiles = {
         m: row.get(f"{m} (percentile)", np.nan)
         for m in metrics.keys()
         if f"{m} (percentile)" in row.index
     }
+    metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
 
-    valid_metrics = {k: v for k, v in metric_percentiles.items() if pd.notnull(v)}
-    if not valid_metrics:
-        return "Insufficient data to generate a meaningful summary."
+    prompt = f"""
+    You are a professional football scout writing concise data-led reports for Livingston FC.
+    Write a 4-6 sentence summary for {player_name}, a {role} aged {age}, playing in {league} for {team}.
+    Use the metric percentiles below to describe their style, strengths, and weaknesses.
+    Include light context about how they might fit or improve our team based on their data.
+    End with a one-line conclusion summarising their player type and suitability.
 
-    # --- Identify strongest and weakest areas ---
-    sorted_metrics = sorted(valid_metrics.items(), key=lambda x: x[1], reverse=True)
-    strengths = sorted_metrics[:3]
-    weaknesses = sorted_metrics[-3:]
+    Metrics (percentiles 0–100):
+    {metric_text}
 
-    # --- Human-readable metric names ---
-    label_map = {
-        "xG": "expected goals",
-        "xG/Shot": "shot quality",
-        "NP Goals": "non-penalty goals",
-        "OBV": "overall on-ball value",
-        "Pass OBV": "progressive passing",
-        "Deep Progressions": "forward passing and carrying",
-        "Deep Completions": "final-third link play",
-        "Pressure Regains": "pressing recoveries",
-        "PAdj Tackles": "tackling",
-        "PAdj Interceptions": "interceptions",
-        "Aggressive Actions": "defensive aggression",
-        "Aerial Win%": "aerial ability",
-        "Aerial Wins": "aerial duels",
-        "Successful Dribbles": "dribbling",
-        "Turnovers": "ball retention",
-        "Fouls": "discipline",
-        "Passing%": "passing accuracy",
-        "xGBuildup": "involvement in buildup play",
-        "xG Assisted": "chance creation",
-        "Fouls Won": "drawing fouls",
-        "Shots": "shot volume",
-        "Player Season Fhalf Pressures 90": "pressing in advanced areas",
-    }
+    Keep tone professional, direct, and natural — like a human scout. Avoid repetition.
+    """
 
-    def label(metric):
-        return label_map.get(metric, metric.replace("_", " ").replace("%", " percent").lower())
-
-    # --- Write readable strengths and weaknesses with percentiles ---
-    strengths_text = ", ".join([f"{label(m)} ({int(v)}th percentile)" for m, v in strengths])
-    weaknesses_text = ", ".join([f"{label(m)} ({int(v)}th percentile)" for m, v in weaknesses])
-
-    # --- Basic info ---
-    name = player_name
-    role = str(row.get("Six-Group Position", "player")).strip()
-    age = row.get("Age", None)
-    league = str(row.get("Competition_norm", "")).strip()
-
-    # --- Write intro naturally (no generic phrasing) ---
-    intro_parts = [f"{name} is a {role.lower()}"] if role else [f"{name} is a player"]
-    if isinstance(age, (int, float)) and not np.isnan(age):
-        intro_parts.append(f"aged {int(age)}")
-    if league:
-        intro_parts.append(f"who currently plays in {league}")
-    intro = " ".join(intro_parts) + "."
-
-    # --- Build summary lines ---
-    summary_lines = []
-    summary_lines.append(
-        f"{intro.split('.')[0]} shows standout numbers in {strengths_text}. "
-        f"Those areas define his main strengths and give a clear picture of how he impacts the game."
-    )
-    summary_lines.append(
-        f"He could improve in {weaknesses_text}, "
-        f"which highlights areas for refinement if he’s to round out his overall game."
-    )
-
-    # --- Role-specific verdict templates (end line) ---
-    role_lower = role.lower()
-    if "keeper" in role_lower:
-        verdict = f"Overall, {name.split()[0]} comes across as a composed goalkeeper with strong shot-stopping foundations and the temperament to suit possession or counter-based systems."
-    elif "centre back" in role_lower:
-        verdict = f"He profiles as an assertive centre-back who defends on the front foot, aerially strong and proactive stepping into challenges — the type who fits a high defensive line."
-    elif "full back" in role_lower:
-        verdict = f"He looks like a modern full-back who offers intensity and ground coverage, ideal for a side that relies on width and overlapping runs."
-    elif "number 6" in role_lower:
-        verdict = f"He’s a disciplined holding midfielder who screens the defence well and links phases efficiently — reliable in structure and key for controlling tempo."
-    elif "number 8" in role_lower:
-        verdict = f"He reads as a box-to-box midfielder with energy and forward intent, able to link play and break lines consistently through work rate and timing."
-    elif "winger" in role_lower:
-        verdict = f"He’s a direct, creative wide player who thrives in 1v1s and quick transitions — best suited to teams that let him isolate defenders and attack space."
-    elif "striker" in role_lower:
-        verdict = f"He’s a direct, penalty-box striker who leads the line with intent, offering energy, physical presence and consistent goal threat."
-    else:
-        verdict = f"Overall, {name.split()[0]} comes across as a player with clear traits that could translate well into a structured, front-foot system."
-
-    # --- Combine all parts ---
-    final_text = " ".join(summary_lines) + " " + verdict
-    return final_text
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=250,
+            temperature=0.7,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ AI summary generation failed: {e}"
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
@@ -1254,6 +1193,16 @@ z_ranking["Rank"] = (
 z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
 z_ranking.index = np.arange(1, len(z_ranking) + 1)
 z_ranking.index.name = "Row"
+
+# --- AI Summary Section ---
+if st.button("🧠 Generate AI Summary"):
+    summary_text = generate_player_summary(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups
+    )
+    st.markdown("#### AI-Generated Player Summary")
+    st.write(summary_text)
 
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
