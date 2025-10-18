@@ -297,17 +297,6 @@ def plot_radial_bar_grouped(player_name: str):
 
 plot_radial_bar_grouped(selected_player)
 
-# ========= AI SUMMARY SECTION =========
-st.markdown("### 🧠 AI Physical Summary")
-
-# Generate button
-if st.button("Generate Physical Report for Selected Player"):
-    with st.spinner("Analysing player profile..."):
-        summary_text = generate_ai_summary(selected_player, df, percentile_df)
-        st.success("✅ Report generated successfully")
-        st.markdown(f"**{selected_player} – Summary:**")
-        st.write(summary_text)
-
 # ---- Replace your current summary function with this one ----
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
@@ -392,6 +381,17 @@ End with one crisp summary line of fit (e.g., “Profiles as a high-work-rate wi
             tail += "composite unavailable."
         parts.append(tail)
         return " ".join(parts)
+
+# ========= AI SUMMARY SECTION =========
+st.markdown("### 🧠 AI Physical Summary")
+
+# Generate button
+if st.button("Generate Physical Report for Selected Player"):
+    with st.spinner("Analysing player profile..."):
+        summary_text = generate_ai_summary(selected_player, df, percentile_df)
+        st.success("✅ Report generated successfully")
+        st.markdown(f"**{selected_player} – Summary:**")
+        st.write(summary_text)
 
 # ========= RANKING TABLE =========
 st.markdown("### Players Ranked by Physical Composite (0–100)")
