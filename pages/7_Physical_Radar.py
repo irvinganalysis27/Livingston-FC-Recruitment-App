@@ -12,8 +12,8 @@ st.title("📈 Physical Radar (SkillCorner)")
 
 # ========= WHERE IS YOUR CSV? =========
 # Point this to your SkillCorner export. Example: data/SkillCorner-2025-10-18.csv
-APP_DIR = Path(__file__).parent
-DATA_PATH = APP_DIR / "SkillCorner-2025-10-18.csv"
+ROOT_DIR = Path(__file__).parents[1]
+DATA_PATH = ROOT_DIR / "SkillCorner-2025-10-18.csv"
 
 # ========= METRICS (fixed set for this page) =========
 RADAR_METRICS = [
