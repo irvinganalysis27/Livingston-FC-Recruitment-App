@@ -1143,15 +1143,6 @@ if st.session_state.selected_player:
         group_colors
     )
 
-    # --- Auto summary below the radar ---
-    summary_text = generate_player_summary(
-        st.session_state.selected_player,
-        plot_data,
-        metric_groups
-    )
-    st.markdown("#### 🧠 Player Summary")
-    st.write(summary_text)
-
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
