@@ -1090,7 +1090,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, width="stretch")
 
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a natural, scout-style summary in Tom's tone using OpenAI (GPT-4o-mini)."""
+    """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
     try:
         row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
     except IndexError:
@@ -1112,32 +1112,46 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
 
     # --- Build dynamic prompt ---
     prompt = f"""
-    You are writing a football scouting report in the voice and style of Tom Irving, a professional recruitment analyst.
+    You are writing a detailed but concise player scouting report in the style of Tom Irving,
+    a professional football recruitment analyst known for honest, critical, and realistic assessments.
 
-    Tone and structure guidelines:
-    - Write naturally, as if speaking to a colleague — no generic openings like “This winger from...”.
-    - Start with the player’s name and position (e.g., “Lewis Smith is an inventive winger…”).
-    - Reference percentile data casually, e.g., “ranking around the 80th percentile for dribbles” or “among the top in his league for aerials”.
-    - Mix data-led insights with observational phrasing (“he often takes risks to progress play”, “his positioning is aggressive without being reckless”).
-    - Avoid repetitive joining phrases like “those areas define…”.
-    - End with a one-line conclusion about player type and fit (e.g., “A composed full-back suited to possession-based systems.”).
-    - Use the following examples of Tom’s real tone:
-        • “He’s got a natural confidence in possession and looks to play forward quickly.”
-        • “He’s not the most powerful, but his balance and control make him hard to dispossess.”
-        • “A rounded midfielder who could add energy and presence to a team lacking legs.”
+    Write a 5–6 sentence paragraph about {player_name}, a {role.lower()} aged {age}, currently playing in {league} for {team}.
 
-    Now write a 5–6 sentence scouting summary for:
-    {player_name}, a {role} aged {age}, playing in {league} for {team}.
-    Use the following metric percentiles (0–100) as context for their data profile:
+    You have access to percentile data (0–100) for performance metrics:
     {metric_text}
+
+    Tone and writing style rules:
+    - Do NOT start with cliches like “is an exciting” or “is a talented” player.
+    - Vary the opening line. It can start with what kind of player he looks like, what stands out, or even what’s missing.
+    - If metrics are low (below 40th percentile), acknowledge weaknesses clearly. Use natural phrasing like:
+        • “Struggles to impact games consistently.” 
+        • “Can look limited when the game becomes physical.”
+        • “Output doesn’t yet match his effort.”
+    - If metrics are high (above 70th percentile), highlight them naturally:
+        • “Ranks among the best in his league for dribbles and chance creation.”
+        • “Shows real control under pressure and moves play forward quickly.”
+    - Keep a balanced tone — be fair, but never overly generous. You're not writing marketing material.
+    - Combine data insight with realistic football language (movement, body shape, pressing work, mentality).
+    - Vary phrasing so no two reports feel copy-pasted.
+    - End with one strong, definitive sentence that sums up his player type or potential fit — e.g.:
+        • “A physically strong, low-risk defender who could suit a compact system.”
+        • “A creative wide player with flashes of quality but inconsistent end product.”
+        • “Profiles as a hard-working forward who fits the pressing style but lacks a ruthless edge.”
+
+    Write in Tom’s natural tone, as seen in these examples:
+    - “He’s got a good base technically but sometimes forces play when it’s not on.”
+    - “Not the most dynamic athlete, but his awareness and timing stand out.”
+    - “There’s something raw but promising about him — a player who could develop quickly in the right setup.”
+
+    Be honest, concise, and analytical. Avoid repetition. Write like a human scout.
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.75,
+            max_tokens=350,
+            temperature=0.85,  # slightly higher for more creative, human tone
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
