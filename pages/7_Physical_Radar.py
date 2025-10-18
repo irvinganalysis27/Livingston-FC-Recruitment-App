@@ -26,7 +26,16 @@ def load_skillcorner_data():
     })
 
     df = pd.DataFrame(data)
-    df = p_utils.add_standard_metrics(df)
+    
+    # Debug: show available columns so we can understand structure
+    st.write("✅ Raw columns returned from API:")
+    st.write(df.columns.tolist())
+    
+    # Add a few sanity checks
+    if "player_name" in df.columns:
+        st.write("Example players:", df["player_name"].head(10).tolist())
+    else:
+        st.warning("⚠️ No 'player_name' column found.")
 
     # Save local backup (optional)
     df.to_csv("data/skillcorner_physical_backup.csv", index=False)
