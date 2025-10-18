@@ -1090,7 +1090,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, width="stretch")
 
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a scout-style summary using OpenAI (GPT-4o-mini)."""
+    """Generate a natural, scout-style summary in Tom's tone using OpenAI (GPT-4o-mini)."""
     try:
         row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
     except IndexError:
@@ -1101,7 +1101,7 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
     age = row.get("Age", "")
     team = str(row.get("Team", ""))
     mins = row.get("Minutes played", 0)
-    
+
     # Collect numeric metrics
     metric_percentiles = {
         m: row.get(f"{m} (percentile)", np.nan)
@@ -1110,25 +1110,34 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
     }
     metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
 
+    # --- Build dynamic prompt ---
     prompt = f"""
-    You are a professional football scout writing concise data-led reports for Livingston FC.
-    Write a 4-6 sentence summary for {player_name}, a {role} aged {age}, playing in {league} for {team}.
-    Use the metric percentiles below to describe their style, strengths, and weaknesses.
-    Include light context about how they might fit or improve our team based on their data.
-    End with a one-line conclusion summarising their player type and suitability.
+    You are writing a football scouting report in the voice and style of Tom Irving, a professional recruitment analyst.
 
-    Metrics (percentiles 0–100):
+    Tone and structure guidelines:
+    - Write naturally, as if speaking to a colleague — no generic openings like “This winger from...”.
+    - Start with the player’s name and position (e.g., “Lewis Smith is an inventive winger…”).
+    - Reference percentile data casually, e.g., “ranking around the 80th percentile for dribbles” or “among the top in his league for aerials”.
+    - Mix data-led insights with observational phrasing (“he often takes risks to progress play”, “his positioning is aggressive without being reckless”).
+    - Avoid repetitive joining phrases like “those areas define…”.
+    - End with a one-line conclusion about player type and fit (e.g., “A composed full-back suited to possession-based systems.”).
+    - Use the following examples of Tom’s real tone:
+        • “He’s got a natural confidence in possession and looks to play forward quickly.”
+        • “He’s not the most powerful, but his balance and control make him hard to dispossess.”
+        • “A rounded midfielder who could add energy and presence to a team lacking legs.”
+
+    Now write a 5–6 sentence scouting summary for:
+    {player_name}, a {role} aged {age}, playing in {league} for {team}.
+    Use the following metric percentiles (0–100) as context for their data profile:
     {metric_text}
-
-    Keep tone professional, direct, and natural — like a human scout. Avoid repetition.
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=250,
-            temperature=0.7,
+            max_tokens=300,
+            temperature=0.75,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
