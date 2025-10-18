@@ -16,6 +16,7 @@ def load_skillcorner_data():
         password=st.secrets["SKILLCORNER"]["PASSWORD"]
     )
 
+    # Fetch raw data
     data = client.get_physical(params={
         'competition': '51,1385,4',  # Example: Scotland Premiership, Championship, League One
         'season': 2025,
@@ -25,20 +26,29 @@ def load_skillcorner_data():
         'data_version': '3'
     })
 
-    df = pd.DataFrame(data)
-    
-    # Debug: show available columns so we can understand structure
-    st.write("✅ Raw columns returned from API:")
-    st.write(df.columns.tolist())
-    
-    # Add a few sanity checks
-    if "player_name" in df.columns:
-        st.write("Example players:", df["player_name"].head(10).tolist())
+    # Check raw type and content
+    print(f"[DEBUG] Type of data returned: {type(data)}")
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+        first_row_keys = list(data[0].keys())
+        print(f"[DEBUG] Keys in first row: {first_row_keys}")
     else:
-        st.warning("⚠️ No 'player_name' column found.")
+        print("[DEBUG] No valid dict-like rows found.")
 
-    # Save local backup (optional)
-    df.to_csv("data/skillcorner_physical_backup.csv", index=False)
+    df = pd.DataFrame(data)
+    print(f"[DEBUG] DataFrame shape: {df.shape}")
+
+    # Try adding metrics (safe)
+    try:
+        df = p_utils.add_standard_metrics(df)
+        print("[DEBUG] Added SkillCorner standard metrics successfully.")
+    except Exception as e:
+        print(f"[DEBUG] ⚠️ Could not add standard metrics: {e}")
+
+    # Skip saving to non-existent folder
+    try:
+        df.to_csv("skillcorner_physical_backup.csv", index=False)
+    except Exception as e:
+        print(f"[DEBUG] ⚠️ Backup save failed: {e}")
 
     print(f"[SkillCorner] Loaded {len(df)} rows at {datetime.now().strftime('%H:%M:%S')}")
     return df
@@ -47,13 +57,11 @@ def load_skillcorner_data():
 st.write("Fetching data from SkillCorner API...")
 df_all_raw = load_skillcorner_data()
 
+st.markdown("### ✅ Raw columns returned from API:")
 if df_all_raw.empty:
     st.error("❌ No data returned from SkillCorner API.")
-    st.stop()
-
-st.success(f"✅ Loaded {len(df_all_raw)} rows and {len(df_all_raw.columns)} columns.")
-st.dataframe(df_all_raw.head(10))
-
-# Show column names for analysis
-st.markdown("### 🧩 Column names from API:")
-st.write(df_all_raw.columns.tolist())
+else:
+    st.success(f"✅ Loaded {len(df_all_raw)} rows and {len(df_all_raw.columns)} columns.")
+    st.dataframe(df_all_raw.head(10))
+    st.markdown("### 🧩 All column names:")
+    st.code(", ".join(df_all_raw.columns.tolist()))
