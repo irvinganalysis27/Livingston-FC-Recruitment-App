@@ -25,8 +25,7 @@ from lib.scoring import (
     ScoringConfig,
 )
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
+client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 # ========= DEBUG MARKERS =========
 print("[DEBUG_LOOP] ---- PAGE START ----")
 print("[DEBUG] Run marker:", random.randint(1000, 9999))
