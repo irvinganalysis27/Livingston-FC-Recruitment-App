@@ -6,6 +6,10 @@ from pathlib import Path
 from datetime import datetime
 import re
 
+import os
+print("Current working directory:", os.getcwd())
+print("Files in current folder:", os.listdir(APP_DIR))
+
 # ========= PAGE CONFIG =========
 st.set_page_config(page_title="SkillCorner Physical Radar", layout="centered")
 st.title("📈 Physical Radar (SkillCorner)")
