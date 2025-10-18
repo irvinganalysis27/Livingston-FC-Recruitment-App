@@ -16,41 +16,28 @@ def load_skillcorner_data():
         password=st.secrets["SKILLCORNER"]["PASSWORD"]
     )
 
-    # Fetch raw data
-    data = client.get_physical(params={
-        'competition': '51,1385,4',  # Example: Scotland Premiership, Championship, League One
-        'season': 2025,
-        'group_by': 'player,team,competition,season,group',
-        'playing_time__gte': 60,
-        'count_match__gte': 5,
-        'data_version': '3'
-    })
+    # --- Minimal request: no filters ---
+    try:
+        data = client.get_physical(params={})
+    except Exception as e:
+        st.error(f"❌ API request failed: {e}")
+        return pd.DataFrame()
 
-    # Check raw type and content
-    print(f"[DEBUG] Type of data returned: {type(data)}")
+    if not data:
+        print("[DEBUG] Empty or null response from API.")
+        return pd.DataFrame()
+
+    print(f"[DEBUG] Type: {type(data)}, length: {len(data)}")
+
     if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-        first_row_keys = list(data[0].keys())
-        print(f"[DEBUG] Keys in first row: {first_row_keys}")
+        first_keys = list(data[0].keys())
+        print(f"[DEBUG] Keys in first row: {first_keys}")
     else:
-        print("[DEBUG] No valid dict-like rows found.")
+        print("[DEBUG] No valid dict-like rows in data.")
 
     df = pd.DataFrame(data)
-    print(f"[DEBUG] DataFrame shape: {df.shape}")
-
-    # Try adding metrics (safe)
-    try:
-        df = p_utils.add_standard_metrics(df)
-        print("[DEBUG] Added SkillCorner standard metrics successfully.")
-    except Exception as e:
-        print(f"[DEBUG] ⚠️ Could not add standard metrics: {e}")
-
-    # Skip saving to non-existent folder
-    try:
-        df.to_csv("skillcorner_physical_backup.csv", index=False)
-    except Exception as e:
-        print(f"[DEBUG] ⚠️ Backup save failed: {e}")
-
-    print(f"[SkillCorner] Loaded {len(df)} rows at {datetime.now().strftime('%H:%M:%S')}")
+    print(f"[DEBUG] Shape: {df.shape}")
+    st.write(df.head())
     return df
 
 # ========= RUN TEST =========
