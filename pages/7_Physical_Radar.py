@@ -40,6 +40,34 @@ GROUP_COLOURS = {
     "Intensity": "purple",
 }
 
+# ---- Add after GROUP_COLOURS ----
+GROUP_THRESHOLDS = dict(high=70.0, low=40.0)
+
+# The metric → group mapping already exists as METRIC_GROUPS.
+# We'll compute one score per group = mean of its metric percentiles.
+def compute_group_labels(percentile_row: pd.Series) -> dict:
+    # percentile_row is a single player's percentiles (the row from `percentile_df`)
+    groups = {}
+    # bucket metric percentiles by group, then mean
+    by_group = {}
+    for m, g in METRIC_GROUPS.items():
+        if m in percentile_row.index:
+            by_group.setdefault(g, []).append(pd.to_numeric(percentile_row[m], errors="coerce"))
+    for g, vals in by_group.items():
+        vals = pd.Series(vals, dtype="float").dropna()
+        if vals.empty:
+            groups[g] = dict(score=np.nan, label="Unknown")
+            continue
+        score = float(vals.mean())
+        if score >= GROUP_THRESHOLDS["high"]:
+            label = "High"
+        elif score < GROUP_THRESHOLDS["low"]:
+            label = "Low"
+        else:
+            label = "Average"
+        groups[g] = dict(score=round(score, 1), label=label)
+    return groups
+
 # ========= BASIC HELPERS =========
 def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -269,55 +297,90 @@ def plot_radial_bar_grouped(player_name: str):
 
 plot_radial_bar_grouped(selected_player)
 
-# ========= AI SUMMARY =========
+# ---- Replace your current summary function with this one ----
+from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
-def generate_ai_summary(player_name: str):
-    try:
-        row = df.loc[df["Player"] == player_name].iloc[0]
-    except IndexError:
+def generate_ai_summary(player_name: str, df_players: pd.DataFrame, percentile_df: pd.DataFrame) -> str:
+    # Find the player's row
+    row_df = df_players.loc[df_players["Player"] == player_name]
+    if row_df.empty:
         return "No data available for this player."
-    role = str(row.get("Position Group Normalised", "player"))
-    league = str(row.get("Competition", ""))
-    team = str(row.get("Team", ""))
-    mins = row.get("Minutes", 0)
-    score = row.get("_score_0_100_global", 0)
-    metric_text = ", ".join([f"{m}: {round(row[m],1)}" for m in RADAR_METRICS if pd.notnull(row[m])])
+    row = row_df.iloc[0]
+
+    # Pull that player’s percentiles row
+    p_row = percentile_df.loc[row_df.index[0], RADAR_METRICS]
+    group_info = compute_group_labels(p_row)
+
+    # Build a locked “evidence” block the model must follow
+    evidence_lines = []
+    for g in ["Work Rate", "Running Load", "Explosiveness", "Top Speed", "Intensity"]:
+        if g in group_info:
+            gi = group_info[g]
+            evidence_lines.append(f"- {g}: {gi['label']} ({gi['score']})")
+    evidence_text = "\n".join(evidence_lines)
+
+    context = {
+        "name": player_name,
+        "team": str(row.get("Team") or ""),
+        "comp": str(row.get("Competition") or ""),
+        "mins": int(row.get("Minutes")) if pd.notnull(row.get("Minutes")) else None,
+        "posg": str(row.get("Position Group") or ""),
+        "overall": float(row.get("_score_0_100", np.nan)),
+    }
 
     prompt = f"""
-        You are writing a concise, honest scouting summary in the style of Tom Irving,
-        focusing on the player's physical profile.
-    
-        Write 5–6 sentences about {player_name}, a {role.lower()} in {league} for {team}.
-        He has played {mins} minutes this season.
-    
-        Base your analysis on these metrics: {metric_text}.
-        Each metric belongs to one of these categories — Work Rate, Running Load, Explosiveness,
-        Top Speed, and Intensity — so use that structure to describe the player’s strengths and weaknesses.
-    
-        - Focus your comments around those groups (Work Rate, Running Load, Explosiveness, Top Speed, Intensity).
-        - When a metric group is below the 40th percentile, describe it as a clear limitation (e.g. "struggles to cover ground", "lacks top-end speed").
-        - When a group is around average (40–70th), describe it neutrally (e.g. "steady work rate", "adequate running load").
-        - When a group is above 70th, highlight it positively (e.g. "exceptional stamina", "strong acceleration profile").
-        - Avoid quoting the exact numeric values or percentile scores.
-        - Use natural football analysis language.
-        - Finish with one sentence that sums up his physical type or suitability.
-        """
+You are writing a short **physical profile** for a football player based ONLY on the labelled evidence below.
+You MUST stick to each label's polarity:
+- If a group is **High**, describe it positively.
+- If a group is **Average**, keep neutral, matter-of-fact language.
+- If a group is **Low**, describe it as a limitation. DO NOT spin it positively.
+
+NEVER contradict a label. NEVER claim a strength where the label is Low, or a weakness where the label is High.
+Do not invent facts beyond these groups. Do not quote raw numbers or percentiles.
+
+Player: {context['name']}
+Role: {context['posg']}
+Team/League: {context['team']} | {context['comp']}
+Minutes: {context['mins']}
+Composite (0–100): {context['overall']:.0f} if not NaN else "n/a"
+
+Evidence (group → label (score)):
+{evidence_text}
+
+Write 4–6 sentences. Cover groups with **High** or **Low** first. Mention **Average** groups only briefly.
+End with one crisp summary line of fit (e.g., “Profiles as a high-work-rate wide player with limited top-end speed.”).
+"""
 
     try:
-        response = client.chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
+            temperature=0.2,            # low = faithful to labels
+            max_tokens=250,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=350,
-            temperature=0.85,
         )
-        return response.choices[0].message.content.strip()
+        return resp.choices[0].message.content.strip()
     except Exception as e:
-        return f"⚠️ AI summary generation failed: {e}"
-
-if st.button("🧠 Generate AI Summary"):
-    st.markdown("#### AI-Generated Player Summary")
-    st.write(generate_ai_summary(selected_player))
+        # Safe fallback: fully deterministic summary if API fails
+        parts = []
+        order = ["High", "Low", "Average"]
+        # Prioritise High/Low groups in output
+        for wanted in ["High", "Low", "Average"]:
+            for g, gi in group_info.items():
+                if gi["label"] == wanted:
+                    if wanted == "High":
+                        parts.append(f"Strong {g.lower()}, a clear positive in his profile.")
+                    elif wanted == "Low":
+                        parts.append(f"Limited {g.lower()}, which reduces impact in that area.")
+                    else:
+                        parts.append(f"{g} looks steady without standing out.")
+        tail = "Overall profile: "
+        if pd.notna(context["overall"]):
+            tail += f"{context['overall']:.0f}/100 composite."
+        else:
+            tail += "composite unavailable."
+        parts.append(tail)
+        return " ".join(parts)
 
 # ========= RANKING TABLE =========
 st.markdown("### Players Ranked by Physical Composite (0–100)")
