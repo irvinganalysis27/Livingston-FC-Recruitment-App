@@ -285,17 +285,21 @@ def generate_ai_summary(player_name: str):
     metric_text = ", ".join([f"{m}: {round(row[m],1)}" for m in RADAR_METRICS if pd.notnull(row[m])])
 
     prompt = f"""
-    You are writing a concise, honest scouting summary in the style of Tom Irving,
-    focusing on the player's physical profile.
-
-    Write 5–6 sentences about {player_name}, a {role.lower()} in {league} for {team}.
-    He has played {mins} minutes and has a physical composite score of {score}/100.
-    Use this data: {metric_text}.
-
-    - Highlight strengths (above 70th percentile) and weaknesses (below 40th).
-    - Use natural, realistic football analysis language.
-    - Finish with one sentence that sums up his physical type or suitability.
-    """
+        You are writing a concise, honest scouting summary in the style of Tom Irving,
+        focusing on the player's physical profile.
+    
+        Write 5–6 sentences about {player_name}, a {role.lower()} in {league} for {team}.
+        He has played {mins} minutes this season.
+    
+        Base your analysis on these metrics: {metric_text}.
+        Each metric belongs to one of these categories — Work Rate, Running Load, Explosiveness,
+        Top Speed, and Intensity — so use that structure to describe the player’s strengths and weaknesses.
+    
+        - Focus your comments around those groups (e.g. "strong running load", "limited top speed").
+        - Avoid quoting the exact numeric values or percentile scores.
+        - Use natural football analysis language.
+        - Finish with one sentence that sums up his physical type or suitability.
+        """
 
     try:
         response = client.chat.completions.create(
