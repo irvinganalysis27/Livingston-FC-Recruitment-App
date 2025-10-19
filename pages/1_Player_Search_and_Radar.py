@@ -16,7 +16,6 @@ from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
 from openai import OpenAI
-from lib.scoring import compute_scores, ScoringConfig
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 # ========= DEBUG MARKERS =========
