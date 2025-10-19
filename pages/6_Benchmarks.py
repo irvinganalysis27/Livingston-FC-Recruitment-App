@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from datetime import datetime
 import re
+from datetime import datetime
 
 from auth import check_password
 from branding import show_branding
@@ -30,7 +30,7 @@ DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 RAW_TO_GROUP = {
     "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
     "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
-    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
+    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTRECENTREBACK": "Centre Back",
     "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
     "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
@@ -41,11 +41,14 @@ RAW_TO_GROUP = {
     "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
     "GOALKEEPER": "Goalkeeper",
 }
+
 def _clean_pos_token(tok: str) -> str:
-    if pd.isna(tok): return ""
+    if pd.isna(tok):
+        return ""
     t = str(tok).upper().strip()
     t = re.sub(r"[.\-_/]", " ", t)
     return re.sub(r"\s+", "", t)
+
 def map_first_position_to_group(primary_pos_cell) -> str:
     return RAW_TO_GROUP.get(_clean_pos_token(primary_pos_cell), None)
 
@@ -56,42 +59,63 @@ def map_first_position_to_group(primary_pos_cell) -> str:
 def load_statsbomb_data(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     df.columns = df.columns.str.strip()
+
+    # Normalise position column
     if "Primary Position" in df.columns:
         df["Six-Group Position"] = df["Primary Position"].apply(map_first_position_to_group)
     elif "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
+
+    # Standardise minutes column
     if "Minutes" in df.columns:
         df["Minutes played"] = pd.to_numeric(df["Minutes"], errors="coerce").fillna(0)
+
     return df
 
+# Load dataset
 try:
     df_all = load_statsbomb_data(DATA_PATH)
 except Exception as e:
     st.error(f"❌ Could not load StatsBomb data: {e}")
     st.stop()
 
-# Filter to eligible (600+ mins)
+# Filter to eligible players
 df_all = df_all[df_all["Minutes played"] >= 600].copy()
 if df_all.empty:
     st.warning("No players with 600+ minutes found.")
     st.stop()
 
-# Numeric metrics only
+# ============================================================
+# Metric Filtering
+# ============================================================
 numeric_cols = df_all.select_dtypes(include=[np.number]).columns.tolist()
-# Drop context columns
 drop_cols = ["Minutes played", "Age", "Height", "Weight", "Multiplier"]
-metrics = [c for c in numeric_cols if c not in drop_cols]
+HIDE_PATTERNS = ["player season", "account id"]
+
+metrics = []
+for c in numeric_cols:
+    cname = str(c).lower()
+    if any(p in cname for p in HIDE_PATTERNS):
+        continue
+    if c not in drop_cols:
+        metrics.append(c)
+
+if not metrics:
+    st.error("No valid numeric metrics available for benchmarks.")
+    st.stop()
 
 # ============================================================
 # Compute Benchmarks (per position)
 # ============================================================
 @st.cache_data
 def compute_benchmarks(df: pd.DataFrame, pos_col: str, metrics: list[str]) -> dict:
-    """Return dict of position→metric→percentile bands."""
+    """Return dict of position → metric → percentile bands."""
     benchmarks = {}
     for pos, sub in df.groupby(pos_col):
+        if pos is None or str(pos).strip() == "":
+            continue
         benchmarks[pos] = {}
         for m in metrics:
             vals = pd.to_numeric(sub[m], errors="coerce").dropna()
@@ -104,12 +128,16 @@ def compute_benchmarks(df: pd.DataFrame, pos_col: str, metrics: list[str]) -> di
                 "Average": f"{q30:.2f}–{q70:.2f}",
                 "Good": f"{q70:.2f}–{q90:.2f}",
                 "Excellent (>90%)": f">{q90:.2f}",
-                "Sustainable Good Range (30–90%)": f"{q30:.2f}–{q90:.2f}"
+                "Sustainable Good Range (30–90%)": f"{q30:.2f}–{q90:.2f}",
             }
     return benchmarks
 
 benchmarks = compute_benchmarks(df_all, "Six-Group Position", metrics)
 positions = sorted(list(benchmarks.keys()))
+
+if not positions:
+    st.error("No position groups found with enough players to calculate benchmarks.")
+    st.stop()
 
 # ============================================================
 # UI: Select Position + Metric
@@ -119,9 +147,18 @@ st.markdown("### Select a Position and Metric")
 selected_position = st.selectbox("Position", positions)
 metric_list = sorted(list(benchmarks[selected_position].keys()))
 
+if not metric_list:
+    st.warning(f"No valid metrics for {selected_position}.")
+    st.stop()
+
 if "selected_metric" not in st.session_state or st.session_state.selected_metric not in metric_list:
     st.session_state.selected_metric = metric_list[0]
-selected_metric = st.selectbox("Metric", metric_list, index=metric_list.index(st.session_state.selected_metric))
+
+selected_metric = st.selectbox(
+    "Metric",
+    metric_list,
+    index=metric_list.index(st.session_state.selected_metric),
+)
 st.session_state.selected_metric = selected_metric
 
 row = benchmarks[selected_position][selected_metric]
@@ -142,7 +179,6 @@ st.write("**Sustainable Good Range (30–90%)**:", row["Sustainable Good Range (
 # Test a Value
 # ============================================================
 st.markdown("### Test a Value")
-
 value = st.number_input("Enter a value to test", step=0.01)
 
 def get_category(val, r):
