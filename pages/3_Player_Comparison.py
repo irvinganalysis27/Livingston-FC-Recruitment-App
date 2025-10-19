@@ -37,122 +37,79 @@ DISPLAY_NAMES = {
     "Player Season Ball Recoveries 90": "Ball Recoveries",
 }
 
-# ========= LEAGUE SYNONYMS =========
+# --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
-    # --- Australia ---
     "A-League": "Australia A-League Men",
-    "Australia A-League": "Australia A-League Men",
-
-    # --- Austria ---
     "2. Liga": "Austria 2. Liga",
-
-    # --- Belgium ---
     "Challenger Pro League": "Belgium Challenger Pro League",
-
-    # --- Bulgaria ---
     "First League": "Bulgaria First League",
-
-    # --- Croatia ---
     "1. HNL": "Croatia 1. HNL",
-
-    # --- Czech Republic ---
+    "HNL": "Croatia 1. HNL",
     "Czech Liga": "Czech First Tier",
-
-    # --- Denmark ---
     "1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
-
-    # --- England ---
+    "Denmark Superliga": "Denmark Superliga",
     "League One": "England League One",
     "League Two": "England League Two",
     "National League": "England National League",
-
-    # --- Estonia ---
+    "National League N / S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
-
-    # --- Finland ---
     "Veikkausliiga": "Finland Veikkausliiga",
-
-    # --- France ---
     "Championnat National": "France National 1",
     "Ligue 2": "Ligue 2",
-
-    # --- Germany ---
+    "France Ligue 2": "Ligue 2",
+    "2. Bundesliga": "2. Bundesliga",
+    "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
-
-    # --- Greece ---
     "Super League": "Greece Super League 1",
-
-    # --- Hungary ---
+    "Greece Super League": "Greece Super League 1",
     "NB I": "Hungary NB I",
-
-    # --- Iceland ---
     "Besta deild karla": "Iceland Besta Deild",
-
-    # --- Italy ---
     "Serie C": "Italy Serie C",
-
-    # --- Japan ---
     "J2 League": "Japan J2 League",
-
-    # --- Latvia ---
     "Virsliga": "Latvia Virsliga",
-
-    # --- Lithuania ---
     "A Lyga": "Lithuania A Lyga",
-
-    # --- Morocco ---
     "Botola Pro": "Morocco Botola Pro",
-
-    # --- Netherlands ---
     "Eredivisie": "Eredivisie",
+    "Netherlands Eredivisie": "Eredivisie",
     "Eerste Divisie": "Netherlands Eerste Divisie",
-
-    # --- Norway ---
     "1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
-
-    # --- Poland ---
     "I Liga": "Poland 1 Liga",
     "Ekstraklasa": "Poland Ekstraklasa",
-
-    # --- Portugal ---
     "Segunda Liga": "Portugal Segunda Liga",
-
-    # --- Ireland ---
+    "Liga Pro": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
-
-    # --- Romania ---
+    "Ireland Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
-
-    # --- Scotland ---
     "Championship": "Scotland Championship",
     "Premiership": "Scotland Premiership",
-
-    # --- Serbia ---
     "Super Liga": "Serbia Super Liga",
-
-    # --- Slovenia ---
+    "Slovakia Super Liga": "Slovakia 1. Liga",
+    "Slovakia First League": "Slovakia 1. Liga",
+    "1. Liga": "Slovakia 1. Liga",
     "1. Liga (SVN)": "Slovenia 1. Liga",
-
-    # --- South Africa ---
     "PSL": "South Africa Premier Division",
-
-    # --- Sweden ---
     "Allsvenskan": "Sweden Allsvenskan",
     "Superettan": "Sweden Superettan",
-
-    # --- Switzerland ---
     "Challenge League": "Switzerland Challenge League",
+    "Denmark 1. Division": "Denmark 1st Division",
+    "Slovenia 1. SNL": "Slovenia 1. Liga",
 
-    # --- Tunisia ---
+    # --- Tunisia fixes ---
+    "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
+    "Ligue 1 (TUN)": "Tunisia Ligue 1",
     "Tunisia Ligue 1": "Tunisia Ligue 1",
+    "France Ligue 1": "Tunisia Ligue 1",
 
     # --- USA ---
     "USL Championship": "USA USL Championship",
 
-    # --- Belgium alt ---
+    # --- Belgium top flight fixes ---
     "Jupiler Pro League": "Jupiler Pro League",
+    "Belgium Pro League": "Jupiler Pro League",
+    "Belgian Pro League": "Jupiler Pro League",
+    "Belgium Jupiler Pro League": "Jupiler Pro League",
 }
 
 # ========== Role groups shown in filters ==========
