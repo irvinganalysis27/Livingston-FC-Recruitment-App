@@ -70,6 +70,7 @@ def compute_group_labels(percentile_row: pd.Series) -> dict:
 
 # ========= BASIC HELPERS =========
 def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardise column names by removing extra spaces and non-breaking spaces."""
     df = df.copy()
     df.columns = (
         df.columns.astype(str)
@@ -79,76 +80,43 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df
 
-def _safe_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    df = df.copy()
-    for c in cols:
-        if c not in df.columns:
-            df[c] = np.nan
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
-
 def pct_rank(series: pd.Series, lower_is_better: bool = False) -> pd.Series:
+    """Return percentile ranks (0–100)."""
     s = pd.to_numeric(series, errors="coerce").fillna(0)
     r = s.rank(pct=True, ascending=True)
     if lower_is_better:
         r = 1.0 - r
     return (r * 100.0).round(1)
 
-# ========= SKILLCORNER API LOADER =========
-try:
-    from skillcorner.client import SkillcornerClient
-
-    @st.cache_data(ttl=86400, show_spinner=True)
-    def fetch_skillcorner_api():
-        client = SkillcornerClient(
-            username=st.secrets["SKILLCORNER"]["USERNAME"],
-            password=st.secrets["SKILLCORNER"]["PASSWORD"]
-        )
-        data = client.get_physical(params={
-            'competition': '18,459,305',  # Example: Scotland, Championship, etc.
-            'season': 2025,
-            'group_by': 'player,team,competition,season,group',
-            'playing_time__gte': 60,
-            'count_match__gte': 5,
-            'data_version': '3'
-        })
-        return pd.DataFrame(data)
-except Exception:
-    fetch_skillcorner_api = None
-
-# ========= CSV FALLBACK LOADER =========
+# ========= CSV LOADER =========
 @st.cache_data(ttl=86400, show_spinner=True)
-def load_skillcorner_csv(path_str: str):
-    trials = [
-        dict(sep=None, engine="python", on_bad_lines="skip"),
-        dict(sep=",", engine="python", on_bad_lines="skip"),
-        dict(sep="\t", engine="python", on_bad_lines="skip"),
-    ]
-    path = Path(path_str)
+def load_skillcorner_csv(path: Path) -> pd.DataFrame:
+    """Load SkillCorner CSV file with basic safety and fallback parsing."""
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
-    for kwargs in trials:
+
+    for sep in [",", "\t", None]:
         try:
-            df = pd.read_csv(path, **kwargs)
+            df = pd.read_csv(path, sep=sep, engine="python", on_bad_lines="skip")
             if df.shape[1] > 1:
-                return df
+                return _clean_columns(df)
         except Exception:
             continue
-    raise ValueError("Unable to read SkillCorner CSV")
+
+    raise ValueError(f"Unable to read CSV file: {path}")
 
 # ========= LOAD DATA =========
 st.caption(f"Source file: `{DATA_PATH}`")
-USE_API = st.toggle("Fetch live from SkillCorner API", value=False)
-if USE_API and fetch_skillcorner_api:
-    df_raw = fetch_skillcorner_api()
-else:
-    df_raw = load_skillcorner_csv(str(DATA_PATH))
+
+try:
+    df_raw = load_skillcorner_csv(DATA_PATH)
+except Exception as e:
+    st.error(f"❌ Could not load SkillCorner CSV: {e}")
+    st.stop()
 
 if df_raw.empty:
     st.error("❌ No rows in dataset.")
     st.stop()
-
-df_raw = _clean_columns(df_raw)
 
 # ========= NORMALISE POSITIONS =========
 SKILLCORNER_TO_FIVE = {
