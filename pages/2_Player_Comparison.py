@@ -7,6 +7,8 @@ from pathlib import Path
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+from openai import OpenAI
+client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 # ---------- Protect page ----------
 if not check_password():
@@ -880,3 +882,68 @@ fig = radar_compare(
     genre_colors=group_colors   # <-- FIXED
 )
 st.pyplot(fig, use_container_width=True)
+
+def generate_comparison_summary(player_a, player_b, df, metrics):
+    """Generate AI comparison between two players using OpenAI."""
+    if not player_a or not player_b:
+        return "Please select two players to compare."
+
+    # Extract player rows
+    rowA = df.loc[df["Player"] == player_a]
+    rowB = df.loc[df["Player"] == player_b]
+    if rowA.empty or rowB.empty:
+        return "Player data missing for one or both players."
+
+    # Collect metric info
+    def player_snapshot(row):
+        summary = {}
+        for m in metrics:
+            if m in row.columns:
+                val = pd.to_numeric(row[m].values[0], errors="coerce")
+                if not np.isnan(val):
+                    summary[m] = round(val, 2)
+        return summary
+
+    summaryA = player_snapshot(rowA)
+    summaryB = player_snapshot(rowB)
+
+    # Construct prompt
+    prompt = f"""
+    You are a professional football recruitment analyst.
+
+    Compare these two players based on the provided performance metrics and describe their relative strengths, weaknesses, and play styles. 
+    Be concise, data-driven, and objective — like a scout report comparison.
+
+    PLAYER A: {player_a}
+    METRICS: {summaryA}
+
+    PLAYER B: {player_b}
+    METRICS: {summaryB}
+
+    Structure the response as:
+    - Overview
+    - Strengths of {player_a}
+    - Strengths of {player_b}
+    - Summary (which profiles better for different tactical systems)
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ AI summary failed: {e}"
+
+# ---------- AI Scouting Comparison ----------
+st.markdown("### 🧠 AI Scouting Comparison")
+
+if pA and pB:
+    if st.button("Generate AI Comparison", key="ai_cmp_button"):
+        with st.spinner("Generating AI scouting comparison..."):
+            summary = generate_comparison_summary(pA, pB, df, metrics)
+            st.markdown(summary)
+else:
+    st.info("Select two players to enable the AI comparison.")
