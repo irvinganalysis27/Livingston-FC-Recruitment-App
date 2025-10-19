@@ -40,15 +40,12 @@ GROUP_COLOURS = {
     "Intensity": "purple",
 }
 
-# ---- Add after GROUP_COLOURS ----
 GROUP_THRESHOLDS = dict(high=70.0, low=40.0)
 
-# The metric → group mapping already exists as METRIC_GROUPS.
-# We'll compute one score per group = mean of its metric percentiles.
+# ========= HELPER FUNCTIONS =========
 def compute_group_labels(percentile_row: pd.Series) -> dict:
-    # percentile_row is a single player's percentiles (the row from `percentile_df`)
+    """Generate High/Average/Low labels per physical group."""
     groups = {}
-    # bucket metric percentiles by group, then mean
     by_group = {}
     for m, g in METRIC_GROUPS.items():
         if m in percentile_row.index:
@@ -68,9 +65,9 @@ def compute_group_labels(percentile_row: pd.Series) -> dict:
         groups[g] = dict(score=round(score, 1), label=label)
     return groups
 
-# ========= BASIC HELPERS =========
+
 def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Standardise column names by removing extra spaces and non-breaking spaces."""
+    """Standardise column names by removing extra spaces and weird characters."""
     df = df.copy()
     df.columns = (
         df.columns.astype(str)
@@ -80,6 +77,7 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df
 
+
 def pct_rank(series: pd.Series, lower_is_better: bool = False) -> pd.Series:
     """Return percentile ranks (0–100)."""
     s = pd.to_numeric(series, errors="coerce").fillna(0)
@@ -88,10 +86,10 @@ def pct_rank(series: pd.Series, lower_is_better: bool = False) -> pd.Series:
         r = 1.0 - r
     return (r * 100.0).round(1)
 
-# ========= CSV LOADER =========
+
 @st.cache_data(ttl=86400, show_spinner=True)
 def load_skillcorner_csv(path: Path) -> pd.DataFrame:
-    """Load SkillCorner CSV file with basic safety and fallback parsing."""
+    """Load SkillCorner CSV file with fallback parsing."""
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
 
@@ -102,8 +100,8 @@ def load_skillcorner_csv(path: Path) -> pd.DataFrame:
                 return _clean_columns(df)
         except Exception:
             continue
-
     raise ValueError(f"Unable to read CSV file: {path}")
+
 
 # ========= LOAD DATA =========
 st.caption(f"Source file: `{DATA_PATH}`")
@@ -141,17 +139,23 @@ use_cols = list(set(id_cols + ["Date", "Minutes"] + RADAR_METRICS + ["PSV-99"]))
 use_cols = [c for c in use_cols if c in df_sorted.columns]
 df_use = df_sorted[use_cols].copy()
 
+
 def _last_non_null(s: pd.Series):
     v = s.dropna()
     return v.iloc[-1] if len(v) else np.nan
 
+
 df_player = (
     df_use.groupby(["Player", "Position Group Normalised"], dropna=False)
-          .agg({**agg_spec,
-                "Team": _last_non_null,
-                "Competition": _last_non_null,
-                "Season": _last_non_null})
-          .reset_index()
+    .agg(
+        {
+            **agg_spec,
+            "Team": _last_non_null,
+            "Competition": _last_non_null,
+            "Season": _last_non_null,
+        }
+    )
+    .reset_index()
 )
 
 # ========= FILTERS =========
@@ -160,68 +164,82 @@ st.markdown("#### Filters")
 # --- League Filter with Select/Clear All Buttons ---
 leagues = sorted(pd.Series(df_player["Competition"]).dropna().unique().tolist())
 
-# Initialise session state for league selection
 if "sc_league_sel" not in st.session_state:
     st.session_state.sc_league_sel = leagues
 
-# Buttons for quick selection
 col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("✅ Add All Leagues"):
         st.session_state.sc_league_sel = leagues
+        st.rerun()
 with col2:
     if st.button("❌ Remove All Leagues"):
         st.session_state.sc_league_sel = []
+        st.rerun()
 
-# Multi-select widget
 selected_leagues = st.multiselect(
     "Leagues",
     options=leagues,
     default=st.session_state.sc_league_sel,
-    key="sc_league_sel"
+    key="sc_league_sel",
 )
 
-# --- Position Filter (Centre Back only by default) ---
-pos_groups = sorted(pd.Series(df_player["Position Group Normalised"]).dropna().unique().tolist())
-
-# Set default to only "Centre Back"
+# --- Position Filter (Centre Back default) ---
+pos_groups = sorted(
+    pd.Series(df_player["Position Group Normalised"]).dropna().unique().tolist()
+)
 default_pos_groups = ["Centre Back"] if "Centre Back" in pos_groups else []
 selected_pos_groups = st.multiselect(
     "Position Groups",
     options=pos_groups,
     default=default_pos_groups,
-    key="sc_pos_sel"
+    key="sc_pos_sel",
 )
 
-# --- Minimum Minutes Input ---
+# --- Minutes Filter ---
 min_minutes = st.number_input("Minimum total minutes", min_value=0, value=600, step=60)
 
-# ========= PERCENTILES (within league) =========
+# --- Apply Filters ---
+df = df_player.copy()
+if selected_leagues:
+    df = df[df["Competition"].isin(selected_leagues)]
+if selected_pos_groups:
+    df = df[df["Position Group Normalised"].isin(selected_pos_groups)]
+df = df[df["Minutes"] >= min_minutes]
+
+st.caption(f"Players after filters: **{len(df)}**")
+if df.empty:
+    st.stop()
+
+# ========= PERCENTILES =========
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
 percentile_df = pd.DataFrame(index=df.index, columns=RADAR_METRICS, dtype=float)
+
 if compute_within_league and "Competition" in df.columns:
     for m in RADAR_METRICS:
         percentile_df[m] = df.groupby("Competition", group_keys=False)[m].apply(lambda s: pct_rank(s))
 else:
     for m in RADAR_METRICS:
         percentile_df[m] = pct_rank(df[m])
+
 percentile_df = percentile_df.fillna(50.0).round(1)
 df["_score_0_100_league"] = percentile_df.mean(axis=1).round(1)
 
-# ========= GLOBAL POSITION SCORES (Z-SCORE BASED) =========
+# ========= GLOBAL Z-SCORE =========
 global_scores = pd.DataFrame(index=df.index, columns=RADAR_METRICS, dtype=float)
 for m in RADAR_METRICS:
     try:
         global_scores[m] = (
             df.groupby("Position Group Normalised", group_keys=False)[m]
-              .transform(lambda s: (s - s.mean()) / s.std(ddof=0))
+            .transform(lambda s: (s - s.mean()) / s.std(ddof=0))
         )
     except Exception:
         global_scores[m] = 0.0
 
 df["_score_0_100_global"] = (
-    (global_scores.mean(axis=1) - global_scores.mean(axis=1).min()) /
-    (global_scores.mean(axis=1).max() - global_scores.mean(axis=1).min()) * 100
+    (global_scores.mean(axis=1) - global_scores.mean(axis=1).min())
+    / (global_scores.mean(axis=1).max() - global_scores.mean(axis=1).min())
+    * 100
 ).round(1)
 
 # ========= PLAYER SELECT =========
@@ -235,10 +253,12 @@ st.session_state.sc_selected_player = selected_player
 def plot_radial_bar_grouped(player_name: str):
     import matplotlib.colors as mcolors
     from matplotlib import colormaps as mcm
+
     row_df = df.loc[df["Player"] == player_name]
     if row_df.empty:
         st.error(f"No player named '{player_name}'")
         return
+
     row = row_df.iloc[0]
     pcts = percentile_df.loc[row_df.index[0], RADAR_METRICS].to_numpy(dtype=float)
     raws = df.loc[row_df.index[0], RADAR_METRICS].to_numpy(dtype=float)
@@ -284,103 +304,8 @@ def plot_radial_bar_grouped(player_name: str):
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
     st.pyplot(fig, use_container_width=True)
 
+
 plot_radial_bar_grouped(selected_player)
-
-# ---- Replace your current summary function with this one ----
-from openai import OpenAI
-client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
-
-def generate_ai_summary(player_name: str, df_players: pd.DataFrame, percentile_df: pd.DataFrame) -> str:
-    # Find the player's row
-    row_df = df_players.loc[df_players["Player"] == player_name]
-    if row_df.empty:
-        return "No data available for this player."
-    row = row_df.iloc[0]
-
-    # Pull that player’s percentiles row
-    p_row = percentile_df.loc[row_df.index[0], RADAR_METRICS]
-    group_info = compute_group_labels(p_row)
-
-    # Build a locked “evidence” block the model must follow
-    evidence_lines = []
-    for g in ["Work Rate", "Running Load", "Explosiveness", "Top Speed", "Intensity"]:
-        if g in group_info:
-            gi = group_info[g]
-            evidence_lines.append(f"- {g}: {gi['label']} ({gi['score']})")
-    evidence_text = "\n".join(evidence_lines)
-
-    context = {
-        "name": player_name,
-        "team": str(row.get("Team") or ""),
-        "comp": str(row.get("Competition") or ""),
-        "mins": int(row.get("Minutes")) if pd.notnull(row.get("Minutes")) else None,
-        "posg": str(row.get("Position Group") or ""),
-        "overall": float(row.get("_score_0_100", np.nan)),
-    }
-
-    prompt = f"""
-You are writing a short **physical profile** for a football player based ONLY on the labelled evidence below.
-You MUST stick to each label's polarity:
-- If a group is **High**, describe it positively.
-- If a group is **Average**, keep neutral, matter-of-fact language.
-- If a group is **Low**, describe it as a limitation. DO NOT spin it positively.
-
-NEVER contradict a label. NEVER claim a strength where the label is Low, or a weakness where the label is High.
-Do not invent facts beyond these groups. Do not quote raw numbers or percentiles.
-
-Player: {context['name']}
-Role: {context['posg']}
-Team/League: {context['team']} | {context['comp']}
-Minutes: {context['mins']}
-Composite (0–100): {context['overall']:.0f} if not NaN else "n/a"
-
-Evidence (group → label (score)):
-{evidence_text}
-
-Write 4–6 sentences. Cover groups with **High** or **Low** first. Mention **Average** groups only briefly.
-End with one crisp summary line of fit (e.g., “Profiles as a high-work-rate wide player with limited top-end speed.”).
-"""
-
-    try:
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.2,            # low = faithful to labels
-            max_tokens=250,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return resp.choices[0].message.content.strip()
-    except Exception as e:
-        # Safe fallback: fully deterministic summary if API fails
-        parts = []
-        order = ["High", "Low", "Average"]
-        # Prioritise High/Low groups in output
-        for wanted in ["High", "Low", "Average"]:
-            for g, gi in group_info.items():
-                if gi["label"] == wanted:
-                    if wanted == "High":
-                        parts.append(f"Strong {g.lower()}, a clear positive in his profile.")
-                    elif wanted == "Low":
-                        parts.append(f"Limited {g.lower()}, which reduces impact in that area.")
-                    else:
-                        parts.append(f"{g} looks steady without standing out.")
-        tail = "Overall profile: "
-        if pd.notna(context["overall"]):
-            tail += f"{context['overall']:.0f}/100 composite."
-        else:
-            tail += "composite unavailable."
-        parts.append(tail)
-        return " ".join(parts)
-
-# ========= AI SUMMARY SECTION =========
-st.markdown("### 🧠 AI Physical Summary")
-
-# Generate button
-if st.button("Generate Physical Report for Selected Player"):
-    with st.spinner("Analysing player profile..."):
-        summary_text = generate_ai_summary(selected_player, df, percentile_df)
-        st.success("✅ Report generated successfully")
-        st.markdown(f"**{selected_player} – Summary:**")
-        st.write(summary_text)
 
 # ========= RANKING TABLE =========
 st.markdown("### Players Ranked by Physical Composite (0–100)")
