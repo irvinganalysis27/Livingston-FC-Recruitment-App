@@ -707,7 +707,7 @@ c1, c2 = st.columns(2)
 with c1:
     # Initialise in session_state if not already set
     if "min_minutes" not in st.session_state:
-        st.session_state.min_minutes = 1000
+        st.session_state.min_minutes = 500
 
     # Persist value in session_state
     st.session_state.min_minutes = st.number_input(
