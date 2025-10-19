@@ -156,24 +156,45 @@ df_player = (
 
 # ========= FILTERS =========
 st.markdown("#### Filters")
+
+# --- League Filter with Select/Clear All Buttons ---
 leagues = sorted(pd.Series(df_player["Competition"]).dropna().unique().tolist())
-selected_leagues = st.multiselect("Leagues", options=leagues, default=leagues, key="sc_league_sel")
 
+# Initialise session state for league selection
+if "sc_league_sel" not in st.session_state:
+    st.session_state.sc_league_sel = leagues
+
+# Buttons for quick selection
+col1, col2 = st.columns([1, 1])
+with col1:
+    if st.button("✅ Add All Leagues"):
+        st.session_state.sc_league_sel = leagues
+with col2:
+    if st.button("❌ Remove All Leagues"):
+        st.session_state.sc_league_sel = []
+
+# Multi-select widget
+selected_leagues = st.multiselect(
+    "Leagues",
+    options=leagues,
+    default=st.session_state.sc_league_sel,
+    key="sc_league_sel"
+)
+
+# --- Position Filter (Centre Back only by default) ---
 pos_groups = sorted(pd.Series(df_player["Position Group Normalised"]).dropna().unique().tolist())
-selected_pos_groups = st.multiselect("Position Groups", options=pos_groups, default=pos_groups, key="sc_pos_sel")
 
+# Set default to only "Centre Back"
+default_pos_groups = ["Centre Back"] if "Centre Back" in pos_groups else []
+selected_pos_groups = st.multiselect(
+    "Position Groups",
+    options=pos_groups,
+    default=default_pos_groups,
+    key="sc_pos_sel"
+)
+
+# --- Minimum Minutes Input ---
 min_minutes = st.number_input("Minimum total minutes", min_value=0, value=600, step=60)
-
-df = df_player.copy()
-if selected_leagues:
-    df = df[df["Competition"].isin(selected_leagues)]
-if selected_pos_groups:
-    df = df[df["Position Group Normalised"].isin(selected_pos_groups)]
-df = df[df["Minutes"] >= min_minutes]
-
-st.caption(f"Players after filters: **{len(df)}**")
-if df.empty:
-    st.stop()
 
 # ========= PERCENTILES (within league) =========
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
