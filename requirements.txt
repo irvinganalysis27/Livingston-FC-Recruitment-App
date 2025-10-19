@@ -6,3 +6,6 @@ openpyxl
 gspread
 google-auth
 supabase>=2.5.0
+openai
+skillcorner
+skillcornerviz==1.1.1
