@@ -286,26 +286,26 @@ try:
         st.stop()
 
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-
-    # ---------- Optional minutes filter (safe adaptive version) ----------
+    
+    # ---------- Optional minutes filter (safe numeric version) ----------
     st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
     
     df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
     min_val = int(df_team["Minutes played"].min())
     max_val = int(df_team["Minutes played"].max())
     
-    # Safely clamp default
+    # Safe default clamp
     default_display_min = st.session_state.get("display_minutes_input", 600)
     if default_display_min > max_val:
         default_display_min = max_val
     
-    # Let the user lower the filter even if dataset is small
-    selected_min_display = st.slider(
+    # Use number input safely
+    selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
         min_value=min_val,
         max_value=max_val,
         value=default_display_min,
-        step=10,
+        step=50,
         key="display_minutes_input"
     )
     
