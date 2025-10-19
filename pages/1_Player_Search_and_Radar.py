@@ -15,8 +15,6 @@ from branding import show_branding
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
-from openai import OpenAI
-client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 # ========= DEBUG MARKERS =========
 print("[DEBUG_LOOP] ---- PAGE START ----")
@@ -1317,74 +1315,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         pass
 
     st.pyplot(fig, width="stretch")
-
-def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
-    try:
-        row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
-    except IndexError:
-        return "No data available for this player."
-
-    role = str(row.get("Six-Group Position", "player"))
-    league = str(row.get("Competition_norm", ""))
-    age = row.get("Age", "")
-    team = str(row.get("Team", ""))
-    mins = row.get("Minutes played", 0)
-
-    # Collect numeric metrics
-    metric_percentiles = {
-        m: row.get(f"{m} (percentile)", np.nan)
-        for m in metrics.keys()
-        if f"{m} (percentile)" in row.index
-    }
-    metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
-
-    # --- Build dynamic prompt ---
-    prompt = f"""
-    You are writing a detailed but concise player scouting report in the style of Tom Irving,
-    a professional football recruitment analyst known for honest, critical, and realistic assessments.
-
-    Write a 5–6 sentence paragraph about {player_name}, a {role.lower()} aged {age}, currently playing in {league} for {team}.
-
-    You have access to percentile data (0–100) for performance metrics:
-    {metric_text}
-
-    Tone and writing style rules:
-    - Do NOT start with cliches like “is an exciting” or “is a talented” player.
-    - Vary the opening line. It can start with what kind of player he looks like, what stands out, or even what’s missing.
-    - If metrics are low (below 40th percentile), acknowledge weaknesses clearly. Use natural phrasing like:
-        • “Struggles to impact games consistently.” 
-        • “Can look limited when the game becomes physical.”
-        • “Output doesn’t yet match his effort.”
-    - If metrics are high (above 70th percentile), highlight them naturally:
-        • “Ranks among the best in his league for dribbles and chance creation.”
-        • “Shows real control under pressure and moves play forward quickly.”
-    - Keep a balanced tone — be fair, but never overly generous. You're not writing marketing material.
-    - Combine data insight with realistic football language (movement, body shape, pressing work, mentality).
-    - Vary phrasing so no two reports feel copy-pasted.
-    - End with one strong, definitive sentence that sums up his player type or potential fit — e.g.:
-        • “A physically strong, low-risk defender who could suit a compact system.”
-        • “A creative wide player with flashes of quality but inconsistent end product.”
-        • “Profiles as a hard-working forward who fits the pressing style but lacks a ruthless edge.”
-
-    Write in Tom’s natural tone, as seen in these examples:
-    - “He’s got a good base technically but sometimes forces play when it’s not on.”
-    - “Not the most dynamic athlete, but his awareness and timing stand out.”
-    - “There’s something raw but promising about him — a player who could develop quickly in the right setup.”
-
-    Be honest, concise, and analytical. Avoid repetition. Write like a human scout.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=350,
-            temperature=0.85,  # slightly higher for more creative, human tone
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"⚠️ AI summary generation failed: {e}"
 
 # ---------- Plot ----------
 if st.session_state.selected_player:
