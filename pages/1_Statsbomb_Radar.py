@@ -1576,9 +1576,9 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
                 new_cols.append(f"{c}_{seen[c]}")
         similar_df.columns = new_cols
 
-        # 🟡 Add 0–100 Score from plot_data (if available)
-        if "Score (0–100)" in plot_data.columns:
-            score_map = plot_data.set_index("Player")["Score (0–100)"].to_dict()
+        # 🟡 Map 0–100 Score using df_all (covers all players)
+        if "Score (0–100)" in df_all.columns:
+            score_map = df_all.set_index("Player")["Score (0–100)"].to_dict()
             similar_df["Score (0–100)"] = similar_df["Player"].map(score_map)
 
         # ✅ Keep only the final display columns
@@ -1588,7 +1588,7 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
                 similar_df[col] = np.nan
         similar_df = similar_df[keep_cols]
 
-        # 🟢 Optional: round numeric columns nicely
+        # 🟢 Round numeric values
         similar_df["Score (0–100)"] = pd.to_numeric(similar_df["Score (0–100)"], errors="coerce").round(1)
         similar_df["Similarity Score"] = pd.to_numeric(similar_df["Similarity Score"], errors="coerce").round(1)
 
