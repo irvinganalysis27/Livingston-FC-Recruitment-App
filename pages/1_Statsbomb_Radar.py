@@ -529,14 +529,13 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         if found_id:
             df.rename(columns={found_id: "competition_id"}, inplace=True)
     
-            # Extract digits (handles "260", "260.0", "CompetitionId(260)", etc.)
+            # --- Extract numeric part from weird formats like "260.0", "[260]", "CompetitionId(260)" etc ---
             df["competition_id"] = (
                 df["competition_id"]
                 .astype(str)
-                .str.extract(r"(\d+)")[0]
+                .str.replace(r"[^\d]", "", regex=True)   # strip out everything except digits
+                .replace("", np.nan)
                 .astype(float)
-                .fillna(0)
-                .astype(int)
             )
             print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
         else:
