@@ -165,15 +165,33 @@ leagues = sorted(pd.Series(df_player["Competition"]).dropna().unique().tolist())
 if "sc_league_sel" not in st.session_state:
     st.session_state.sc_league_sel = leagues
 
-col1, col2 = st.columns([1, 1])
-with col1:
-    if st.button("✅ Add All Leagues"):
-        st.session_state.sc_league_sel = leagues
-        st.rerun()
-with col2:
-    if st.button("❌ Remove All Leagues"):
+# --- League Filter with Select/Clear All Buttons ---
+st.markdown("#### Choose league(s)")
+
+if "sc_league_sel" not in st.session_state:
+    st.session_state.sc_league_sel = leagues.copy()
+
+b1, b2, _ = st.columns([1, 1, 6])
+with b1:
+    if st.button("Select all"):
+        st.session_state.sc_league_sel = leagues.copy()
+with b2:
+    if st.button("Clear all"):
         st.session_state.sc_league_sel = []
-        st.rerun()
+
+valid_defaults = [l for l in st.session_state.get("sc_league_sel", []) if l in leagues]
+
+selected_leagues = st.multiselect(
+    "Leagues",
+    options=leagues,
+    default=valid_defaults,
+    key="sc_league_sel",
+    label_visibility="collapsed"
+)
+
+# Keep session_state clean if options changed
+if set(valid_defaults) != set(st.session_state.sc_league_sel):
+    st.session_state.sc_league_sel = valid_defaults
 
 selected_leagues = st.multiselect(
     "Leagues",
