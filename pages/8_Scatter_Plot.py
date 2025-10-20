@@ -16,7 +16,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("📊 Metric Scatter Plot (Interactive)")
+st.title("📊 Playing Metric Scatter Plot")
 
 # ============================================================
 # Data Load
@@ -274,21 +274,36 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight (Gold for Livingston) ---
+# --- Team Highlight (Gold for Livingston, no extra tooltip) ---
 my_team_name = "Livingston"
 
 if highlight_team and "Team" in df.columns:
     team_mask = df["Team"].str.strip().eq(my_team_name)
     if team_mask.any():
         team_df = df[team_mask]
+
+        # Draw Livingston dots (gold, no text label)
         fig.add_scatter(
             x=team_df[x_metric],
             y=team_df[y_metric],
-            mode="markers+text",
-            text=team_df["Name"] if "Name" in df.columns else None,
-            textposition="top center",
-            marker=dict(color="#FFD700", size=12, symbol="circle"),  # gold
+            mode="markers",
+            marker=dict(color="#FFD700", size=14, symbol="circle"),
             name=my_team_name,
+            hoverinfo="skip",  # disables their own tooltip overlay
+            showlegend=True,
+        )
+
+        # Fade all other teams slightly & remove “Other” from legend
+        other_df = df[~team_mask]
+        fig.add_scatter(
+            x=other_df[x_metric],
+            y=other_df[y_metric],
+            mode="markers",
+            marker=dict(color="rgba(120,180,170,0.5)", size=10),
+            name="",  # no legend entry
+            hovertext=None,
+            hoverinfo="none",
+            showlegend=False,
         )
 
 fig.update_layout(
