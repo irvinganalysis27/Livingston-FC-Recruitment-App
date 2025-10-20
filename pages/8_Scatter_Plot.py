@@ -40,25 +40,18 @@ if df_all.empty:
     st.stop()
 
 # ============================================================
-# Identify column names safely
+# Match your actual column names
 # ============================================================
-# Find the best-matching competition column
-possible_league_cols = ["Competition_norm", "Competition", "League", "Competition Name"]
-league_col = next((c for c in possible_league_cols if c in df_all.columns), None)
-if not league_col:
-    st.error("❌ Could not find a competition/league column in the dataset.")
-    st.stop()
+league_col = "Competition"
+minutes_col = "Minutes"
+position_col = "Primary Position"
 
-# Fallbacks for minutes + position columns
-minutes_col = next((c for c in ["Minutes played", "Minutes", "Mins"] if c in df_all.columns), None)
-position_col = next((c for c in ["Six-Group Position", "Position Group Normalised", "Position"] if c in df_all.columns), None)
-
-if not minutes_col or not position_col:
-    st.error("❌ Could not find required 'minutes' or 'position' columns.")
+if league_col not in df_all.columns or minutes_col not in df_all.columns or position_col not in df_all.columns:
+    st.error("❌ Could not find required columns in the dataset.")
     st.stop()
 
 # ============================================================
-# Filters (same style as radar page)
+# Filters
 # ============================================================
 st.markdown("#### Filters")
 
@@ -95,7 +88,7 @@ selected_positions = st.multiselect(
     key="scatter_pos_sel",
 )
 
-# Apply filters
+# --- Apply filters ---
 df = df_all.copy()
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)]
@@ -131,17 +124,14 @@ with c2:
 with c3:
     highlight_team = st.toggle("Highlight My Team")
 
-my_team_name = "Livingston FC"  # customise this!
+my_team_name = "Livingston FC"
 
 # ============================================================
-# Compute Sample Averages
+# Compute Averages & Outliers
 # ============================================================
 x_mean = df[x_metric].mean()
 y_mean = df[y_metric].mean()
 
-# ============================================================
-# Outlier Detection
-# ============================================================
 df["_is_outlier"] = False
 if highlight_outliers:
     x_std, y_std = df[x_metric].std(), df[y_metric].std()
@@ -151,7 +141,7 @@ if highlight_outliers:
     )
 
 # ============================================================
-# Colour Mapping Logic
+# Colour Mapping
 # ============================================================
 if highlight_all:
     color_col = position_col
@@ -169,7 +159,7 @@ if highlight_team and "Team" in df.columns:
 # Plotly Scatter
 # ============================================================
 hover_data = {
-    "Player": True if "Player" in df.columns else False,
+    "Name": True if "Name" in df.columns else False,
     "Team": True if "Team" in df.columns else False,
     league_col: True,
     x_metric: ":.2f",
@@ -189,33 +179,33 @@ fig = px.scatter(
     title=f"{y_metric} vs {x_metric}",
 )
 
-# --- Add Sample Average Lines ---
+# --- Average Lines ---
 fig.add_shape(type="line", x0=x_mean, x1=x_mean, y0=df[y_metric].min(), y1=df[y_metric].max(),
               line=dict(color="black", dash="dot"))
 fig.add_shape(type="line", x0=df[x_metric].min(), x1=df[x_metric].max(), y0=y_mean, y1=y_mean,
               line=dict(color="black", dash="dot"))
 
-# --- Outlier Highlight Overlay ---
+# --- Outliers ---
 if highlight_outliers:
     outliers = df[df["_is_outlier"]]
     fig.add_scatter(
         x=outliers[x_metric],
         y=outliers[y_metric],
         mode="markers+text",
-        text=outliers["Player"] if "Player" in df.columns else None,
+        text=outliers["Name"] if "Name" in df.columns else None,
         textposition="top center",
         marker=dict(color="red", size=12, symbol="star"),
         name="Outliers",
     )
 
-# --- Team Highlight Overlay ---
+# --- Team Highlight ---
 if highlight_team and "Team" in df.columns and my_team_name in df["Team"].values:
     team_df = df[df["Team"] == my_team_name]
     fig.add_scatter(
         x=team_df[x_metric],
         y=team_df[y_metric],
         mode="markers+text",
-        text=team_df["Player"] if "Player" in df.columns else None,
+        text=team_df["Name"] if "Name" in df.columns else None,
         textposition="top center",
         marker=dict(color="green", size=10, symbol="circle"),
         name=my_team_name,
@@ -231,7 +221,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
-# Download Filtered Data
+# Download CSV
 # ============================================================
 st.download_button(
     "📥 Download Filtered Data (CSV)",
