@@ -533,7 +533,11 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:30])
 
         # --- Make sure df has proper ID column ---
-        id_candidates = ["Competition_ID", "competition_id", "Competition ID", "Competition id", "competition id"]
+        id_candidates = [
+            "Competition_ID", "competition_id",
+            "Competition ID", "Competition id", "competition id",
+            "Competition Id"  # ✅ your actual column name
+        ]
         found_id = next((c for c in id_candidates if c in df.columns), None)
         if found_id:
             df.rename(columns={found_id: "competition_id"}, inplace=True)
