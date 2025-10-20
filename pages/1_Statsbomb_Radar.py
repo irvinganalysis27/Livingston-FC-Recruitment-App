@@ -1563,19 +1563,19 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
         st.info("No similar players found.")
     else:
         st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
-    
+
         # 🔧 Prevent duplicate column names from breaking Streamlit
-    seen = {}
-    new_cols = []
-    for c in similar_df.columns:
-        if c not in seen:
-            seen[c] = 1
-            new_cols.append(c)
-        else:
-            seen[c] += 1
-            new_cols.append(f"{c}_{seen[c]}")
-    similar_df.columns = new_cols
-    
+        seen = {}
+        new_cols = []
+        for c in similar_df.columns:
+            if c not in seen:
+                seen[c] = 1
+                new_cols.append(c)
+            else:
+                seen[c] += 1
+                new_cols.append(f"{c}_{seen[c]}")
+        similar_df.columns = new_cols
+
         st.dataframe(similar_df, use_container_width=True)
 
 # ---------- Ranking table with favourites ----------
