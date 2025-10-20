@@ -507,84 +507,72 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         m = pd.read_excel(multipliers_path)
 
-        # --- Normalise column names ---
+        # --- Clean multipliers file ---
         m.columns = m.columns.str.strip().str.lower().str.replace(" ", "_")
+        m.rename(columns={
+            "competitionid": "competition_id",
+            "competition_id_": "competition_id",
+            "competition": "league",
+            "league_name": "league"
+        }, inplace=True)
 
-        # --- Normalise the Competition Id column in main data ---
+        m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce")
+        m["multiplier"] = pd.to_numeric(m.get("multiplier", 1.0), errors="coerce").fillna(1.0)
+        m["league"] = m.get("league", "").astype(str).str.strip()
+
+        # --- Normalise the Competition Id in main df ---
         id_candidates = [
-            "Competition_ID", "competition_id",
-            "Competition ID", "Competition id",
-            "competition id", "Competition Id"
+            "Competition_ID", "competition_id", "Competition ID",
+            "Competition id", "competition id", "Competition Id"
         ]
         found_id = next((c for c in id_candidates if c in df.columns), None)
         if found_id:
+            # Clean & coerce safely
             df.rename(columns={found_id: "competition_id"}, inplace=True)
-            df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce").fillna(0).astype(int)
-            print(f"[DEBUG] Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
+            df["competition_id"] = (
+                df["competition_id"]
+                .astype(str)
+                .str.replace(r"[^0-9]", "", regex=True)   # remove spaces or junk
+                .replace("", np.nan)
+                .astype(float)
+                .astype("Int64")
+            )
+            print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
         else:
+            df["competition_id"] = pd.NA
             print("[DEBUG] ⚠️ No Competition ID column found in data!")
 
-        # --- Clean & rename ---
-        rename_map = {
-            "competitionid": "competition_id",
-            "competition_id ": "competition_id",
-            "competition": "league",
-            "league_name": "league",
-        }
-        m.rename(columns={k: v for k, v in rename_map.items() if k in m.columns}, inplace=True)
+        print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:25])
 
-        # --- Data type safety ---
-        m["league"] = m["league"].astype(str).str.strip()
-        if "competition_id" in m.columns:
-            m["competition_id"] = pd.to_numeric(m["competition_id"], errors="coerce").fillna(0).astype(int)
+        # --- Merge priority: ID > League name ---
+        if df["competition_id"].notna().sum() > 0 and df["competition_id"].nunique() > 5:
+            df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
+            print("[DEBUG] ✅ Merged league multipliers by competition_id")
         else:
-            m["competition_id"] = 0
-        if "multiplier" in m.columns:
-            m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
-        else:
-            m["multiplier"] = 1.0
+            df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
+            print("[DEBUG] ⚠️ Merged league multipliers by league name")
 
-        print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:30])
-
-        # --- Make sure df has proper ID column ---
-        id_candidates = [
-            "Competition_ID", "competition_id",
-            "Competition ID", "Competition id", "competition id",
-            "Competition Id"  # ✅ your actual column name
-        ]
-        found_id = next((c for c in id_candidates if c in df.columns), None)
-        if found_id:
-            df.rename(columns={found_id: "competition_id"}, inplace=True)
-            df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce").fillna(0).astype(int)
-        else:
-            df["competition_id"] = 0
-
-        # --- Merge priority: ID > league name ---
-        if df["competition_id"].nunique() > 1:
-            df = df.merge(
-                m[["competition_id", "multiplier"]],
-                on="competition_id",
-                how="left"
-            )
-            print("[DEBUG] ✅ Merged league multipliers via competition_id")
-        else:
-            df = df.merge(
-                m[["league", "multiplier"]],
-                left_on="Competition_norm",
-                right_on="league",
-                how="left"
-            )
-            print("[DEBUG] ⚠️ Merged league multipliers via league name")
-
-        # --- Final multiplier cleanup ---
+        # --- Final numeric Multiplier column ---
         df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
         df.drop(columns=["multiplier"], inplace=True, errors="ignore")
 
-        # --- Debug output ---
+        # --- Debug preview ---
         debug_cols = [c for c in ["Competition", "Competition_norm", "competition_id", "Multiplier"] if c in df.columns]
         st.write("🔍 Debug – League Multiplier Preview:")
         st.dataframe(df[debug_cols].drop_duplicates().head(20))
 
+        # --- Warn if missing multipliers ---
+        missing = (
+            df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
+              .drop_duplicates()
+              .tolist()
+        )
+        if missing:
+            st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
+
+    except Exception as e:
+        st.error(f"❌ Failed to merge league multipliers: {e}")
+        df["Multiplier"] = 1.0
         # --- Warn if missing multipliers ---
         missing = (
             df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
