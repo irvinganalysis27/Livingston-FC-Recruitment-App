@@ -1601,6 +1601,9 @@ for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
+# Build ranking table from the current plot_data
+z_ranking = plot_data[cols_for_table].copy()
+
 # ---------- LFC Score logic (same as Team Rankings) ----------
 plot_data = plot_data.copy()
 
