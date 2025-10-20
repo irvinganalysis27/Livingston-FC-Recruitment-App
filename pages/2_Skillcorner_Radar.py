@@ -9,7 +9,7 @@ from openai import OpenAI
 
 # ========= PAGE CONFIG =========
 st.set_page_config(page_title="SkillCorner Physical Radar", layout="centered")
-st.title("📈 Physical Radar (SkillCorner)")
+st.title("SkillCorner Radar")
 
 # ========= PATHS / CONFIG =========
 ROOT_DIR = Path(__file__).parents[1]
