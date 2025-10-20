@@ -664,39 +664,35 @@ def load_data_once():
     # ============================================================
     df_raw = add_age_column(df_raw)
     df_preprocessed = preprocess_df(df_raw)
-
+    
     return df_preprocessed
-
-# ---------- Load & preprocess ----------
-df_all_raw = load_data_once()
-
-if df_all_raw is None or df_all_raw.empty:
-    st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
-    st.stop()
-
-if "Competition" not in df_all_raw.columns:
-    st.error("❌ Expected a 'Competition' column in your data.")
-    st.stop()
-
-# ---------- Clean and prepare ----------
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()
-    .str.replace(u"\xa0", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-)
-
-# Add Age if using "Birth Date" instead of "birth_date"
-if "Birth Date" in df_all_raw.columns and "Age" not in df_all_raw.columns:
-    today = datetime.today()
-    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
-        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if pd.notna(dob) else np.nan
+    
+    
+    # ---------- Load & preprocess ----------
+    df_all_raw = load_data_once()
+    
+    if df_all_raw is None or df_all_raw.empty:
+        st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
+        st.stop()
+    
+    if "Competition" not in df_all_raw.columns:
+        st.error("❌ Expected a 'Competition' column in your data.")
+        st.stop()
+    
+    # ---------- Clean and prepare ----------
+    df_all_raw.columns = (
+        df_all_raw.columns.astype(str)
+        .str.strip()
+        .str.replace(u"\xa0", " ", regex=False)
+        .str.replace(r"\s+", " ", regex=True)
     )
-
-# Preprocess and create the working copy
-df_all = preprocess_df(df_all_raw)
-df = df_all.copy()
+    
+    # ✅ REMOVE the “Add Age if using Birth Date” block completely
+    # (no need anymore — add_age_column() now handles both 'birth_date' and 'Birth Date')
+    
+    # ---------- Preprocess and create the working copy ----------
+    df_all = preprocess_df(df_all_raw)
+    df = df_all.copy()
 
 # ============================================================
 # 3️⃣ LEAGUE FILTER
