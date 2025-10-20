@@ -529,14 +529,29 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         if found_id:
             # Clean & coerce safely
             df.rename(columns={found_id: "competition_id"}, inplace=True)
+        # --- Normalise the Competition Id column in main data ---
+        id_candidates = [
+            "Competition_ID", "competition_id",
+            "Competition ID", "Competition id",
+            "competition id", "Competition Id"
+        ]
+        found_id = next((c for c in id_candidates if c in df.columns), None)
+        if found_id:
+            df.rename(columns={found_id: "competition_id"}, inplace=True)
+        
+            # Extract any numeric ID pattern safely (e.g. "CompetitionId(260)" → 260)
             df["competition_id"] = (
                 df["competition_id"]
                 .astype(str)
-                .str.replace(r"[^0-9]", "", regex=True)   # remove spaces or junk
-                .replace("", np.nan)
+                .str.extract(r"(\d+)")[0]  # extract digits only
                 .astype(float)
-                .astype("Int64")
+                .fillna(0)
+                .astype(int)
             )
+            print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
+        else:
+            df["competition_id"] = 0
+            print("[DEBUG] ⚠️ No Competition ID column found in data!")
             print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
         else:
             df["competition_id"] = pd.NA
