@@ -323,4 +323,5 @@ table = df[rank_cols].copy()
 table = table.sort_values("_score_0_100_global", ascending=False).reset_index(drop=True)
 table.index = np.arange(1, len(table) + 1)
 table.index.name = "Rank"
+table.rename(columns={"_score_0_100_global": "Score (0–100)"}, inplace=True)
 st.dataframe(table, use_container_width=True)
