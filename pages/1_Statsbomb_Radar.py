@@ -1606,25 +1606,35 @@ plot_data = plot_data.copy()
 
 # Step 1: Apply custom LFC multiplier (1.20 for Scottish Premiership)
 plot_data["LFC Multiplier"] = plot_data.get("Multiplier", 1.0)
-plot_data.loc[plot_data["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
+plot_data.loc[
+    plot_data["Competition_norm"] == "Scotland Premiership",
+    "LFC Multiplier"
+] = 1.20
 
 # Step 2: Recreate LFC Weighted Z (same formula as Team Rankings)
 avg_z = pd.to_numeric(plot_data.get("Avg Z Score", 0), errors="coerce").fillna(0)
 lfc_mult = pd.to_numeric(plot_data.get("LFC Multiplier", 1.0), errors="coerce").fillna(1.0)
 
 plot_data["LFC Weighted Z"] = np.select(
-    [
-        avg_z > 0,
-        avg_z < 0
-    ],
-    [
-        avg_z * lfc_mult,
-        avg_z / lfc_mult
-    ],
+    [avg_z > 0, avg_z < 0],
+    [avg_z * lfc_mult, avg_z / lfc_mult],
     default=0.0
 )
 
-# Step 3: Use same anchors from Weighted Z Score (already merged earlier)
+# Step 3: Rebuild anchors from Weighted Z (same as Team Rankings)
+_mins = pd.to_numeric(plot_data.get("Minutes played", np.nan), errors="coerce").fillna(0)
+eligible = plot_data[_mins >= 600].copy()
+if eligible.empty:
+    eligible = plot_data.copy()
+
+anchors = (
+    eligible.groupby("Six-Group Position", dropna=False)["Weighted Z Score"]
+    .agg(_scale_min="min", _scale_max="max")
+    .fillna(0)
+)
+plot_data = plot_data.merge(anchors, on="Six-Group Position", how="left")
+
+# Step 4: Convert to 0–100 scale
 def _to100(v, lo, hi):
     if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
         return 50.0
@@ -1632,40 +1642,17 @@ def _to100(v, lo, hi):
 
 plot_data["LFC Score (0–100)"] = [
     _to100(v, lo, hi)
-    for v, lo, hi in zip(plot_data["LFC Weighted Z"], plot_data["_scale_min"], plot_data["_scale_max"])
+    for v, lo, hi in zip(
+        plot_data["LFC Weighted Z"],
+        plot_data["_scale_min"],
+        plot_data["_scale_max"]
+    )
 ]
-
 plot_data["LFC Score (0–100)"] = (
     pd.to_numeric(plot_data["LFC Score (0–100)"], errors="coerce")
     .round(1)
     .fillna(0)
 )
-
-# Merge into table
-z_ranking = plot_data[cols_for_table + ["LFC Z Score"]].copy()
-
-# Clean up columns
-z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
-z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
-
-if "Age" in z_ranking.columns:
-    z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
-z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
-z_ranking["Avg Z Score"] = pd.to_numeric(z_ranking["Avg Z Score"], errors="coerce").round(3)
-z_ranking["Weighted Z Score"] = pd.to_numeric(z_ranking["Weighted Z Score"], errors="coerce").round(3)
-
-# Deduplicate and rank
-z_ranking = (
-    z_ranking.sort_values("Score (0–100)", ascending=False)
-             .groupby("Player", as_index=False)
-             .first()
-)
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
-z_ranking.index = np.arange(1, len(z_ranking) + 1)
-z_ranking.index.name = "Row"
 
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
