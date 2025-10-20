@@ -40,6 +40,7 @@ DISPLAY_NAMES = {
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
+    "A-League": "Australia A-League",
     "2. Liga": "Austria 2. Liga",
     "Challenger Pro League": "Belgium Challenger Pro League",
     "First League": "Bulgaria First League",
