@@ -467,17 +467,27 @@ def _data_signature(path: Path):
 
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Add numeric Age column based on birth_date (if present)."""
-    if "birth_date" not in df.columns:
+    """Add numeric Age column based on birth_date or Birth Date (if present)."""
+    today = datetime.today()
+
+    # --- Detect correct birth date column ---
+    birth_col = None
+    for c in df.columns:
+        if c.strip().lower() in {"birth_date", "birth date"}:
+            birth_col = c
+            break
+
+    if not birth_col:
         df["Age"] = np.nan
+        print("[DEBUG] No birth date column found — Age set to NaN")
         return df
 
-    today = datetime.today()
-    df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+    df["Age"] = pd.to_datetime(df[birth_col], errors="coerce").apply(
         lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if pd.notna(dob) else np.nan
     )
-    print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
+
+    print(f"[DEBUG] Age column created from '{birth_col}'. Non-null ages: {df['Age'].notna().sum()}")
     return df
 
 
