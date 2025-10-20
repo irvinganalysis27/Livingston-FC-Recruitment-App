@@ -506,7 +506,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         m = pd.read_excel(multipliers_path)
-    
+
         # --- Clean multipliers file ---
         m.columns = m.columns.str.strip().str.lower().str.replace(" ", "_")
         m.rename(columns={
@@ -515,53 +515,52 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             "competition": "league",
             "league_name": "league"
         }, inplace=True)
-    
-        m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce")
+
+        # Force both numeric
+        m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce").astype("Int64")
         m["multiplier"] = pd.to_numeric(m.get("multiplier", 1.0), errors="coerce").fillna(1.0)
         m["league"] = m.get("league", "").astype(str).str.strip()
-    
-        # --- Normalise Competition Id in main data ---
+
+        # --- Normalise competition ID in main data ---
         id_candidates = [
-            "Competition_ID", "competition_id", "Competition ID",
-            "Competition id", "competition id", "Competition Id"
+            "Competition_ID", "competition_id", "Competition Id", "Competition id"
         ]
         found_id = next((c for c in id_candidates if c in df.columns), None)
         if found_id:
             df.rename(columns={found_id: "competition_id"}, inplace=True)
-    
-            # --- Extract numeric part from weird formats like "260.0", "[260]", "CompetitionId(260)" etc ---
             df["competition_id"] = (
-                df["competition_id"]
-                .astype(str)
-                .str.replace(r"[^\d]", "", regex=True)   # strip out everything except digits
-                .replace("", np.nan)
-                .astype(float)
+                pd.to_numeric(df["competition_id"], errors="coerce").astype("Int64")
             )
             print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
         else:
             df["competition_id"] = pd.NA
             print("[DEBUG] ⚠️ No Competition ID column found in data!")
-    
+
         print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:25])
-    
+
         # --- Merge priority: ID > League name ---
-        if df["competition_id"].notna().sum() > 0 and df["competition_id"].nunique() > 5:
-            df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged league multipliers by competition_id")
-        else:
+        df = df.merge(
+            m[["competition_id", "multiplier"]],
+            on="competition_id",
+            how="left"
+        )
+        merged_count = df["multiplier"].notna().sum()
+        print(f"[DEBUG] ✅ Merged league multipliers by competition_id — {merged_count} rows matched")
+
+        # Fallback if no matches
+        if df["multiplier"].isna().all():
             df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ⚠️ Merged league multipliers by league name")
-    
+            print("[DEBUG] ⚠️ No ID matches, merged by league name instead")
+
         # --- Final numeric Multiplier column ---
         df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
         df.drop(columns=["multiplier"], inplace=True, errors="ignore")
-    
+
         # --- Debug preview ---
         debug_cols = [c for c in ["Competition", "Competition_norm", "competition_id", "Multiplier"] if c in df.columns]
         st.write("🔍 Debug – League Multiplier Preview:")
         st.dataframe(df[debug_cols].drop_duplicates().head(20))
-    
-        # --- Warn if missing multipliers ---
+
         missing = (
             df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
               .drop_duplicates()
@@ -569,7 +568,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         )
         if missing:
             st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
-    
+
     except Exception as e:
         st.error(f"❌ Failed to merge league multipliers: {e}")
         df["Multiplier"] = 1.0
