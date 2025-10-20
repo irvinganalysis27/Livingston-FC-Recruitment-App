@@ -500,79 +500,75 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Competition_norm"] = np.nan
 
-    # ============================================================
-    # ⚖️ 2. Merge League Multipliers (using Competition_ID first)
-    # ============================================================
-    try:
-        multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        m = pd.read_excel(multipliers_path)
+# ============================================================
+# ⚖️ 2. Merge League Multipliers (by Competition_ID first, fallback to name)
+# ============================================================
+try:
+    multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
+    m = pd.read_excel(multipliers_path)
 
-        # Normalise Excel headers
-        m.columns = m.columns.str.strip().str.lower()  # -> competition_id, league, multiplier
-        df.columns = df.columns.str.strip()  # ensure consistency
+    # --- Normalise multiplier file columns ---
+    m.columns = m.columns.str.strip().str.lower()
+    rename_map = {}
+    if "competition_id" not in m.columns and "competitionid" in m.columns:
+        rename_map["competitionid"] = "competition_id"
+    if "league" not in m.columns and "competition" in m.columns:
+        rename_map["competition"] = "league"
+    if "multiplier" not in m.columns and "Multiplier" in m.columns:
+        rename_map["Multiplier"] = "multiplier"
+    if rename_map:
+        m.rename(columns=rename_map, inplace=True)
 
-        merged = False
+    # --- Clean values ---
+    m["league"] = m["league"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
+    m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
+    m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce")
 
-        if "competition_id" in df.columns and "competition_id" in m.columns:
-            df = df.merge(m, on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_ID")
-            merged = True
-        elif "Competition_norm" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_norm")
-            merged = True
-        elif "Competition" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition", right_on="league", how="left")
-            print("[DEBUG] ⚠️ Fallback merge on raw Competition name")
-            merged = True
-        else:
-            print("[DEBUG] ⚠️ No matching key found for league multipliers; using 1.0 for all.")
-            df["multiplier"] = 1.0
+    # --- Ensure Competition_norm exists on df ---
+    if "Competition" in df.columns and "Competition_norm" not in df.columns:
+        df["Competition_norm"] = (
+            df["Competition"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
+            .map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+        )
 
-        # Safely assign numeric multiplier
-        if "multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-        elif "Multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-        else:
-            df["Multiplier"] = 1.0
-        
-        # === DEBUG: show merge diagnostics ===
-        try:
-            st.write("🔍 DEBUG – merge diagnostics (first 15 rows):")
-            st.dataframe(
-                df[["Competition", "Competition_norm", "league", "Multiplier"]]
-                .drop_duplicates()
-                .sort_values("Competition_norm")
-                .head(15)
-            )
-        except Exception as e:
-            st.write("DEBUG ERROR displaying merge diagnostics:", e)
-        
-        missing = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique().tolist()
-        if missing:
-            st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
+    # --- Determine merge strategy ---
+    df_cols_lower = [c.lower().strip() for c in df.columns]
+    has_id = "competition_id" in df_cols_lower or "competition id" in df_cols_lower
 
-        # Debug output
-        print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
+    if has_id:
+        # find actual matching column name
+        df_id_col = next(
+            (c for c in df.columns if c.lower().strip() in {"competition_id", "competition id"}), None
+        )
+        df["competition_id"] = pd.to_numeric(df[df_id_col], errors="coerce")
+        df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
+        print("[DEBUG] ✅ Merged multipliers using Competition_ID")
+    elif "Competition_norm" in df.columns:
+        df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
+        print("[DEBUG] ✅ Merged multipliers using Competition_norm name")
+    else:
+        df["multiplier"] = 1.0
+        print("[DEBUG] ⚠️ No merge key found — default multiplier = 1.0")
 
-        if merged:
-            sample = (
-                df[["Competition_norm", "Multiplier"]]
-                .drop_duplicates()
-                .sort_values("Competition_norm")
-                .head(15)
-            )
-            print("[DEBUG] Sample multiplier matches:")
-            print(sample.to_string(index=False))
+    # --- Final numeric Multiplier column ---
+    df["Multiplier"] = pd.to_numeric(df.get("multiplier", 1.0), errors="coerce").fillna(1.0)
 
-            unmatched = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique()
-            if len(unmatched) > 0:
-                print("[DEBUG] ⚠️ Competitions missing multipliers (first 10):", unmatched[:10])
+    # --- Optional debug preview ---
+    debug_cols = [c for c in ["Competition", "Competition_norm", "competition_id", "Multiplier"] if c in df.columns]
+    st.write("🔍 Debug – League Multiplier Preview (first 15 rows):")
+    st.dataframe(df[debug_cols].drop_duplicates().head(15))
 
-    except Exception as e:
-        print(f"[DEBUG] ⚠️ Failed to merge league multipliers: {e}")
-        df["Multiplier"] = 1.0
+    # --- Warn about missing multipliers ---
+    missing = (
+        df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
+        .drop_duplicates().tolist()
+    )
+    if missing:
+        st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
+
+except Exception as e:
+    st.error(f"⚠️ Failed to merge league multipliers: {e}")
+    df["Multiplier"] = 1.0
 
     # ============================================================
     # 🪪 3. Rename Identifiers to Match Radar Columns
