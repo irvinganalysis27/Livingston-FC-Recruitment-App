@@ -194,7 +194,7 @@ with c2:
 with c3:
     highlight_team = st.toggle("Highlight My Team")
 
-my_team_name = "Livingston"
+my_team_name = "Livingston FC"
 
 # ============================================================
 # Averages & Outliers
