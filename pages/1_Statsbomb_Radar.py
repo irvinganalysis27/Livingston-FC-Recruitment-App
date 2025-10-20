@@ -499,7 +499,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         )
     else:
         df["Competition_norm"] = np.nan
-    
+
     # ============================================================
     # ⚖️ 2. Merge League Multipliers (by Competition_ID first, fallback to name)
     # ============================================================
@@ -516,7 +516,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             "league_name": "league"
         }, inplace=True)
 
-        # Force both numeric
         m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce").astype("Int64")
         m["multiplier"] = pd.to_numeric(m.get("multiplier", 1.0), errors="coerce").fillna(1.0)
         m["league"] = m.get("league", "").astype(str).str.strip()
@@ -528,49 +527,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         found_id = next((c for c in id_candidates if c in df.columns), None)
         if found_id:
             df.rename(columns={found_id: "competition_id"}, inplace=True)
-            df["competition_id"] = (
-                pd.to_numeric(df["competition_id"], errors="coerce").astype("Int64")
-            )
-            print(f"[DEBUG] ✅ Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
+            df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce").astype("Int64")
         else:
             df["competition_id"] = pd.NA
-            print("[DEBUG] ⚠️ No Competition ID column found in data!")
 
-        print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:25])
+        # --- Merge by ID first ---
+        df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
 
-        # --- Merge priority: ID > League name ---
-        df = df.merge(
-            m[["competition_id", "multiplier"]],
-            on="competition_id",
-            how="left"
-        )
-        merged_count = df["multiplier"].notna().sum()
-        print(f"[DEBUG] ✅ Merged league multipliers by competition_id — {merged_count} rows matched")
-
-        # Fallback if no matches
+        # --- Fallback: merge by league name if no matches found ---
         if df["multiplier"].isna().all():
             df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ⚠️ No ID matches, merged by league name instead")
 
         # --- Final numeric Multiplier column ---
         df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-        df.drop(columns=["multiplier"], inplace=True, errors="ignore")
+        df.drop(columns=["multiplier", "league"], inplace=True, errors="ignore")
 
-        # --- Debug preview ---
-        debug_cols = [c for c in ["Competition", "Competition_norm", "competition_id", "Multiplier"] if c in df.columns]
-        st.write("🔍 Debug – League Multiplier Preview:")
-        st.dataframe(df[debug_cols].drop_duplicates().head(20))
-
-        missing = (
-            df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
-              .drop_duplicates()
-              .tolist()
-        )
-        if missing:
-            st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
-
-    except Exception as e:
-        st.error(f"❌ Failed to merge league multipliers: {e}")
+    except Exception:
         df["Multiplier"] = 1.0
 
     # ============================================================
@@ -593,7 +565,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
-
     df.rename(columns=rename_map, inplace=True)
 
     # ============================================================
@@ -628,32 +599,25 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Positions played"] = np.nan
 
-    # Fallbacks
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # Map to six positional groups
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
 
-    # Duplicate generic CMs into both 6 & 8
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"] == "Centre Midfield"
-        if cm_mask.any():
-            cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy()
-            cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy()
-            cm_as_8["Six-Group Position"] = "Number 8"
-            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+    cm_mask = df["Six-Group Position"] == "Centre Midfield"
+    if cm_mask.any():
+        cm_rows = df.loc[cm_mask].copy()
+        cm_as_6 = cm_rows.copy()
+        cm_as_6["Six-Group Position"] = "Number 6"
+        cm_as_8 = cm_rows.copy()
+        cm_as_8["Six-Group Position"] = "Number 8"
+        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
-    # ============================================================
-    # ✅ 6. Return Cleaned Data
-    # ============================================================
     return df
 
 # ---------- Cached Data Loader ----------
