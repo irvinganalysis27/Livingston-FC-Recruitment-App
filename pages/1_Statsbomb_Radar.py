@@ -622,52 +622,42 @@ def load_data_once():
     path = DATA_PATH
     sig = _data_signature(path)
 
-    # ============================================================
-    # 1️⃣ LOAD FILE(S)
-    # ============================================================
-    if path.is_file():
-        df_raw = load_one_file(path)
-    else:
-        files = sorted(
-            f for f in path.iterdir()
-            if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
-        )
-        if not files:
-            raise FileNotFoundError(f"No data files found in {path.name}. Add CSV or XLSX.")
-        frames = []
-        for f in files:
-            try:
-                frames.append(load_one_file(f))
-            except Exception as e:
-                print(f"[WARNING] Skipping {f.name} ({e})")
-        if not frames:
-            raise ValueError("No readable files found in statsbombdata")
-        df_raw = pd.concat(frames, ignore_index=True, sort=False)
-        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
+# ============================================================
+# 1️⃣ LOAD FILE(S)
+# ============================================================
+if path.is_file():
+    df_raw = load_one_file(path)
+else:
+    files = sorted(
+        f for f in path.iterdir()
+        if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
+    )
+    if not files:
+        st.error(f"No data files found in {path.name}. Please add a CSV or XLSX file.")
+        st.stop()
 
-    print("[DEBUG] Columns in raw data:", df_raw.columns.tolist()[:25])
+    frames = []
+    for f in files:
+        try:
+            frames.append(load_one_file(f))
+        except Exception:
+            continue
 
-    # ============================================================
-    # 2️⃣ DEBUG CHECK: SHOW COMPETITION ID VALUES
-    # ============================================================
-    st.write("🔍 **Sample raw 'Competition Id' values from CSV:**")
-    possible_cols = [c for c in df_raw.columns if "competition" in c.lower()]
-    if possible_cols:
-        for c in possible_cols:
-            st.markdown(f"**→ {c}**")
-            st.dataframe(df_raw[c].drop_duplicates().head(25))
-    else:
-        st.warning("No column found containing 'Competition' in its name!")
+    if not frames:
+        st.error("No readable player data files found.")
+        st.stop()
 
-    # ============================================================
-    # 3️⃣ AGE + PREPROCESSING
-    # ============================================================
-    df_raw = add_age_column(df_raw)
-    df_preprocessed = preprocess_df(df_raw)
-    print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
+    df_raw = pd.concat(frames, ignore_index=True, sort=False)
 
-    return df_preprocessed
-    
+# ============================================================
+# 2️⃣ AGE + PREPROCESSING
+# ============================================================
+df_raw = add_age_column(df_raw)
+df_preprocessed = preprocess_df(df_raw)
+
+return df_preprocessed
+
+
 # ---------- Load & preprocess ----------
 df_all_raw = load_data_once()
 
@@ -679,15 +669,7 @@ if "Competition" not in df_all_raw.columns:
     st.error("❌ Expected a 'Competition' column in your data.")
     st.stop()
 
-print("[DEBUG] Sample Competitions:", df_all_raw["Competition"].dropna().unique()[:10])
-
-# ---------- Debug: list all 'cross' columns ----------
-print("[DEBUG] Columns containing 'cross':")
-for c in df_all_raw.columns:
-    if "cross" in c.lower():
-        print("   ", c)
-
-# ---------- Clean raw column headers ----------
+# ---------- Clean and prepare ----------
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
     .str.strip()
@@ -695,36 +677,27 @@ df_all_raw.columns = (
     .str.replace(r"\s+", " ", regex=True)
 )
 
-# ---------- Add Age column from Birth Date ----------
-if "Birth Date" in df_all_raw.columns:
+# Add Age if using "Birth Date" instead of "birth_date"
+if "Birth Date" in df_all_raw.columns and "Age" not in df_all_raw.columns:
     today = datetime.today()
     df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
         lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if pd.notna(dob) else np.nan
     )
-    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
 
-# ---------- Preprocess ----------
+# Preprocess and create the working copy
 df_all = preprocess_df(df_all_raw)
-print("[DEBUG] Final columns:", list(df_all.columns))
+df = df_all.copy()
 
-st.write("🔍 Debug – Sample Competition_norm + Multiplier values after preprocessing:")
-st.dataframe(df_all[["Competition", "Competition_norm", "Multiplier"]].head(15))
-
-# (Optional) quick debug to verify key columns are present exactly as expected
-print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
-print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
-df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (filtered by UI)
-
-# ---------- League filter ----------
+# ============================================================
+# 3️⃣ LEAGUE FILTER
+# ============================================================
 league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
 league_col = next((c for c in league_candidates if c in df.columns), None)
 if league_col is None:
     st.error("❌ No league/competition column found after preprocessing.")
     st.stop()
 
-# build clean options; avoid the literal string "nan"
 leagues_series = pd.Series(df[league_col], dtype="string").str.strip()
 all_leagues = sorted([x for x in leagues_series.dropna().unique().tolist() if x and x.lower() != "nan"])
 
@@ -751,7 +724,6 @@ selected_leagues = st.multiselect(
     label_visibility="collapsed"
 )
 
-# keep session_state clean if options changed
 if set(valid_defaults) != set(st.session_state.league_selection):
     st.session_state.league_selection = valid_defaults
 
@@ -759,12 +731,11 @@ if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
     if df.empty:
-        st.warning("No players match the selected leagues. Clear or change the league filter.")
+        st.warning("No players match the selected leagues. Try a different selection.")
         st.stop()
 else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
-
 # ---------- Minutes + Age filters (side by side) ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
