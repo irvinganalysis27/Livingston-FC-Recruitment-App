@@ -192,12 +192,6 @@ selected_leagues = st.multiselect(
 # Keep session_state clean if options changed
 if set(valid_defaults) != set(st.session_state.sc_league_sel):
     st.session_state.sc_league_sel = valid_defaults
-
-selected_leagues = st.multiselect(
-    "Leagues",
-    options=leagues,
-    default=st.session_state.sc_league_sel,
-    key="sc_league_sel",
 )
 
 # --- Position Filter (Centre Back default) ---
