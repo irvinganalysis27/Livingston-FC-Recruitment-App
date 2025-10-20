@@ -1576,12 +1576,21 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
                 new_cols.append(f"{c}_{seen[c]}")
         similar_df.columns = new_cols
 
-        # ✅ Keep only the columns you want
+        # 🟡 Add 0–100 Score from plot_data (if available)
+        if "Score (0–100)" in plot_data.columns:
+            score_map = plot_data.set_index("Player")["Score (0–100)"].to_dict()
+            similar_df["Score (0–100)"] = similar_df["Player"].map(score_map)
+
+        # ✅ Keep only the final display columns
         keep_cols = ["Player", "Team", "League", "Age", "Score (0–100)", "Similarity Score"]
         for col in keep_cols:
             if col not in similar_df.columns:
                 similar_df[col] = np.nan
         similar_df = similar_df[keep_cols]
+
+        # 🟢 Optional: round numeric columns nicely
+        similar_df["Score (0–100)"] = pd.to_numeric(similar_df["Score (0–100)"], errors="coerce").round(1)
+        similar_df["Similarity Score"] = pd.to_numeric(similar_df["Similarity Score"], errors="coerce").round(1)
 
         st.dataframe(similar_df, use_container_width=True)
 # ---------- Ranking table with favourites ----------
