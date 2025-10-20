@@ -505,29 +505,28 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     # ============================================================
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
-        m = pd.read_excel(multipliers_path)
+        m = pd.read_excel(multipliers_path, header=0)
     
-        # --- Normalise multiplier file columns ---
+        # --- Clean and normalise multiplier file ---
         m.columns = m.columns.str.strip().str.lower()
-        rename_map = {}
-        if "competition_id" not in m.columns and "competitionid" in m.columns:
-            rename_map["competitionid"] = "competition_id"
-        if "league" not in m.columns and "competition" in m.columns:
-            rename_map["competition"] = "league"
-        if "multiplier" not in m.columns and "Multiplier" in m.columns:
-            rename_map["Multiplier"] = "multiplier"
-        if rename_map:
-            m.rename(columns=rename_map, inplace=True)
+        rename_map = {
+            "competitionid": "competition_id",
+            "competition_id ": "competition_id",
+            "competition": "league",
+            "multiplier ": "multiplier",
+        }
+        m.rename(columns={k: v for k, v in rename_map.items() if k in m.columns}, inplace=True)
     
-        # --- Clean values ---
-        if "league" in m.columns:
-            m["league"] = m["league"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
-        if "multiplier" in m.columns:
-            m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
+        # Guarantee essential columns
+        if "league" not in m.columns:
+            raise ValueError("Missing 'League' column in multipliers file.")
+        if "multiplier" not in m.columns:
+            raise ValueError("Missing 'Multiplier' column in multipliers file.")
+    
+        m["league"] = m["league"].astype(str).str.strip()
+        m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
         if "competition_id" in m.columns:
             m["competition_id"] = pd.to_numeric(m["competition_id"], errors="coerce")
-        else:
-            m["competition_id"] = np.nan  # ensure column always exists
     
         # --- Ensure Competition_norm exists on df ---
         if "Competition" in df.columns and "Competition_norm" not in df.columns:
@@ -535,37 +534,38 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 df["Competition"]
                 .astype(str)
                 .str.strip()
-                .str.replace(u"\xa0", " ", regex=False)
+                .replace(u"\xa0", " ", regex=False)
                 .map(lambda x: LEAGUE_SYNONYMS.get(x, x))
             )
     
         # --- Determine merge strategy ---
-        df_cols_lower = [c.lower().strip() for c in df.columns]
-        has_id = "competition_id" in df_cols_lower or "competition id" in df_cols_lower
+        merged = False
+        if "Competition_ID" in df.columns or "competition_id" in df.columns:
+            id_col = "Competition_ID" if "Competition_ID" in df.columns else "competition_id"
+            df[id_col] = pd.to_numeric(df[id_col], errors="coerce")
+            df = df.merge(m[["competition_id", "multiplier"]], left_on=id_col, right_on="competition_id", how="left")
+            merged = True
+            print("[DEBUG] ✅ Merged multipliers by Competition_ID")
     
-        if has_id:
-            df_id_col = next(
-                (c for c in df.columns if c.lower().strip() in {"competition_id", "competition id"}), None
-            )
-            df["competition_id"] = pd.to_numeric(df[df_id_col], errors="coerce")
-            df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged multipliers using Competition_ID")
-        elif "Competition_norm" in df.columns:
+        # fallback: text match
+        if not merged and "Competition_norm" in df.columns:
             df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ✅ Merged multipliers using Competition_norm name")
-        else:
-            df["multiplier"] = 1.0
-            print("[DEBUG] ⚠️ No merge key found — default multiplier = 1.0")
+            merged = True
+            print("[DEBUG] ✅ Merged multipliers by league name")
     
-        # --- Final numeric Multiplier column ---
+        if not merged:
+            print("[DEBUG] ⚠️ No valid merge key found; assigning default multiplier = 1.0")
+            df["multiplier"] = 1.0
+    
+        # --- Final numeric Multiplier ---
         df["Multiplier"] = pd.to_numeric(df.get("multiplier", 1.0), errors="coerce").fillna(1.0)
     
-        # --- Optional debug preview ---
+        # --- Debug output (first few) ---
         debug_cols = [c for c in ["Competition", "Competition_norm", "competition_id", "Multiplier"] if c in df.columns]
-        st.write("🔍 Debug – League Multiplier Preview (first 15 rows):")
+        st.write("🔍 Debug – League Multiplier Preview:")
         st.dataframe(df[debug_cols].drop_duplicates().head(15))
     
-        # --- Warn about missing multipliers ---
+        # --- Warn if some leagues not matched ---
         missing = (
             df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
             .drop_duplicates()
