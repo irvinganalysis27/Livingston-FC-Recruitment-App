@@ -530,6 +530,8 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         else:
             m["multiplier"] = 1.0
 
+        print("[DEBUG] Columns in df before multiplier merge:", df.columns.tolist()[:30])
+
         # --- Make sure df has proper ID column ---
         id_candidates = ["Competition_ID", "competition_id", "Competition ID", "Competition id", "competition id"]
         found_id = next((c for c in id_candidates if c in df.columns), None)
