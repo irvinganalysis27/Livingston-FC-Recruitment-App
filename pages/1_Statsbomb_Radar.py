@@ -35,7 +35,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("Player Radar")
+st.title("Statsbomb Radar")
 
 # ========= PATHS =========
 APP_DIR = Path(__file__).parent          # pages/
