@@ -622,41 +622,40 @@ def load_data_once():
     path = DATA_PATH
     sig = _data_signature(path)
 
-# ============================================================
-# 1️⃣ LOAD FILE(S)
-# ============================================================
-if path.is_file():
-    df_raw = load_one_file(path)
-else:
-    files = sorted(
-        f for f in path.iterdir()
-        if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
-    )
-    if not files:
-        st.error(f"No data files found in {path.name}. Please add a CSV or XLSX file.")
-        st.stop()
+    # ============================================================
+    # 1️⃣ LOAD FILE(S)
+    # ============================================================
+    if path.is_file():
+        df_raw = load_one_file(path)
+    else:
+        files = sorted(
+            f for f in path.iterdir()
+            if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
+        )
+        if not files:
+            st.error(f"No data files found in {path.name}. Please add a CSV or XLSX file.")
+            st.stop()
 
-    frames = []
-    for f in files:
-        try:
-            frames.append(load_one_file(f))
-        except Exception:
-            continue
+        frames = []
+        for f in files:
+            try:
+                frames.append(load_one_file(f))
+            except Exception:
+                continue
 
-    if not frames:
-        st.error("No readable player data files found.")
-        st.stop()
+        if not frames:
+            st.error("No readable player data files found.")
+            st.stop()
 
-    df_raw = pd.concat(frames, ignore_index=True, sort=False)
+        df_raw = pd.concat(frames, ignore_index=True, sort=False)
 
-# ============================================================
-# 2️⃣ AGE + PREPROCESSING
-# ============================================================
-df_raw = add_age_column(df_raw)
-df_preprocessed = preprocess_df(df_raw)
+    # ============================================================
+    # 2️⃣ AGE + PREPROCESSING
+    # ============================================================
+    df_raw = add_age_column(df_raw)
+    df_preprocessed = preprocess_df(df_raw)
 
-return df_preprocessed
-
+    return df_preprocessed
 
 # ---------- Load & preprocess ----------
 df_all_raw = load_data_once()
