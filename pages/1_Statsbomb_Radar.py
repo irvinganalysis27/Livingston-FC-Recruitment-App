@@ -689,6 +689,8 @@ def load_data_once():
         df_raw = pd.concat(frames, ignore_index=True, sort=False)
         print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
 
+    print("[DEBUG] Columns in raw data:", df_raw.columns.tolist()[:25])
+
     df_raw = add_age_column(df_raw)
     df_preprocessed = preprocess_df(df_raw)
     print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
