@@ -18,11 +18,6 @@ from datetime import datetime, timezone
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
-# ========= DEBUG MARKERS =========
-print("[DEBUG_LOOP] ---- PAGE START ----")
-print("[DEBUG] Run marker:", random.randint(1000, 9999))
-print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
-
 # ========= PAGE CONFIG =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
