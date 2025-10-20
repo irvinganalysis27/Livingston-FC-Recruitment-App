@@ -1604,6 +1604,10 @@ for c in cols_for_table:
 # Build ranking table from the current plot_data
 z_ranking = plot_data[cols_for_table].copy()
 
+# Rename Competition_norm → League for display consistency
+if "Competition_norm" in z_ranking.columns:
+    z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
+
 # ---------- LFC Score logic (same as Team Rankings) ----------
 plot_data = plot_data.copy()
 
