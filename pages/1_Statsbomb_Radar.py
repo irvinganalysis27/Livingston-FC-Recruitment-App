@@ -531,7 +531,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             m["multiplier"] = 1.0
 
         # --- Make sure df has proper ID column ---
-        id_candidates = ["Competition_ID", "competition_id"]
+        id_candidates = ["Competition_ID", "competition_id", "Competition ID", "Competition id", "competition id"]
         found_id = next((c for c in id_candidates if c in df.columns), None)
         if found_id:
             df.rename(columns={found_id: "competition_id"}, inplace=True)
