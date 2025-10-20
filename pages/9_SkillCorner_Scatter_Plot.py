@@ -56,6 +56,10 @@ df_all.columns = (
     .str.replace(r"\s+", " ", regex=True)
 )
 
+# 🔹 Drop Competition ID (not needed)
+if "Competition ID" in df_all.columns:
+    df_all.drop(columns=["Competition ID"], inplace=True)
+
 # ============================================================
 # Validate key columns
 # ============================================================
@@ -87,7 +91,7 @@ df_all["Minutes"] = pd.to_numeric(df_all["Minutes"], errors="coerce").fillna(0)
 
 exclude_cols = [
     "Player", "Team", "Competition", "Season", "Position Group",
-    "Match", "Date", "Competition ID", "Team ID", "Player ID"
+    "Match", "Date", "Team ID", "Player ID"
 ]
 numeric_cols = [c for c in df_all.columns if c not in exclude_cols and df_all[c].dtype != "object"]
 
@@ -103,7 +107,6 @@ df_player = (
 )
 
 df = df_player.copy()
-
 # ============================================================
 # Filters
 # ============================================================
