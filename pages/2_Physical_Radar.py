@@ -104,8 +104,6 @@ def load_skillcorner_csv(path: Path) -> pd.DataFrame:
 
 
 # ========= LOAD DATA =========
-st.caption(f"Source file: `{DATA_PATH}`")
-
 try:
     df_raw = load_skillcorner_csv(DATA_PATH)
 except Exception as e:
