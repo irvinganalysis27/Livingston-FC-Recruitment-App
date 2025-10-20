@@ -57,18 +57,11 @@ df_all.columns = (
 )
 
 # ============================================================
-# Normalise position groups
+# Use SkillCorner's existing Position Group column
 # ============================================================
-POSITION_MAP = {
-    "GK": "Goalkeeper",
-    "CB": "Centre Back", "RCB": "Centre Back", "LCB": "Centre Back",
-    "RB": "Full Back", "RWB": "Full Back", "LB": "Full Back", "LWB": "Full Back",
-    "CDM": "Midfield", "DM": "Midfield", "CM": "Midfield", "RCM": "Midfield", "LCM": "Midfield",
-    "CAM": "Midfield", "AM": "Midfield",
-    "RW": "Winger", "LW": "Winger", "RM": "Winger", "LM": "Winger",
-    "CF": "Striker", "ST": "Striker", "LS": "Striker", "RS": "Striker",
-}
-df_all["Position Group"] = df_all["Position"].map(POSITION_MAP)
+if "Position Group" not in df_all.columns:
+    st.error("❌ 'Position Group' column not found in SkillCorner dataset.")
+    st.stop()
 
 # ============================================================
 # Required columns
