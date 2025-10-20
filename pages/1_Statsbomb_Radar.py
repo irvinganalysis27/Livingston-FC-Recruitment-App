@@ -664,7 +664,9 @@ def load_data_once():
     path = DATA_PATH
     sig = _data_signature(path)
 
-    # Load one or many files
+    # ============================================================
+    # 1️⃣ LOAD FILE(S)
+    # ============================================================
     if path.is_file():
         df_raw = load_one_file(path)
     else:
@@ -687,6 +689,21 @@ def load_data_once():
 
     print("[DEBUG] Columns in raw data:", df_raw.columns.tolist()[:25])
 
+    # ============================================================
+    # 2️⃣ DEBUG CHECK: SHOW COMPETITION ID VALUES
+    # ============================================================
+    st.write("🔍 **Sample raw 'Competition Id' values from CSV:**")
+    possible_cols = [c for c in df_raw.columns if "competition" in c.lower()]
+    if possible_cols:
+        for c in possible_cols:
+            st.markdown(f"**→ {c}**")
+            st.dataframe(df_raw[c].drop_duplicates().head(25))
+    else:
+        st.warning("No column found containing 'Competition' in its name!")
+
+    # ============================================================
+    # 3️⃣ AGE + PREPROCESSING
+    # ============================================================
     df_raw = add_age_column(df_raw)
     df_preprocessed = preprocess_df(df_raw)
     print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
