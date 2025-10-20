@@ -187,11 +187,11 @@ selected_leagues = st.multiselect(
     default=valid_defaults,
     key="sc_league_sel",
     label_visibility="collapsed"
+)
 
 # Keep session_state clean if options changed
 if set(valid_defaults) != set(st.session_state.sc_league_sel):
     st.session_state.sc_league_sel = valid_defaults
-)
 
 # --- Position Filter (Centre Back default) ---
 pos_groups = sorted(
