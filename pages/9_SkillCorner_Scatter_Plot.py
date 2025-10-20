@@ -37,17 +37,18 @@ def load_data(path: Path) -> pd.DataFrame:
 try:
     df_all = load_data(DATA_PATH)
 
-st.subheader("📋 Data Preview")
-st.dataframe(df_all.head(10))
+    # ===== DEBUG PREVIEW =====
+    st.subheader("📋 Data Preview")
+    st.dataframe(df_all.head(10))
 
-st.write("**Columns found:**", list(df_all.columns))
-st.write("**Sample values:**")
-for col in ["Competition", "Minutes", "Position Group"]:
-    if col in df_all.columns:
-        st.write(f"→ {col}: ", df_all[col].dropna().unique()[:10])
-    else:
-        st.write(f"❌ Column missing: {col}")
-        
+    st.write("**Columns found:**", list(df_all.columns))
+    st.write("**Sample values:**")
+    for col in ["Competition", "Minutes", "Position Group"]:
+        if col in df_all.columns:
+            st.write(f"→ {col}: ", df_all[col].dropna().unique()[:10])
+        else:
+            st.write(f"❌ Column missing: {col}")
+
 except Exception as e:
     st.error(f"❌ Could not load SkillCorner data: {e}")
     st.stop()
