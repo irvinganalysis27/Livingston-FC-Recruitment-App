@@ -162,6 +162,18 @@ if df.empty:
 # Metric Selection
 # ============================================================
 numeric_cols = sorted(df.select_dtypes(include=[np.number]).columns.tolist())
+
+# Remove irrelevant numeric ID columns
+exclude_metrics = {
+    "Competition ID",
+    "Competition Edition ID",
+    "Team ID",
+    "Player ID",
+    "Season ID",
+    "Match ID",
+}
+numeric_cols = [c for c in numeric_cols if c not in exclude_metrics]
+
 if not numeric_cols:
     st.error("❌ No numeric columns found for plotting.")
     st.stop()
