@@ -18,11 +18,6 @@ from datetime import datetime, timezone
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
-# ========= DEBUG MARKERS =========
-print("[DEBUG_LOOP] ---- PAGE START ----")
-print("[DEBUG] Run marker:", random.randint(1000, 9999))
-print("[DEBUG] Password OK?", st.session_state.get("password_ok"))
-
 # ========= PAGE CONFIG =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -91,7 +86,6 @@ LEAGUE_SYNONYMS = {
 
     # --- Denmark ---
     "1st Division": "Denmark 1st Division",
-    "Superliga": "Denmark Superliga",
 
     # --- England ---
     "League One": "England League One",
@@ -163,8 +157,11 @@ LEAGUE_SYNONYMS = {
     # --- Serbia ---
     "Super Liga": "Serbia Super Liga",
 
+    # --- Slovakia ---
+    "1. Liga": "Slovakia 1. Liga",
+
     # --- Slovenia ---
-    "1. Liga (SVN)": "Slovenia 1. Liga",
+    "1. Liga": "Slovenia 1. Liga",
 
     # --- South Africa ---
     "PSL": "South Africa Premier Division",
@@ -470,17 +467,27 @@ def _data_signature(path: Path):
 
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    """Add numeric Age column based on birth_date (if present)."""
-    if "birth_date" not in df.columns:
+    """Add numeric Age column based on birth_date or Birth Date (if present)."""
+    today = datetime.today()
+
+    # --- Detect correct birth date column ---
+    birth_col = None
+    for c in df.columns:
+        if c.strip().lower() in {"birth_date", "birth date"}:
+            birth_col = c
+            break
+
+    if not birth_col:
         df["Age"] = np.nan
+        print("[DEBUG] No birth date column found — Age set to NaN")
         return df
 
-    today = datetime.today()
-    df["Age"] = pd.to_datetime(df["birth_date"], errors="coerce").apply(
+    df["Age"] = pd.to_datetime(df[birth_col], errors="coerce").apply(
         lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if pd.notna(dob) else np.nan
     )
-    print(f"[DEBUG] Age column created. Non-null ages: {df['Age'].notna().sum()}")
+
+    print(f"[DEBUG] Age column created from '{birth_col}'. Non-null ages: {df['Age'].notna().sum()}")
     return df
 
 
@@ -499,61 +506,48 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["Competition_norm"] = np.nan
 
     # ============================================================
-    # ⚖️ 2. Merge League Multipliers (using Competition_ID first)
+    # ⚖️ 2. Merge League Multipliers (by Competition_ID first, fallback to name)
     # ============================================================
     try:
         multipliers_path = ROOT_DIR / "league_multipliers.xlsx"
         m = pd.read_excel(multipliers_path)
 
-        # Normalise Excel headers
-        m.columns = m.columns.str.strip().str.lower()  # -> competition_id, league, multiplier
-        df.columns = df.columns.str.strip()  # ensure consistency
+        # --- Clean multipliers file ---
+        m.columns = m.columns.str.strip().str.lower().str.replace(" ", "_")
+        m.rename(columns={
+            "competitionid": "competition_id",
+            "competition_id_": "competition_id",
+            "competition": "league",
+            "league_name": "league"
+        }, inplace=True)
 
-        merged = False
+        m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce").astype("Int64")
+        m["multiplier"] = pd.to_numeric(m.get("multiplier", 1.0), errors="coerce").fillna(1.0)
+        m["league"] = m.get("league", "").astype(str).str.strip()
 
-        if "competition_id" in df.columns and "competition_id" in m.columns:
-            df = df.merge(m, on="competition_id", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_ID")
-            merged = True
-        elif "Competition_norm" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition_norm", right_on="league", how="left")
-            print("[DEBUG] ✅ Merged league multipliers using Competition_norm")
-            merged = True
-        elif "Competition" in df.columns and "league" in m.columns:
-            df = df.merge(m, left_on="Competition", right_on="league", how="left")
-            print("[DEBUG] ⚠️ Fallback merge on raw Competition name")
-            merged = True
+        # --- Normalise competition ID in main data ---
+        id_candidates = [
+            "Competition_ID", "competition_id", "Competition Id", "Competition id"
+        ]
+        found_id = next((c for c in id_candidates if c in df.columns), None)
+        if found_id:
+            df.rename(columns={found_id: "competition_id"}, inplace=True)
+            df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce").astype("Int64")
         else:
-            print("[DEBUG] ⚠️ No matching key found for league multipliers; using 1.0 for all.")
-            df["multiplier"] = 1.0
+            df["competition_id"] = pd.NA
 
-        # Safely assign numeric multiplier
-        if "multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
-        elif "Multiplier" in df.columns:
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-        else:
-            df["Multiplier"] = 1.0
+        # --- Merge by ID first ---
+        df = df.merge(m[["competition_id", "multiplier"]], on="competition_id", how="left")
 
-        # Debug output
-        print("[DEBUG] Unique multipliers after merge:", sorted(df["Multiplier"].dropna().unique())[:15])
+        # --- Fallback: merge by league name if no matches found ---
+        if df["multiplier"].isna().all():
+            df = df.merge(m[["league", "multiplier"]], left_on="Competition_norm", right_on="league", how="left")
 
-        if merged:
-            sample = (
-                df[["Competition_norm", "Multiplier"]]
-                .drop_duplicates()
-                .sort_values("Competition_norm")
-                .head(15)
-            )
-            print("[DEBUG] Sample multiplier matches:")
-            print(sample.to_string(index=False))
+        # --- Final numeric Multiplier column ---
+        df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
+        df.drop(columns=["multiplier", "league"], inplace=True, errors="ignore")
 
-            unmatched = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique()
-            if len(unmatched) > 0:
-                print("[DEBUG] ⚠️ Competitions missing multipliers (first 10):", unmatched[:10])
-
-    except Exception as e:
-        print(f"[DEBUG] ⚠️ Failed to merge league multipliers: {e}")
+    except Exception:
         df["Multiplier"] = 1.0
 
     # ============================================================
@@ -576,7 +570,6 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
     })
-
     df.rename(columns=rename_map, inplace=True)
 
     # ============================================================
@@ -611,32 +604,25 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Positions played"] = np.nan
 
-    # Fallbacks
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # Map to six positional groups
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
 
-    # Duplicate generic CMs into both 6 & 8
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"] == "Centre Midfield"
-        if cm_mask.any():
-            cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy()
-            cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy()
-            cm_as_8["Six-Group Position"] = "Number 8"
-            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+    cm_mask = df["Six-Group Position"] == "Centre Midfield"
+    if cm_mask.any():
+        cm_rows = df.loc[cm_mask].copy()
+        cm_as_6 = cm_rows.copy()
+        cm_as_6["Six-Group Position"] = "Number 6"
+        cm_as_8 = cm_rows.copy()
+        cm_as_8["Six-Group Position"] = "Number 8"
+        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
-    # ============================================================
-    # ✅ 6. Return Cleaned Data
-    # ============================================================
     return df
 
 # ---------- Cached Data Loader ----------
@@ -646,7 +632,9 @@ def load_data_once():
     path = DATA_PATH
     sig = _data_signature(path)
 
-    # Load one or many files
+    # ============================================================
+    # 1️⃣ LOAD FILE(S)
+    # ============================================================
     if path.is_file():
         df_raw = load_one_file(path)
     else:
@@ -655,25 +643,33 @@ def load_data_once():
             if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
         )
         if not files:
-            raise FileNotFoundError(f"No data files found in {path.name}. Add CSV or XLSX.")
+            st.error(f"No data files found in {path.name}. Please add a CSV or XLSX file.")
+            st.stop()
+
         frames = []
         for f in files:
             try:
                 frames.append(load_one_file(f))
-            except Exception as e:
-                print(f"[WARNING] Skipping {f.name} ({e})")
-        if not frames:
-            raise ValueError("No readable files found in statsbombdata")
-        df_raw = pd.concat(frames, ignore_index=True, sort=False)
-        print(f"[DEBUG] Merged {len(files)} files, total rows {len(df_raw)}")
+            except Exception:
+                continue
 
+        if not frames:
+            st.error("No readable player data files found.")
+            st.stop()
+
+        df_raw = pd.concat(frames, ignore_index=True, sort=False)
+
+    # ============================================================
+    # 2️⃣ AGE + PREPROCESSING
+    # ============================================================
     df_raw = add_age_column(df_raw)
     df_preprocessed = preprocess_df(df_raw)
-    print(f"[DEBUG] Data fully preprocessed. Rows: {len(df_preprocessed)}")
-
     return df_preprocessed
-    
-# ---------- Load & preprocess ----------
+
+
+# ============================================================
+# ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
+# ============================================================
 df_all_raw = load_data_once()
 
 if df_all_raw is None or df_all_raw.empty:
@@ -684,15 +680,7 @@ if "Competition" not in df_all_raw.columns:
     st.error("❌ Expected a 'Competition' column in your data.")
     st.stop()
 
-print("[DEBUG] Sample Competitions:", df_all_raw["Competition"].dropna().unique()[:10])
-
-# ---------- Debug: list all 'cross' columns ----------
-print("[DEBUG] Columns containing 'cross':")
-for c in df_all_raw.columns:
-    if "cross" in c.lower():
-        print("   ", c)
-
-# ---------- Clean raw column headers ----------
+# ---------- Clean and prepare ----------
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
     .str.strip()
@@ -700,33 +688,21 @@ df_all_raw.columns = (
     .str.replace(r"\s+", " ", regex=True)
 )
 
-# ---------- Add Age column from Birth Date ----------
-if "Birth Date" in df_all_raw.columns:
-    today = datetime.today()
-    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
-        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if pd.notna(dob) else np.nan
-    )
-    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
+# ✅ No extra “Birth Date” handling block needed anymore
 
-# ---------- Preprocess ----------
+# ---------- Preprocess and create the working copy ----------
 df_all = preprocess_df(df_all_raw)
-print("[DEBUG] Final columns:", list(df_all.columns))
+df = df_all.copy()
 
-# (Optional) quick debug to verify key columns are present exactly as expected
-print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
-print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
-df_all = preprocess_df(df_all_raw)   # baseline (full dataset, fully prepared)
-df = df_all.copy()                   # working copy (filtered by UI)
-
-# ---------- League filter ----------
+# ============================================================
+# 3️⃣ LEAGUE FILTER
+# ============================================================
 league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
 league_col = next((c for c in league_candidates if c in df.columns), None)
 if league_col is None:
     st.error("❌ No league/competition column found after preprocessing.")
     st.stop()
 
-# build clean options; avoid the literal string "nan"
 leagues_series = pd.Series(df[league_col], dtype="string").str.strip()
 all_leagues = sorted([x for x in leagues_series.dropna().unique().tolist() if x and x.lower() != "nan"])
 
@@ -753,7 +729,6 @@ selected_leagues = st.multiselect(
     label_visibility="collapsed"
 )
 
-# keep session_state clean if options changed
 if set(valid_defaults) != set(st.session_state.league_selection):
     st.session_state.league_selection = valid_defaults
 
@@ -761,12 +736,11 @@ if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
     if df.empty:
-        st.warning("No players match the selected leagues. Clear or change the league filter.")
+        st.warning("No players match the selected leagues. Try a different selection.")
         st.stop()
 else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
-
 # ---------- Minutes + Age filters (side by side) ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
@@ -1591,38 +1565,75 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Include key columns
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Avg Z Score", "Weighted Z Score", "Score (0–100)", "LFC Score (0–100)",
+    "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
+# Build ranking table from the current plot_data
 z_ranking = plot_data[cols_for_table].copy()
 
-# Clean up columns
-z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
-z_ranking["Team"] = z_ranking["Team"].fillna("N/A")
+# Rename Competition_norm → League for display consistency
+if "Competition_norm" in z_ranking.columns:
+    z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 
-if "Age" in z_ranking.columns:
-    z_ranking["Age"] = z_ranking["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
+# ---------- LFC Score logic (same as Team Rankings) ----------
+plot_data = plot_data.copy()
 
-z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
-z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
+# Step 1: Apply custom LFC multiplier (1.20 for Scottish Premiership)
+plot_data["LFC Multiplier"] = plot_data.get("Multiplier", 1.0)
+plot_data.loc[
+    plot_data["Competition_norm"] == "Scotland Premiership",
+    "LFC Multiplier"
+] = 1.20
 
-# Deduplicate and rank
-z_ranking = (
-    z_ranking.sort_values("Score (0–100)", ascending=False)
-             .groupby("Player", as_index=False)
-             .first()
+# Step 2: Recreate LFC Weighted Z (same formula as Team Rankings)
+avg_z = pd.to_numeric(plot_data.get("Avg Z Score", 0), errors="coerce").fillna(0)
+lfc_mult = pd.to_numeric(plot_data.get("LFC Multiplier", 1.0), errors="coerce").fillna(1.0)
+
+plot_data["LFC Weighted Z"] = np.select(
+    [avg_z > 0, avg_z < 0],
+    [avg_z * lfc_mult, avg_z / lfc_mult],
+    default=0.0
 )
-z_ranking["Rank"] = z_ranking["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-z_ranking = z_ranking.sort_values("Rank", ascending=True).reset_index(drop=True)
-z_ranking.index = np.arange(1, len(z_ranking) + 1)
-z_ranking.index.name = "Row"
+
+# Step 3: Rebuild anchors from Weighted Z (same as Team Rankings)
+_mins = pd.to_numeric(plot_data.get("Minutes played", np.nan), errors="coerce").fillna(0)
+eligible = plot_data[_mins >= 600].copy()
+if eligible.empty:
+    eligible = plot_data.copy()
+
+anchors = (
+    eligible.groupby("Six-Group Position", dropna=False)["Weighted Z Score"]
+    .agg(_scale_min="min", _scale_max="max")
+    .fillna(0)
+)
+plot_data = plot_data.merge(anchors, on="Six-Group Position", how="left")
+
+# Step 4: Convert to 0–100 scale
+def _to100(v, lo, hi):
+    if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
+        return 50.0
+    return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+
+plot_data["LFC Score (0–100)"] = [
+    _to100(v, lo, hi)
+    for v, lo, hi in zip(
+        plot_data["LFC Weighted Z"],
+        plot_data["_scale_min"],
+        plot_data["_scale_max"]
+    )
+]
+plot_data["LFC Score (0–100)"] = (
+    pd.to_numeric(plot_data["LFC Score (0–100)"], errors="coerce")
+    .round(1)
+    .fillna(0)
+)
 
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
@@ -1694,7 +1705,9 @@ z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
-    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Multiplier", "Avg Z Score", "Weighted Z Score",
+    "Score (0–100)", "LFC Score (0–100)",
+    "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
@@ -1717,7 +1730,7 @@ sig_parts = (
 editor_key = f"ranking_editor_{hash(sig_parts)}"
 
 edited_df = st.data_editor(
-    z_ranking,   # <- always the fresh, filtered table
+    z_ranking,
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player", help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
@@ -1728,6 +1741,9 @@ edited_df = st.data_editor(
         "Multiplier": st.column_config.NumberColumn(
             "League Weight", help="League weighting applied in ranking", format="%.3f"
         ),
+        "Avg Z Score": st.column_config.NumberColumn("Avg Z", format="%.3f"),
+        "Weighted Z Score": st.column_config.NumberColumn("Weighted Z", format="%.3f"),
+        "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
     },
     hide_index=False,
     width="stretch",
