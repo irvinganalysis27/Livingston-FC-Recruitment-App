@@ -274,18 +274,22 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight ---
-if highlight_team and "Team" in df.columns and my_team_name in df["Team"].values:
-    team_df = df[df["Team"] == my_team_name]
-    fig.add_scatter(
-        x=team_df[x_metric],
-        y=team_df[y_metric],
-        mode="markers+text",
-        text=team_df["Name"] if "Name" in df.columns else None,
-        textposition="top center",
-        marker=dict(color="green", size=10, symbol="circle"),
-        name=my_team_name,
-    )
+# --- Team Highlight (Gold for Livingston) ---
+my_team_name = "Livingston"
+
+if highlight_team and "Team" in df.columns:
+    team_mask = df["Team"].str.strip().eq(my_team_name)
+    if team_mask.any():
+        team_df = df[team_mask]
+        fig.add_scatter(
+            x=team_df[x_metric],
+            y=team_df[y_metric],
+            mode="markers+text",
+            text=team_df["Name"] if "Name" in df.columns else None,
+            textposition="top center",
+            marker=dict(color="#FFD700", size=12, symbol="circle"),  # gold
+            name=my_team_name,
+        )
 
 fig.update_layout(
     xaxis_title=x_metric,
