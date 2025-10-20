@@ -664,35 +664,35 @@ def load_data_once():
     # ============================================================
     df_raw = add_age_column(df_raw)
     df_preprocessed = preprocess_df(df_raw)
-    
     return df_preprocessed
-    
-    
-    # ---------- Load & preprocess ----------
-    df_all_raw = load_data_once()
-    
-    if df_all_raw is None or df_all_raw.empty:
-        st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
-        st.stop()
-    
-    if "Competition" not in df_all_raw.columns:
-        st.error("❌ Expected a 'Competition' column in your data.")
-        st.stop()
-    
-    # ---------- Clean and prepare ----------
-    df_all_raw.columns = (
-        df_all_raw.columns.astype(str)
-        .str.strip()
-        .str.replace(u"\xa0", " ", regex=False)
-        .str.replace(r"\s+", " ", regex=True)
-    )
-    
-    # ✅ REMOVE the “Add Age if using Birth Date” block completely
-    # (no need anymore — add_age_column() now handles both 'birth_date' and 'Birth Date')
-    
-    # ---------- Preprocess and create the working copy ----------
-    df_all = preprocess_df(df_all_raw)
-    df = df_all.copy()
+
+
+# ============================================================
+# ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
+# ============================================================
+df_all_raw = load_data_once()
+
+if df_all_raw is None or df_all_raw.empty:
+    st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
+    st.stop()
+
+if "Competition" not in df_all_raw.columns:
+    st.error("❌ Expected a 'Competition' column in your data.")
+    st.stop()
+
+# ---------- Clean and prepare ----------
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.strip()
+    .str.replace(u"\xa0", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+)
+
+# ✅ No extra “Birth Date” handling block needed anymore
+
+# ---------- Preprocess and create the working copy ----------
+df_all = preprocess_df(df_all_raw)
+df = df_all.copy()
 
 # ============================================================
 # 3️⃣ LEAGUE FILTER
