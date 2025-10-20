@@ -1576,8 +1576,14 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
                 new_cols.append(f"{c}_{seen[c]}")
         similar_df.columns = new_cols
 
-        st.dataframe(similar_df, use_container_width=True)
+        # ✅ Keep only the columns you want
+        keep_cols = ["Player", "Team", "League", "Age", "Score (0–100)", "Similarity Score"]
+        for col in keep_cols:
+            if col not in similar_df.columns:
+                similar_df[col] = np.nan
+        similar_df = similar_df[keep_cols]
 
+        st.dataframe(similar_df, use_container_width=True)
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
