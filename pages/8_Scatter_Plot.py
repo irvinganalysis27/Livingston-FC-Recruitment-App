@@ -40,12 +40,30 @@ if df_all.empty:
     st.stop()
 
 # ============================================================
+# Identify column names safely
+# ============================================================
+# Find the best-matching competition column
+possible_league_cols = ["Competition_norm", "Competition", "League", "Competition Name"]
+league_col = next((c for c in possible_league_cols if c in df_all.columns), None)
+if not league_col:
+    st.error("❌ Could not find a competition/league column in the dataset.")
+    st.stop()
+
+# Fallbacks for minutes + position columns
+minutes_col = next((c for c in ["Minutes played", "Minutes", "Mins"] if c in df_all.columns), None)
+position_col = next((c for c in ["Six-Group Position", "Position Group Normalised", "Position"] if c in df_all.columns), None)
+
+if not minutes_col or not position_col:
+    st.error("❌ Could not find required 'minutes' or 'position' columns.")
+    st.stop()
+
+# ============================================================
 # Filters (same style as radar page)
 # ============================================================
 st.markdown("#### Filters")
 
 # --- League Filter ---
-all_leagues = sorted(df_all["Competition_norm"].dropna().unique().tolist())
+all_leagues = sorted(df_all[league_col].dropna().unique().tolist())
 if "scatter_league_sel" not in st.session_state:
     st.session_state.scatter_league_sel = all_leagues.copy()
 
@@ -66,10 +84,10 @@ selected_leagues = st.multiselect(
 )
 
 # --- Minutes Filter ---
-min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50, key="scatter_min_minutes")
+min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50)
 
 # --- Position Filter ---
-pos_groups = sorted(df_all["Six-Group Position"].dropna().unique().tolist())
+pos_groups = sorted(df_all[position_col].dropna().unique().tolist())
 selected_positions = st.multiselect(
     "Position Groups",
     options=pos_groups,
@@ -80,10 +98,10 @@ selected_positions = st.multiselect(
 # Apply filters
 df = df_all.copy()
 if selected_leagues:
-    df = df[df["Competition_norm"].isin(selected_leagues)]
-df = df[df["Minutes played"] >= min_minutes]
+    df = df[df[league_col].isin(selected_leagues)]
+df = df[pd.to_numeric(df[minutes_col], errors="coerce") >= min_minutes]
 if selected_positions:
-    df = df[df["Six-Group Position"].isin(selected_positions)]
+    df = df[df[position_col].isin(selected_positions)]
 
 if df.empty:
     st.warning("No players match selected filters.")
@@ -93,6 +111,9 @@ if df.empty:
 # Metric Selection
 # ============================================================
 numeric_cols = sorted(df.select_dtypes(include=[np.number]).columns.tolist())
+if not numeric_cols:
+    st.error("❌ No numeric columns found for plotting.")
+    st.stop()
 
 st.markdown("#### Choose metrics for X and Y axes")
 x_metric = st.selectbox("X-axis metric", options=numeric_cols, index=0)
@@ -133,7 +154,7 @@ if highlight_outliers:
 # Colour Mapping Logic
 # ============================================================
 if highlight_all:
-    color_col = "Six-Group Position"
+    color_col = position_col
     color_title = "Position Group"
 else:
     color_col = None
@@ -148,9 +169,9 @@ if highlight_team and "Team" in df.columns:
 # Plotly Scatter
 # ============================================================
 hover_data = {
-    "Player": True,
-    "Team": True,
-    "Competition_norm": True,
+    "Player": True if "Player" in df.columns else False,
+    "Team": True if "Team" in df.columns else False,
+    league_col: True,
     x_metric: ":.2f",
     y_metric: ":.2f",
 }
@@ -162,33 +183,17 @@ fig = px.scatter(
     color=color_col,
     color_discrete_sequence=px.colors.qualitative.Set2,
     hover_data=hover_data,
-    size="Minutes played" if "Minutes played" in df.columns else None,
+    size=minutes_col if minutes_col in df.columns else None,
     opacity=0.75,
     height=650,
     title=f"{y_metric} vs {x_metric}",
 )
 
 # --- Add Sample Average Lines ---
-fig.add_shape(
-    type="line",
-    x0=x_mean, x1=x_mean,
-    y0=df[y_metric].min(), y1=df[y_metric].max(),
-    line=dict(color="black", dash="dot"),
-)
-fig.add_shape(
-    type="line",
-    x0=df[x_metric].min(), x1=df[x_metric].max(),
-    y0=y_mean, y1=y_mean,
-    line=dict(color="black", dash="dot"),
-)
-fig.add_annotation(
-    x=x_mean, y=df[y_metric].max(),
-    text="Sample Avg", showarrow=False, yshift=10
-)
-fig.add_annotation(
-    x=df[x_metric].min(), y=y_mean,
-    text="Sample Avg", showarrow=False, xshift=10
-)
+fig.add_shape(type="line", x0=x_mean, x1=x_mean, y0=df[y_metric].min(), y1=df[y_metric].max(),
+              line=dict(color="black", dash="dot"))
+fig.add_shape(type="line", x0=df[x_metric].min(), x1=df[x_metric].max(), y0=y_mean, y1=y_mean,
+              line=dict(color="black", dash="dot"))
 
 # --- Outlier Highlight Overlay ---
 if highlight_outliers:
@@ -197,20 +202,20 @@ if highlight_outliers:
         x=outliers[x_metric],
         y=outliers[y_metric],
         mode="markers+text",
-        text=outliers["Player"],
+        text=outliers["Player"] if "Player" in df.columns else None,
         textposition="top center",
         marker=dict(color="red", size=12, symbol="star"),
         name="Outliers",
     )
 
 # --- Team Highlight Overlay ---
-if highlight_team and my_team_name in df["Team"].values:
+if highlight_team and "Team" in df.columns and my_team_name in df["Team"].values:
     team_df = df[df["Team"] == my_team_name]
     fig.add_scatter(
         x=team_df[x_metric],
         y=team_df[y_metric],
         mode="markers+text",
-        text=team_df["Player"],
+        text=team_df["Player"] if "Player" in df.columns else None,
         textposition="top center",
         marker=dict(color="green", size=10, symbol="circle"),
         name=my_team_name,
