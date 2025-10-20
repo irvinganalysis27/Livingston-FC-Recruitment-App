@@ -603,26 +603,30 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df["Positions played"] = df["Position"].astype(str)
     else:
         df["Positions played"] = np.nan
-
+    
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
-
+    
+    # Map base position
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
-
-    cm_mask = df["Six-Group Position"] == "Centre Midfield"
+    
+    # ✅ Only duplicate *true* Centre Midfielders (not DMs or AMs)
+    cm_mask = df["Six-Group Position"].eq("Centre Midfield")
     if cm_mask.any():
         cm_rows = df.loc[cm_mask].copy()
         cm_as_6 = cm_rows.copy()
         cm_as_6["Six-Group Position"] = "Number 6"
         cm_as_8 = cm_rows.copy()
         cm_as_8["Six-Group Position"] = "Number 8"
+    
+        # Keep everyone else (don’t remove 6s/8s)
         df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-
+    
     return df
 
 # ---------- Cached Data Loader ----------
