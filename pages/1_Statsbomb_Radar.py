@@ -713,6 +713,9 @@ if "Birth Date" in df_all_raw.columns:
 df_all = preprocess_df(df_all_raw)
 print("[DEBUG] Final columns:", list(df_all.columns))
 
+st.write("🔍 Debug – Sample Competition_norm + Multiplier values after preprocessing:")
+st.dataframe(df_all[["Competition", "Competition_norm", "Multiplier"]].head(15))
+
 # (Optional) quick debug to verify key columns are present exactly as expected
 print("[DEBUG] First 10 cleaned columns:", list(df_all_raw.columns[:10]))
 print("[DEBUG] Has 'Successful Box Cross%':", "Successful Box Cross%" in df_all_raw.columns)
