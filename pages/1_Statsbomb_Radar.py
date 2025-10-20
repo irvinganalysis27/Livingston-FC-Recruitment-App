@@ -536,7 +536,6 @@ try:
     has_id = "competition_id" in df_cols_lower or "competition id" in df_cols_lower
 
     if has_id:
-        # find actual matching column name
         df_id_col = next(
             (c for c in df.columns if c.lower().strip() in {"competition_id", "competition id"}), None
         )
