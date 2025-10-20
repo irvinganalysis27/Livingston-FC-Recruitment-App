@@ -1,5 +1,3 @@
-# pages/10_SkillCorner_Scatter_Plot.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -16,7 +14,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("Skillcorner Scatter Plot")
+st.title("SkillCorner Scatter Plot")
 
 # ============================================================
 # Data Load
@@ -57,11 +55,19 @@ df_all.columns = (
 )
 
 # ============================================================
-# Use SkillCorner's existing Position Group column
+# Use SkillCorner's existing Position Group column (rename for consistency)
 # ============================================================
 if "Position Group" not in df_all.columns:
     st.error("❌ 'Position Group' column not found in SkillCorner dataset.")
     st.stop()
+
+# Optional: normalise SkillCorner position group names to match your app
+POSITION_RENAME = {
+    "Central Defender": "Centre Back",
+    "Center Forward": "Striker",
+    "Wide Attacker": "Winger",
+}
+df_all["Position Group"] = df_all["Position Group"].replace(POSITION_RENAME)
 
 # ============================================================
 # Required columns
@@ -101,7 +107,7 @@ selected_leagues = st.multiselect(
 )
 
 # --- Minutes Filter ---
-min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50)
+min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=200, step=50)
 
 # --- Position Filter ---
 pos_groups = sorted(df_all[position_col].dropna().unique().tolist())
@@ -199,18 +205,10 @@ fig = px.scatter(
 )
 
 # --- Average Lines ---
-fig.add_shape(
-    type="line",
-    x0=x_mean, x1=x_mean,
-    y0=df[y_metric].min(), y1=df[y_metric].max(),
-    line=dict(color="black", dash="dot"),
-)
-fig.add_shape(
-    type="line",
-    x0=df[x_metric].min(), x1=df[x_metric].max(),
-    y0=y_mean, y1=y_mean,
-    line=dict(color="black", dash="dot"),
-)
+fig.add_shape(type="line", x0=x_mean, x1=x_mean, y0=df[y_metric].min(), y1=df[y_metric].max(),
+              line=dict(color="black", dash="dot"))
+fig.add_shape(type="line", x0=df[x_metric].min(), x1=df[x_metric].max(), y0=y_mean, y1=y_mean,
+              line=dict(color="black", dash="dot"))
 
 # --- Outliers ---
 if highlight_outliers:
