@@ -1557,13 +1557,17 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
             n_similar=10,
         )
 
-        if err:
-            st.warning(err)
-        elif similar_df.empty:
-            st.info("No similar players found.")
-        else:
-            st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
-            st.dataframe(similar_df, use_container_width=True)
+    if err:
+        st.warning(err)
+    elif similar_df.empty:
+        st.info("No similar players found.")
+    else:
+        st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
+    
+        # 🔧 Prevent duplicate column names from breaking Streamlit
+        similar_df.columns = pd.io.parsers.ParserBase({'names': similar_df.columns})._maybe_dedup_names(similar_df.columns)
+    
+        st.dataframe(similar_df, use_container_width=True)
 
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
