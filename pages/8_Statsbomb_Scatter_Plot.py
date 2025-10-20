@@ -16,7 +16,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("📊 Playing Metric Scatter Plot")
+st.title("Statsbomb Scatter Plot")
 
 # ============================================================
 # Data Load
