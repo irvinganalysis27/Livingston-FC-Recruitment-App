@@ -1594,14 +1594,26 @@ st.markdown("### Players Ranked by Score (0–100)")
 # Include key columns
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Score (0–100)", "Avg Z Score", "Weighted Z Score", "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-z_ranking = plot_data[cols_for_table].copy()
+# Add LFC Z Score (scaled Weighted Z Score within filtered players)
+if "Weighted Z Score" in plot_data.columns:
+    z_min = plot_data["Weighted Z Score"].min()
+    z_max = plot_data["Weighted Z Score"].max()
+    plot_data["LFC Z Score"] = (
+        (plot_data["Weighted Z Score"] - z_min) / (z_max - z_min)
+    ) * 100  # scaled to 0–100
+    plot_data["LFC Z Score"] = plot_data["LFC Z Score"].round(1)
+else:
+    plot_data["LFC Z Score"] = np.nan
+
+# Merge into table
+z_ranking = plot_data[cols_for_table + ["LFC Z Score"]].copy()
 
 # Clean up columns
 z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
@@ -1612,6 +1624,8 @@ if "Age" in z_ranking.columns:
 
 z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
 z_ranking["Multiplier"] = pd.to_numeric(z_ranking["Multiplier"], errors="coerce").fillna(1.0).round(3)
+z_ranking["Avg Z Score"] = pd.to_numeric(z_ranking["Avg Z Score"], errors="coerce").round(3)
+z_ranking["Weighted Z Score"] = pd.to_numeric(z_ranking["Weighted Z Score"], errors="coerce").round(3)
 
 # Deduplicate and rank
 z_ranking = (
@@ -1694,7 +1708,8 @@ z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
-    "Multiplier", "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Multiplier", "Avg Z Score", "Weighted Z Score", "LFC Z Score",
+    "Score (0–100)", "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
@@ -1717,7 +1732,7 @@ sig_parts = (
 editor_key = f"ranking_editor_{hash(sig_parts)}"
 
 edited_df = st.data_editor(
-    z_ranking,   # <- always the fresh, filtered table
+    z_ranking,
     column_config={
         "Player (coloured)": st.column_config.TextColumn(
             "Player", help="Shows Favourite colour (🟢🟡🔴🟣 only if marked)"
@@ -1728,6 +1743,9 @@ edited_df = st.data_editor(
         "Multiplier": st.column_config.NumberColumn(
             "League Weight", help="League weighting applied in ranking", format="%.3f"
         ),
+        "Avg Z Score": st.column_config.NumberColumn("Avg Z", format="%.3f"),
+        "Weighted Z Score": st.column_config.NumberColumn("Weighted Z", format="%.3f"),
+        "LFC Z Score": st.column_config.NumberColumn("LFC Z (0–100)", format="%.1f"),
     },
     hide_index=False,
     width="stretch",
