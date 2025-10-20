@@ -1480,151 +1480,70 @@ if st.button("Generate AI Summary", key="ai_summary_button"):
 # ---------- 🔍 Find 10 Similar Players ----------
 st.markdown("### 🔍 Find Similar Players")
 
-MINUTES_SIMILAR = 400  # only compare against players with >= 400 mins
+MINUTES_SIMILAR = 400
 pos_col = "Six-Group Position"
 minutes_col = "Minutes played"
 
-def _safe_num(s):
-    return pd.to_numeric(s, errors="coerce")
+def find_similar_players_same_scale(
+    player_name: str,
+    base_df: pd.DataFrame,
+    metrics: list,
+    position_col: str,
+    lower_is_better: set,
+    n_similar: int = 10,
+    minutes_floor: int = 400
+):
+    """Find most similar players using the *existing* Weighted Z Score scale and same 0–100 logic."""
+    if player_name not in base_df["Player"].values:
+        return pd.DataFrame(), f"{player_name} not found."
 
-def _zscore_frame(frame: pd.DataFrame, cols: list) -> pd.DataFrame:
-    """Column-wise z-score; if std == 0 -> 0."""
-    Z = pd.DataFrame(index=frame.index)
-    for c in cols:
-        x = _safe_num(frame[c]).fillna(0.0)
-        std = x.std(ddof=0)
-        if std == 0 or not np.isfinite(std):
-            Z[c] = 0.0
-        else:
-            Z[c] = (x - x.mean()) / std
-    return Z
-
-def _compute_scores_for_all(df_all: pd.DataFrame, sel_metrics: list, lower_is_better: set,
-                            minutes_floor: int = 400) -> pd.DataFrame:
-    """Recreate the 0–100 table score across the FULL dataset for the current template."""
-    work = df_all.copy()
-
-    # 1) Per-position raw Z for each metric (invert 'lower is better')
-    raw_z = pd.DataFrame(index=work.index, columns=sel_metrics, dtype=float)
-    for m in sel_metrics:
-        # z within position
-        z = work.groupby(pos_col, group_keys=False)[m].apply(
-            lambda s: _zscore_frame(pd.DataFrame({m: s}), [m])[m]
-        )
-        if m in lower_is_better:
-            z = -z
-        raw_z[m] = _safe_num(z).fillna(0.0)
-
-    work["Avg Z Score"] = raw_z.mean(axis=1).fillna(0.0)
-
-    # 2) Apply league multiplier (already present from your preprocess)
-    work["Multiplier"] = _safe_num(work.get("Multiplier", 1.0)).fillna(1.0)
-    work["Weighted Z Score"] = work["Avg Z Score"] * work["Multiplier"]
-
-    # 3) Anchors by position using only players with >= minutes_floor
-    mins_num = _safe_num(work.get(minutes_col, np.nan))
-    eligible = work.loc[mins_num >= minutes_floor].copy()
-    if eligible.empty:
-        # fall back: avoid divide by zero later
-        eligible = work.copy()
-
-    anchor = (
-        eligible.groupby(pos_col)["Weighted Z Score"]
-                .agg(_lo="min", _hi="max")
-                .reset_index()
-    )
-
-    work = work.merge(anchor, on=pos_col, how="left")
-
-    def _scale(v, lo, hi):
-        v = float(v) if np.isfinite(v) else 0.0
-        lo = float(lo) if np.isfinite(lo) else 0.0
-        hi = float(hi) if np.isfinite(hi) else 1.0
-        if hi <= lo:
-            return 50.0
-        return float(np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0))
-
-    work["Score (0–100)"] = [
-        _scale(v, lo, hi) for v, lo, hi in
-        zip(work["Weighted Z Score"], work["_lo"], work["_hi"])
-    ]
-    work.drop(columns=["_lo", "_hi"], inplace=True, errors="ignore")
-    return work
-
-def find_similar_players(player_name: str,
-                         df_all: pd.DataFrame,
-                         position_col: str,
-                         metrics: list,
-                         lower_is_better: set,
-                         n_similar: int = 10,
-                         minutes_floor: int = 400) -> tuple[pd.DataFrame, str|None]:
-
-    if "Player" not in df_all.columns:
-        return pd.DataFrame(), "Player column missing."
-
-    # Ensure the score exists across FULL dataset for current template
-    if not {"Weighted Z Score", "Score (0–100)"}.issubset(df_all.columns):
-        df_scored = _compute_scores_for_all(df_all, metrics, lower_is_better, minutes_floor)
-    else:
-        # still recompute score to ensure it's aligned with current template metrics
-        df_scored = _compute_scores_for_all(df_all, metrics, lower_is_better, minutes_floor)
-
-    if player_name not in set(df_scored["Player"]):
-        return pd.DataFrame(), "Player not found."
-
-    # Position of the selected player
-    pos = df_scored.loc[df_scored["Player"] == player_name, position_col].iloc[0]
+    # Selected player's position
+    pos = base_df.loc[base_df["Player"] == player_name, position_col].iloc[0]
     if pd.isna(pos) or not pos:
         return pd.DataFrame(), f"No position found for {player_name}."
 
-    # Candidate pool: same position, >= minutes_floor, exclude the player
-    mins_num = _safe_num(df_scored.get(minutes_col, np.nan))
-    pool = df_scored[
-        (df_scored[position_col] == pos) &
+    # Filter pool: same position & ≥ minutes_floor
+    mins_num = pd.to_numeric(base_df.get(minutes_col, np.nan), errors="coerce")
+    pool = base_df[
+        (base_df[position_col] == pos) &
         (mins_num >= minutes_floor)
     ].copy()
-
     if pool.empty:
-        return pd.DataFrame(), f"No other players (≥{minutes_floor} mins) at {pos}."
+        return pd.DataFrame(), f"No players (≥{minutes_floor} mins) at {pos}."
 
-    # Keep valid metrics
+    # Ensure numeric metrics exist
     valid_metrics = [m for m in metrics if m in pool.columns]
     if not valid_metrics:
         return pd.DataFrame(), "No valid metrics for similarity."
 
-    # Build standardized feature space (within the pool)
+    # Z-score within the pool (so distances are scale-free)
     X = pool[valid_metrics].apply(pd.to_numeric, errors="coerce").fillna(0.0)
-    Z = _zscore_frame(X, valid_metrics)
+    Z = (X - X.mean()) / X.std(ddof=0).replace(0, np.nan)
+    Z = Z.fillna(0)
 
-    # Selected player vector
+    # Get player vector
     pZ = Z.loc[pool["Player"] == player_name]
     if pZ.empty:
-        # if player is under minutes_floor, take his row from df_scored and project into pool stats
-        p_raw = df_scored.loc[df_scored["Player"] == player_name, valid_metrics].apply(pd.to_numeric, errors="coerce").fillna(0.0)
-        # z using pool means/stds
-        Z_means = Z.mean(axis=0)
-        Z_stds  = Z.std(axis=0, ddof=0).replace(0, np.nan)
-        pZ_vals = (p_raw.values.flatten() - X.mean(axis=0).values) / X.std(axis=0, ddof=0).replace(0, np.nan).values
-        pZ = pd.DataFrame([np.nan_to_num(pZ_vals, nan=0.0)], columns=valid_metrics, index=[-1])
+        return pd.DataFrame(), f"{player_name} has no valid metric data."
 
-    # Euclidean distance in Z space
+    # Compute Euclidean distance
     diff = Z.values - pZ.values[0]
     dists = np.sqrt(np.sum(diff**2, axis=1))
-    pool = pool.assign(_dist=dists)
+    pool["Similarity Score"] = 100.0 - (dists / dists.max() * 100.0 if dists.max() != 0 else 0)
 
-    # Similarity 0–100 (higher = more similar)
-    if pool["_dist"].max() == 0:
-        pool["Similarity Score"] = 100.0
-    else:
-        pool["Similarity Score"] = 100.0 - (pool["_dist"] / pool["_dist"].max() * 100.0)
+    # Exclude self
+    out = (
+        pool[pool["Player"] != player_name]
+        .sort_values("Similarity Score", ascending=False)
+        .head(n_similar)
+        .copy()
+    )
 
-    # Exclude the player himself and sort
-    out = (pool[pool["Player"] != player_name]
-           .sort_values("Similarity Score", ascending=False)
-           .head(n_similar)
-           .copy())
+    # Keep same “Score (0–100)” as ranking table (don’t recalc)
+    score_map = base_df.set_index("Player")["Score (0–100)"].to_dict()
+    out["Score (0–100)"] = out["Player"].map(score_map)
 
-    # Final columns
+    # Clean columns
     out.rename(columns={"Team within selected timeframe": "Team",
                         "Competition_norm": "League"}, inplace=True)
     keep_cols = ["Player", "Team", "League", "Age", minutes_col, "Score (0–100)", "Similarity Score"]
@@ -1633,22 +1552,24 @@ def find_similar_players(player_name: str,
             out[c] = np.nan
     out = out[keep_cols]
 
-    # Tidy types & rounding
-    out[minutes_col] = _safe_num(out[minutes_col]).fillna(0).astype(int)
-    out["Age"] = _safe_num(out["Age"]).round(0)
-    out["Score (0–100)"] = _safe_num(out["Score (0–100)"]).round(1)
-    out["Similarity Score"] = _safe_num(out["Similarity Score"]).round(1)
+    # Round + tidy
+    out[minutes_col] = pd.to_numeric(out[minutes_col], errors="coerce").fillna(0).astype(int)
+    out["Age"] = pd.to_numeric(out["Age"], errors="coerce").round(0)
+    out["Score (0–100)"] = pd.to_numeric(out["Score (0–100)"], errors="coerce").round(1)
+    out["Similarity Score"] = pd.to_numeric(out["Similarity Score"], errors="coerce").round(1)
 
     return out, None
 
+
+# ---------- Run Button ----------
 if st.button("Find 10 Similar Players", key="similar_players_button"):
     with st.spinner("Finding most similar players..."):
-        similar_df, err = find_similar_players(
+        similar_df, err = find_similar_players_same_scale(
             st.session_state.selected_player,
-            df_all,
-            position_col=pos_col,
-            metrics=position_metrics[st.session_state.template_select]["metrics"],
-            lower_is_better={"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"},
+            plot_data,  # ✅ use same scaled dataset that feeds the ranking table
+            position_metrics[st.session_state.template_select]["metrics"],
+            pos_col,
+            {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"},
             n_similar=10,
             minutes_floor=MINUTES_SIMILAR,
         )
@@ -1660,36 +1581,12 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
     else:
         st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
 
-        # 🔧 Auto-deduplicate any repeated column names
-        seen = {}
-        new_cols = []
-        for c in similar_df.columns:
-            if c not in seen:
-                seen[c] = 1
-                new_cols.append(c)
-            else:
-                seen[c] += 1
-                new_cols.append(f"{c}_{seen[c]}")
-        similar_df.columns = new_cols
+        # Remove duplicate cols safely
+        similar_df = similar_df.loc[:, ~similar_df.columns.duplicated()]
 
-        # 🔄 Rename minutes column if needed
-        if minutes_col in similar_df.columns:
-            similar_df.rename(columns={minutes_col: "Minutes played"}, inplace=True)
+        # Clean order
+        similar_df = similar_df[["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]]
 
-        # 🧹 Reorder columns cleanly
-        keep_order = ["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]
-        for c in keep_order:
-            if c not in similar_df.columns:
-                similar_df[c] = np.nan
-        similar_df = similar_df[keep_order]
-
-        # 🪄 Final clean-up of types and rounding
-        similar_df["Age"] = pd.to_numeric(similar_df["Age"], errors="coerce").fillna("").astype(str)
-        similar_df["Minutes played"] = pd.to_numeric(similar_df["Minutes played"], errors="coerce").astype(int)
-        similar_df["Score (0–100)"] = pd.to_numeric(similar_df["Score (0–100)"], errors="coerce").round(1)
-        similar_df["Similarity Score"] = pd.to_numeric(similar_df["Similarity Score"], errors="coerce").round(1)
-
-        # ✅ Display
         st.dataframe(similar_df, use_container_width=True)
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
