@@ -533,6 +533,21 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         if "multiplier" in df.columns:
             df["Multiplier"] = pd.to_numeric(df["multiplier"], errors="coerce").fillna(1.0)
         elif "Multiplier" in df.columns:
+                # === DEBUG: show merge diagnostics ===
+    try:
+        st.write("🔍 DEBUG – merge diagnostics (first 15 rows):")
+        st.dataframe(
+            df[["Competition", "Competition_norm", "league", "Multiplier"]]
+            .drop_duplicates()
+            .sort_values("Competition_norm")
+            .head(15)
+        )
+    except Exception as e:
+        st.write("DEBUG ERROR displaying merge diagnostics:", e)
+    
+    missing = df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"].unique().tolist()
+    if missing:
+        st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
             df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
         else:
             df["Multiplier"] = 1.0
