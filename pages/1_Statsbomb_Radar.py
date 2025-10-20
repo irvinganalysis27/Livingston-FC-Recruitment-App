@@ -91,7 +91,6 @@ LEAGUE_SYNONYMS = {
 
     # --- Denmark ---
     "1st Division": "Denmark 1st Division",
-    "Superliga": "Denmark Superliga",
 
     # --- England ---
     "League One": "England League One",
@@ -163,8 +162,11 @@ LEAGUE_SYNONYMS = {
     # --- Serbia ---
     "Super Liga": "Serbia Super Liga",
 
+    # --- Slovakia ---
+    "1. Liga": "Slovakia 1. Liga",
+
     # --- Slovenia ---
-    "1. Liga (SVN)": "Slovenia 1. Liga",
+    "1. Liga": "Slovenia 1. Liga",
 
     # --- South Africa ---
     "PSL": "South Africa Premier Division",
