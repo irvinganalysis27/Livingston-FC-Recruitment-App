@@ -510,6 +510,20 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         # --- Normalise column names ---
         m.columns = m.columns.str.strip().str.lower().str.replace(" ", "_")
 
+        # --- Normalise the Competition Id column in main data ---
+        id_candidates = [
+            "Competition_ID", "competition_id",
+            "Competition ID", "Competition id",
+            "competition id", "Competition Id"
+        ]
+        found_id = next((c for c in id_candidates if c in df.columns), None)
+        if found_id:
+            df.rename(columns={found_id: "competition_id"}, inplace=True)
+            df["competition_id"] = pd.to_numeric(df["competition_id"], errors="coerce").fillna(0).astype(int)
+            print(f"[DEBUG] Normalised '{found_id}' to 'competition_id' — {df['competition_id'].nunique()} unique IDs found.")
+        else:
+            print("[DEBUG] ⚠️ No Competition ID column found in data!")
+
         # --- Clean & rename ---
         rename_map = {
             "competitionid": "competition_id",
