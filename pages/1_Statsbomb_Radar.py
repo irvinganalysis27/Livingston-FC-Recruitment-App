@@ -1591,26 +1591,55 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
-# Include key columns
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
-    "Score (0–100)", "Avg Z Score", "Weighted Z Score", "Age", "Minutes played", "Rank"
+    "Avg Z Score", "Weighted Z Score", "Score (0–100)", "LFC Score (0–100)",
+    "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
 
-# Add LFC Z Score (scaled Weighted Z Score within filtered players)
-if "Weighted Z Score" in plot_data.columns:
-    z_min = plot_data["Weighted Z Score"].min()
-    z_max = plot_data["Weighted Z Score"].max()
-    plot_data["LFC Z Score"] = (
-        (plot_data["Weighted Z Score"] - z_min) / (z_max - z_min)
-    ) * 100  # scaled to 0–100
-    plot_data["LFC Z Score"] = plot_data["LFC Z Score"].round(1)
-else:
-    plot_data["LFC Z Score"] = np.nan
+# ---------- LFC Score logic (same as Team Rankings) ----------
+plot_data = plot_data.copy()
+
+# Step 1: Apply custom LFC multiplier (1.20 for Scottish Premiership)
+plot_data["LFC Multiplier"] = plot_data.get("Multiplier", 1.0)
+plot_data.loc[plot_data["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
+
+# Step 2: Recreate LFC Weighted Z (same formula as Team Rankings)
+avg_z = pd.to_numeric(plot_data.get("Avg Z Score", 0), errors="coerce").fillna(0)
+lfc_mult = pd.to_numeric(plot_data.get("LFC Multiplier", 1.0), errors="coerce").fillna(1.0)
+
+plot_data["LFC Weighted Z"] = np.select(
+    [
+        avg_z > 0,
+        avg_z < 0
+    ],
+    [
+        avg_z * lfc_mult,
+        avg_z / lfc_mult
+    ],
+    default=0.0
+)
+
+# Step 3: Use same anchors from Weighted Z Score (already merged earlier)
+def _to100(v, lo, hi):
+    if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
+        return 50.0
+    return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+
+plot_data["LFC Score (0–100)"] = [
+    _to100(v, lo, hi)
+    for v, lo, hi in zip(plot_data["LFC Weighted Z"], plot_data["_scale_min"], plot_data["_scale_max"])
+]
+
+plot_data["LFC Score (0–100)"] = (
+    pd.to_numeric(plot_data["LFC Score (0–100)"], errors="coerce")
+    .round(1)
+    .fillna(0)
+)
 
 # Merge into table
 z_ranking = plot_data[cols_for_table + ["LFC Z Score"]].copy()
@@ -1708,8 +1737,9 @@ z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n
 
 required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
-    "Multiplier", "Avg Z Score", "Weighted Z Score", "LFC Z Score",
-    "Score (0–100)", "Age", "Minutes played", "Rank"
+    "Multiplier", "Avg Z Score", "Weighted Z Score",
+    "Score (0–100)", "LFC Score (0–100)",
+    "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
@@ -1745,7 +1775,7 @@ edited_df = st.data_editor(
         ),
         "Avg Z Score": st.column_config.NumberColumn("Avg Z", format="%.3f"),
         "Weighted Z Score": st.column_config.NumberColumn("Weighted Z", format="%.3f"),
-        "LFC Z Score": st.column_config.NumberColumn("LFC Z (0–100)", format="%.1f"),
+        "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
     },
     hide_index=False,
     width="stretch",
