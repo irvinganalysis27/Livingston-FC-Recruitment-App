@@ -1,3 +1,5 @@
+# pages/10_SkillCorner_Scatter_Plot.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,7 +16,7 @@ if not check_password():
     st.stop()
 
 show_branding()
-st.title("SkillCorner Scatter Plot")
+st.title("📊 SkillCorner Physical Scatter Plot")
 
 # ============================================================
 # Data Load
@@ -36,19 +38,6 @@ def load_data(path: Path) -> pd.DataFrame:
 
 try:
     df_all = load_data(DATA_PATH)
-
-    # ===== DEBUG PREVIEW =====
-    st.subheader("📋 Data Preview")
-    st.dataframe(df_all.head(10))
-
-    st.write("**Columns found:**", list(df_all.columns))
-    st.write("**Sample values:**")
-    for col in ["Competition", "Minutes", "Position Group"]:
-        if col in df_all.columns:
-            st.write(f"→ {col}: ", df_all[col].dropna().unique()[:10])
-        else:
-            st.write(f"❌ Column missing: {col}")
-
 except Exception as e:
     st.error(f"❌ Could not load SkillCorner data: {e}")
     st.stop()
@@ -68,71 +57,94 @@ df_all.columns = (
 )
 
 # ============================================================
-# Use SkillCorner's existing Position Group column (rename for consistency)
+# Validate key columns
 # ============================================================
-if "Position Group" not in df_all.columns:
-    st.error("❌ 'Position Group' column not found in SkillCorner dataset.")
-    st.stop()
+required_cols = ["Player", "Team", "Competition", "Season", "Position Group", "Minutes"]
+for col in required_cols:
+    if col not in df_all.columns:
+        st.error(f"❌ Missing required column: {col}")
+        st.stop()
 
-# Optional: normalise SkillCorner position group names to match your app
+# ============================================================
+# 🧹 Remove substitutes & clean positions
+# ============================================================
+df_all["Position Group"] = df_all["Position Group"].str.strip()
+df_all = df_all[df_all["Position Group"].ne("Substitute")]
+
 POSITION_RENAME = {
     "Central Defender": "Centre Back",
     "Center Forward": "Striker",
     "Wide Attacker": "Winger",
+    "Full Back": "Full Back",
+    "Midfield": "Midfield",
 }
 df_all["Position Group"] = df_all["Position Group"].replace(POSITION_RENAME)
 
 # ============================================================
-# Required columns
+# 🧮 Aggregate to Player–Season–Position level
 # ============================================================
-league_col = "Competition"
-minutes_col = "Minutes"
-position_col = "Position Group"
+df_all["Minutes"] = pd.to_numeric(df_all["Minutes"], errors="coerce").fillna(0)
 
-if not all(c in df_all.columns for c in [league_col, minutes_col, position_col]):
-    st.error("❌ Missing required columns in SkillCorner dataset.")
-    st.stop()
+exclude_cols = [
+    "Player", "Team", "Competition", "Season", "Position Group",
+    "Match", "Date", "Competition ID", "Team ID", "Player ID"
+]
+numeric_cols = [c for c in df_all.columns if c not in exclude_cols and df_all[c].dtype != "object"]
+
+def _last_non_null(s):
+    v = s.dropna()
+    return v.iloc[-1] if len(v) else np.nan
+
+df_player = (
+    df_all.groupby(["Player", "Position Group", "Season"], dropna=False)
+    .agg({**{m: "mean" for m in numeric_cols}, "Minutes": "sum",
+          "Team": _last_non_null, "Competition": _last_non_null})
+    .reset_index()
+)
+
+df = df_player.copy()
 
 # ============================================================
 # Filters
 # ============================================================
 st.markdown("#### Filters")
 
-# --- League Filter ---
-all_leagues = sorted(df_all[league_col].dropna().unique().tolist())
-if "scatt_sc_league_sel" not in st.session_state:
-    st.session_state.scatt_sc_league_sel = all_leagues.copy()
+league_col = "Competition"
+minutes_col = "Minutes"
+position_col = "Position Group"
+
+all_leagues = sorted(df[league_col].dropna().unique().tolist())
+if "sc_league_sel" not in st.session_state:
+    st.session_state.sc_league_sel = all_leagues.copy()
 
 b1, b2 = st.columns([1, 1])
 with b1:
     if st.button("Select all leagues"):
-        st.session_state.scatt_sc_league_sel = all_leagues.copy()
+        st.session_state.sc_league_sel = all_leagues.copy()
 with b2:
     if st.button("Clear all leagues"):
-        st.session_state.scatt_sc_league_sel = []
+        st.session_state.sc_league_sel = []
 
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    default=st.session_state.scatt_sc_league_sel,
-    key="scatt_sc_league_sel",
+    default=st.session_state.sc_league_sel,
+    key="sc_league_sel",
     label_visibility="collapsed",
 )
 
-# --- Minutes Filter ---
-min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=200, step=50)
+min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=60)
 
-# --- Position Filter ---
-pos_groups = sorted(df_all[position_col].dropna().unique().tolist())
+pos_groups = sorted(df[position_col].dropna().unique().tolist())
 selected_positions = st.multiselect(
     "Position Groups",
     options=pos_groups,
     default=pos_groups,
-    key="scatt_sc_pos_sel",
+    key="sc_pos_sel",
 )
 
-# --- Apply Filters ---
-df = df_all.copy()
+# Apply filters
+df = df.copy()
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)]
 df = df[pd.to_numeric(df[minutes_col], errors="coerce") >= min_minutes]
@@ -170,7 +182,7 @@ with c3:
 my_team_name = "Livingston"
 
 # ============================================================
-# Compute averages & outliers
+# Averages & Outliers
 # ============================================================
 x_mean = df[x_metric].mean()
 y_mean = df[y_metric].mean()
@@ -200,6 +212,7 @@ hover_data = {
     "Player": True if "Player" in df.columns else False,
     "Team": True if "Team" in df.columns else False,
     league_col: True,
+    "Season": True if "Season" in df.columns else False,
     x_metric: ":.2f",
     y_metric: ":.2f",
 }
@@ -214,16 +227,22 @@ fig = px.scatter(
     size=minutes_col if minutes_col in df.columns else None,
     opacity=0.8,
     height=650,
-    title=f"{y_metric} vs {x_metric}",
+    title=f"{y_metric} vs {x_metric} (Season Averages)",
 )
 
-# --- Average Lines ---
-fig.add_shape(type="line", x0=x_mean, x1=x_mean, y0=df[y_metric].min(), y1=df[y_metric].max(),
-              line=dict(color="black", dash="dot"))
-fig.add_shape(type="line", x0=df[x_metric].min(), x1=df[x_metric].max(), y0=y_mean, y1=y_mean,
-              line=dict(color="black", dash="dot"))
+# Average lines
+fig.add_shape(
+    type="line", x0=x_mean, x1=x_mean,
+    y0=df[y_metric].min(), y1=df[y_metric].max(),
+    line=dict(color="black", dash="dot"),
+)
+fig.add_shape(
+    type="line", x0=df[x_metric].min(), x1=df[x_metric].max(),
+    y0=y_mean, y1=y_mean,
+    line=dict(color="black", dash="dot"),
+)
 
-# --- Outliers ---
+# Outliers
 if highlight_outliers:
     outliers = df[df["_is_outlier"]]
     fig.add_scatter(
@@ -236,12 +255,11 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight (Gold for Livingston, no tooltip) ---
+# Team Highlight (Gold)
 if highlight_team and "Team" in df.columns:
     team_mask = df["Team"].str.strip().eq(my_team_name)
     if team_mask.any():
         team_df = df[team_mask]
-
         fig.add_scatter(
             x=team_df[x_metric],
             y=team_df[y_metric],
@@ -251,8 +269,6 @@ if highlight_team and "Team" in df.columns:
             hoverinfo="skip",
             showlegend=True,
         )
-
-        # fade other teams slightly (no “Other” legend)
         other_df = df[~team_mask]
         fig.add_scatter(
             x=other_df[x_metric],
@@ -280,6 +296,6 @@ st.plotly_chart(fig, use_container_width=True)
 st.download_button(
     "📥 Download Filtered Data (CSV)",
     df.to_csv(index=False).encode("utf-8"),
-    file_name="skillcorner_scatter_plot_data.csv",
+    file_name="skillcorner_season_averages.csv",
     mime="text/csv",
 )
