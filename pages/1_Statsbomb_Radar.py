@@ -1477,6 +1477,94 @@ if st.button("Generate AI Summary", key="ai_summary_button"):
         )
         st.markdown(summary_text)
 
+# ---------- 🔍 Find 10 Similar Players ----------
+st.markdown("### 🔍 Find Similar Players")
+
+def find_similar_players(player_name: str, df_all: pd.DataFrame, position_col: str, metrics: list, n_similar: int = 10):
+    """Find n most similar players in the same position based on scaled metric distance."""
+    from sklearn.preprocessing import StandardScaler
+    from scipy.spatial.distance import cdist
+
+    # Safety checks
+    if player_name not in df_all["Player"].values:
+        return pd.DataFrame(), "Player not found in dataset."
+    if position_col not in df_all.columns:
+        return pd.DataFrame(), "Position column missing."
+    if len(metrics) == 0:
+        return pd.DataFrame(), "No metrics available for comparison."
+
+    # Current player info
+    player_row = df_all.loc[df_all["Player"] == player_name].iloc[0]
+    pos = player_row.get(position_col, None)
+    if not pos:
+        return pd.DataFrame(), f"No position found for {player_name}."
+
+    # Filter by position
+    same_pos_df = df_all[df_all[position_col] == pos].copy()
+    if same_pos_df.empty:
+        return pd.DataFrame(), f"No other players found for position '{pos}'."
+
+    # Keep only numeric metrics that exist
+    valid_metrics = [m for m in metrics if m in same_pos_df.columns]
+    if not valid_metrics:
+        return pd.DataFrame(), "No valid numeric metrics available."
+
+    # Prepare comparison matrix
+    same_pos_df[valid_metrics] = same_pos_df[valid_metrics].apply(pd.to_numeric, errors="coerce").fillna(0)
+    player_vec = same_pos_df.loc[same_pos_df["Player"] == player_name, valid_metrics].to_numpy()
+
+    if player_vec.size == 0:
+        return pd.DataFrame(), "Player metric vector empty."
+
+    # Standardise (z-score) across metrics to normalise scale
+    scaler = StandardScaler()
+    scaled = scaler.fit_transform(same_pos_df[valid_metrics])
+
+    # Compute Euclidean distances
+    distances = cdist(player_vec, scaled)[0]
+    same_pos_df["Similarity Score"] = 100 - (distances / distances.max() * 100)  # 100 = identical
+
+    # Exclude the player himself
+    result = same_pos_df[same_pos_df["Player"] != player_name].copy()
+
+    # Sort by similarity descending
+    result = result.sort_values("Similarity Score", ascending=False).head(n_similar)
+
+    # Keep useful info
+    keep_cols = [
+        "Player", "Team within selected timeframe", "Competition_norm", "Age", "Minutes played", "Similarity Score"
+    ]
+    for c in keep_cols:
+        if c not in result.columns:
+            result[c] = np.nan
+
+    result = result.rename(columns={
+        "Team within selected timeframe": "Team",
+        "Competition_norm": "League"
+    })
+    result["Similarity Score"] = result["Similarity Score"].round(1)
+
+    return result[["Player", "Team", "League", "Age", "Minutes played", "Similarity Score"]], None
+
+
+if st.button("Find 10 Similar Players", key="similar_players_button"):
+    with st.spinner("Finding most similar players..."):
+        similar_df, err = find_similar_players(
+            st.session_state.selected_player,
+            df_all,
+            position_col="Six-Group Position",
+            metrics=current_metrics,
+            n_similar=10,
+        )
+
+        if err:
+            st.warning(err)
+        elif similar_df.empty:
+            st.info("No similar players found.")
+        else:
+            st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
+            st.dataframe(similar_df, use_container_width=True)
+
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
