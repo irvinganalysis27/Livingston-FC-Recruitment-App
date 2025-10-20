@@ -1659,8 +1659,38 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
         st.info("No similar players found.")
     else:
         st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
-        st.dataframe(similar_df.rename(columns={minutes_col: "Minutes played"}),
-                     use_container_width=True)
+
+        # 🔧 Auto-deduplicate any repeated column names
+        seen = {}
+        new_cols = []
+        for c in similar_df.columns:
+            if c not in seen:
+                seen[c] = 1
+                new_cols.append(c)
+            else:
+                seen[c] += 1
+                new_cols.append(f"{c}_{seen[c]}")
+        similar_df.columns = new_cols
+
+        # 🔄 Rename minutes column if needed
+        if minutes_col in similar_df.columns:
+            similar_df.rename(columns={minutes_col: "Minutes played"}, inplace=True)
+
+        # 🧹 Reorder columns cleanly
+        keep_order = ["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]
+        for c in keep_order:
+            if c not in similar_df.columns:
+                similar_df[c] = np.nan
+        similar_df = similar_df[keep_order]
+
+        # 🪄 Final clean-up of types and rounding
+        similar_df["Age"] = pd.to_numeric(similar_df["Age"], errors="coerce").fillna("").astype(str)
+        similar_df["Minutes played"] = pd.to_numeric(similar_df["Minutes played"], errors="coerce").astype(int)
+        similar_df["Score (0–100)"] = pd.to_numeric(similar_df["Score (0–100)"], errors="coerce").round(1)
+        similar_df["Similarity Score"] = pd.to_numeric(similar_df["Similarity Score"], errors="coerce").round(1)
+
+        # ✅ Display
+        st.dataframe(similar_df, use_container_width=True)
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
