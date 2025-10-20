@@ -499,7 +499,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         )
     else:
         df["Competition_norm"] = np.nan
-
+    
     # ============================================================
     # ⚖️ 2. Merge League Multipliers (by Competition_ID first, fallback to name)
     # ============================================================
@@ -520,14 +520,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             m.rename(columns=rename_map, inplace=True)
     
         # --- Clean values ---
-        m["league"] = m["league"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
-        m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
-        m["competition_id"] = pd.to_numeric(m.get("competition_id", np.nan), errors="coerce")
+        if "league" in m.columns:
+            m["league"] = m["league"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
+        if "multiplier" in m.columns:
+            m["multiplier"] = pd.to_numeric(m["multiplier"], errors="coerce").fillna(1.0)
+        if "competition_id" in m.columns:
+            m["competition_id"] = pd.to_numeric(m["competition_id"], errors="coerce")
+        else:
+            m["competition_id"] = np.nan  # ensure column always exists
     
         # --- Ensure Competition_norm exists on df ---
         if "Competition" in df.columns and "Competition_norm" not in df.columns:
             df["Competition_norm"] = (
-                df["Competition"].astype(str).str.strip().str.replace(u"\xa0", " ", regex=False)
+                df["Competition"]
+                .astype(str)
+                .str.strip()
+                .str.replace(u"\xa0", " ", regex=False)
                 .map(lambda x: LEAGUE_SYNONYMS.get(x, x))
             )
     
@@ -560,7 +568,8 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         # --- Warn about missing multipliers ---
         missing = (
             df.loc[df["Multiplier"].eq(1.0) & df["Competition_norm"].notna(), "Competition_norm"]
-            .drop_duplicates().tolist()
+            .drop_duplicates()
+            .tolist()
         )
         if missing:
             st.warning(f"⚠️ Missing multipliers for: {missing[:10]}")
