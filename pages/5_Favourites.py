@@ -66,7 +66,7 @@ if selected_statuses and len(selected_statuses) < len(COLOUR_CHOICES):
 # ➕ ADD NEW PLAYER MANUALLY
 # ============================================================
 with st.expander("➕ Add New Player to Favourites", expanded=False):
-    st.markdown("Use this form to manually add a new player record into Supabase and Google Sheets.")
+    st.markdown("Use this form to manually add a new player record.")
 
     c1, c2 = st.columns(2)
     with c1:
