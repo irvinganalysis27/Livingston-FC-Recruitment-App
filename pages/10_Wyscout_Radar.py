@@ -931,8 +931,11 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             ncol=min(len(patches), 4), frameon=False
         )
 
-    # --- Title (same as StatsBomb Radar) ---
-    weighted_z = float(row.get("Weighted Z Score", 0) or 0)
+    # Prefer Avg Z Score (computed in this app) over legacy Weighted Z Score
+    weighted_z = float(row.get("Avg Z Score", np.nan))
+    if pd.isna(weighted_z):
+        weighted_z = float(row.get("Weighted Z Score", 0) or 0)
+    
     score_100 = row.get("Score (0–100)")
     score_100 = float(score_100) if pd.notnull(score_100) else None
 
@@ -957,8 +960,8 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if rank_v: bottom_parts.append(f"Rank #{rank_v}")
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
-    else:
-        bottom_parts.append(f"Z {weighted_z:.2f}")
+    elif not np.isnan(weighted_z):
+        bottom_parts.append(f"Avg Z Score {weighted_z:.2f}")
     line2 = " | ".join(bottom_parts)
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
