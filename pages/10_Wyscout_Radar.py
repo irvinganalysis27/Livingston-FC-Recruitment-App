@@ -885,7 +885,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     # Metric labels
     for ang, m in zip(angles, valid_metrics):
-        label = DISPLAY_NAMES.get(m, m)
+        label = m
         label = label.replace(" per 90", "").replace(", %", " (%)")
         color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
         ax.text(ang, 108, label, ha="center", va="center", color=color, fontsize=10, fontweight="bold")
