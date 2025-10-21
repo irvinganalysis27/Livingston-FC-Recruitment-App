@@ -75,7 +75,7 @@ GENRE_BG_ALPHA   = 0.14
 GENRE_LABEL_R    = 118
 SECTION_GAP_FRAC = 0.15
 
-# ================== Position Mapping (same as main app) ==================
+# ================== Simplified 7-Position System ==================
 SIX_GROUPS = [
     "Goalkeeper",
     "Centre Back",
@@ -86,40 +86,81 @@ SIX_GROUPS = [
     "Striker",
 ]
 
-# Map Wyscout position codes / text into your simplified 7-position model
+# --- Short token mapping (e.g. from abbreviations like CB, CDM, etc.) ---
 RAW_TO_SIX = {
-    # Goalkeepers
-    "GK": "Goalkeeper", "GOALKEEPER": "Goalkeeper", "GKP": "Goalkeeper",
+    "GK": "Goalkeeper", "GKP": "Goalkeeper",
 
-    # Centre Backs
     "CB": "Centre Back", "RCB": "Centre Back", "LCB": "Centre Back",
-    "CBR": "Centre Back", "CBL": "Centre Back", "CD": "Centre Back", "DEFENDER CENTRAL": "Centre Back",
+    "CBR": "Centre Back", "CBL": "Centre Back", "CD": "Centre Back",
 
-    # Full Backs
     "RB": "Full Back", "LB": "Full Back", "RWB": "Full Back", "LWB": "Full Back",
-    "RFB": "Full Back", "LFB": "Full Back", "WIDE DEFENDER": "Full Back",
 
-    # Number 6 (Defensive Midfielders)
-    "CDM": "Number 6", "DM": "Number 6", "RDM": "Number 6", "LDM": "Number 6",
-    "DEFENSIVE MIDFIELDER": "Number 6", "HOLDING MIDFIELDER": "Number 6",
+    "DM": "Number 6", "CDM": "Number 6", "RDM": "Number 6", "LDM": "Number 6",
 
-    # Number 8 (Box-to-box / central mids)
-    "CM": "Number 8", "CMF": "Number 8", "RCM": "Number 8", "LCM": "Number 8",
-    "CENTRAL MIDFIELDER": "Number 8", "MIDFIELDER CENTRAL": "Number 8", "BOX TO BOX": "Number 8",
+    "CM": "Number 8", "RCM": "Number 8", "LCM": "Number 8",
 
-    # Wingers
-    "RW": "Winger", "LW": "Winger", "RWF": "Winger", "LWF": "Winger", "RM": "Winger", "LM": "Winger",
-    "WINGER": "Winger", "WIDE MIDFIELDER": "Winger", "WIDE FORWARD": "Winger",
+    "RW": "Winger", "LW": "Winger", "RM": "Winger", "LM": "Winger", "RWF": "Winger", "LWF": "Winger",
 
-    # Strikers
-    "CF": "Striker", "ST": "Striker", "FW": "Striker", "STRIKER": "Striker", "FORWARD": "Striker",
-    "ATTACKER": "Striker", "CENTRE FORWARD": "Striker", "9": "Striker",
+    "ST": "Striker", "CF": "Striker", "FW": "Striker", "9": "Striker",
 }
 
+# --- Full Wyscout text mapping ---
+Wyscout_TO_Simplified = {
+    # Goalkeepers
+    "Goalkeeper": "Goalkeeper",
+
+    # Centre Backs
+    "Centre Back": "Centre Back",
+    "Centre Back (Right)": "Centre Back",
+    "Centre Back (Left)": "Centre Back",
+    "Central Defender": "Centre Back",
+
+    # Full Backs
+    "Right Back": "Full Back",
+    "Left Back": "Full Back",
+    "Wing Back (Right)": "Full Back",
+    "Wing Back (Left)": "Full Back",
+    "Full Back": "Full Back",
+
+    # Number 6s (Defensive Mids)
+    "Defensive Midfielder": "Number 6",
+    "Defensive Midfielder (Centre)": "Number 6",
+    "Defensive Midfielder (Left)": "Number 6",
+    "Defensive Midfielder (Right)": "Number 6",
+    "Holding Midfielder": "Number 6",
+    "Anchor Midfielder": "Number 6",
+
+    # Number 8s (Box-to-box / Central)
+    "Central Midfielder": "Number 8",
+    "Central Midfielder (Left)": "Number 8",
+    "Central Midfielder (Right)": "Number 8",
+    "Box-to-Box Midfielder": "Number 8",
+    "Midfielder": "Number 8",
+
+    # Wingers / Wide players
+    "Right Winger": "Winger",
+    "Left Winger": "Winger",
+    "Wide Midfielder (Right)": "Winger",
+    "Wide Midfielder (Left)": "Winger",
+    "Wide Forward (Right)": "Winger",
+    "Wide Forward (Left)": "Winger",
+    "Attacking Midfielder (Right)": "Winger",
+    "Attacking Midfielder (Left)": "Winger",
+
+    # Strikers / Forwards
+    "Centre Forward": "Striker",
+    "Forward": "Striker",
+    "Striker": "Striker",
+    "Second Striker": "Striker",
+    "Attacking Midfielder (Centre)": "Striker",  # often plays as a 10
+}
+
+# --- Helper to clean tokens like 'CB ' or 'CM, ST' ---
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
-    t = str(tok).upper().replace(".", "").replace("-", "").replace(" ", "")
+    t = str(tok).upper()
+    t = t.replace(".", "").replace("-", "").replace(" ", "")
     return t
 
 def parse_first_position(cell) -> str:
@@ -128,10 +169,53 @@ def parse_first_position(cell) -> str:
     first = re.split(r"[,/]", str(cell))[0].strip()
     return _clean_pos_token(first)
 
+# --- Main mapping function (handles all cases) ---
 def map_first_position_to_group(cell) -> str:
-    tok = parse_first_position(cell)
-    return RAW_TO_SIX.get(tok, "Wide Midfielder")
+    """Smartly map Wyscout position names or abbreviations into 7 simplified roles."""
+    if pd.isna(cell):
+        return ""
 
+    cell_str = str(cell).strip()
+
+    # --- Direct Wyscout name match ---
+    if cell_str in Wyscout_TO_Simplified:
+        return Wyscout_TO_Simplified[cell_str]
+
+    # --- Handle multi-position strings like "Centre Back / Right Back" ---
+    parts = re.split(r"[,/]", cell_str)
+    for p in parts:
+        p = p.strip()
+        if p in Wyscout_TO_Simplified:
+            return Wyscout_TO_Simplified[p]
+
+    # --- Fallback to short-code mapping ---
+    tok = parse_first_position(cell)
+    if tok in RAW_TO_SIX:
+        raw_pos = RAW_TO_SIX[tok]
+        if raw_pos == "Central Midfielder":
+            return "Number 8"
+        return raw_pos
+
+    # --- Fuzzy keyword matching (last resort) ---
+    up = cell_str.upper()
+    if "DEFENSIVE MID" in up:
+        return "Number 6"
+    if "CENTRAL MID" in up or "BOX" in up:
+        return "Number 8"
+    if "WING" in up or "WIDE" in up:
+        return "Winger"
+    if "FORWARD" in up or "STRIKER" in up:
+        return "Striker"
+    if "BACK" in up:
+        if "CENT" in up:
+            return "Centre Back"
+        return "Full Back"
+    if "KEEP" in up:
+        return "Goalkeeper"
+
+    return "Winger"  # safe fallback
+
+# --- Default radar templates for each simplified role ---
 DEFAULT_TEMPLATE = {
     "Goalkeeper": "Goalkeeper",
     "Centre Back": "Central Defender, All Round",
