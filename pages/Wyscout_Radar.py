@@ -4,15 +4,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 
-# --- Basic password protection ---
-PASSWORD = "cowboy"
+# ========= AUTH & BRANDING =========
+from auth import check_password
+from branding import show_branding
 
-st.title("⚽ Radar Chart and Ranking App")
+st.set_page_config(page_title="Alternate Radar (Manual Upload)", layout="centered")
 
-pwd = st.text_input("Enter password:", type="password")
-if pwd != PASSWORD:
-    st.warning("Please enter the correct password to access the app.")
+# Password protection
+if not check_password():
     st.stop()
+
+# Branding banner
+show_branding()
+st.title("⚽ Alternate Radar Chart and Ranking App")
 
 # ================== Color helpers for tercile gradient bars ==================
 def _hex_to_rgb(h):
@@ -29,7 +33,6 @@ def _lerp(c1, c2, t):
     b = int(b1 + (b2 - b1) * t)
     return _rgb_to_hex(r, g, b)
 
-# band endpoints (light -> deep) for each tercile
 BAND_PALETTES = {
     "low":  ("#fee2e2", "#ef4444"),  # red
     "mid":  ("#fff7ed", "#f59e0b"),  # orange
@@ -37,7 +40,6 @@ BAND_PALETTES = {
 }
 
 def percentile_to_color(p):
-    """Map 0..100 percentile to a gradient within terciles (low/mid/high)."""
     p = 0 if p is None else float(p)
     if p < 33.3334:
         lo, hi = BAND_PALETTES["low"]
@@ -52,10 +54,9 @@ def percentile_to_color(p):
         t = (p - 66.6667) / 33.3333
         return _lerp(lo, hi, t)
 
-# background wedge opacity + outside genre label radius
-GENRE_BG_ALPHA   = 0.14      # a touch stronger so averages read well
-GENRE_LABEL_R    = 118       # outside the 0..100 ring
-SECTION_GAP_FRAC = 0.15      # fraction of one bar's step trimmed from EACH side of a section
+GENRE_BG_ALPHA   = 0.14
+GENRE_LABEL_R    = 118
+SECTION_GAP_FRAC = 0.15
 
 # ================== 6-position mapping ==================
 SIX_GROUPS = [
@@ -65,27 +66,19 @@ SIX_GROUPS = [
 
 RAW_TO_SIX = {
     "GK": "Goalkeeper", "GKP": "Goalkeeper", "GOALKEEPER": "Goalkeeper",
-    "RB": "Wide Defender", "LB": "Wide Defender",
-    "RWB": "Wide Defender", "LWB": "Wide Defender", "RFB": "Wide Defender", "LFB": "Wide Defender",
+    "RB": "Wide Defender", "LB": "Wide Defender", "RWB": "Wide Defender", "LWB": "Wide Defender",
     "CB": "Central Defender", "RCB": "Central Defender", "LCB": "Central Defender",
-    "CBR": "Central Defender", "CBL": "Central Defender", "SW": "Central Defender",
-    "CMF": "Central Midfielder", "CM": "Central Midfielder", "RCMF": "Central Midfielder", "RCM": "Central Midfielder",
-    "LCMF": "Central Midfielder", "LCM": "Central Midfielder", "DMF": "Central Midfielder",
-    "DM": "Central Midfielder", "CDM": "Central Midfielder", "RDMF": "Central Midfielder", "RDM": "Central Midfielder",
-    "LDMF": "Central Midfielder", "LDM": "Central Midfielder", "AMF": "Central Midfielder",
-    "AM": "Central Midfielder", "CAM": "Central Midfielder", "SS": "Central Midfielder", "10": "Central Midfielder",
-    "LWF": "Wide Midfielder", "RWF": "Wide Midfielder", "RW": "Wide Midfielder", "LW": "Wide Midfielder",
-    "LAMF": "Wide Midfielder", "RAMF": "Wide Midfielder", "RM": "Wide Midfielder", "LM": "Wide Midfielder",
-    "WF": "Wide Midfielder", "RWG": "Wide Midfielder", "LWG": "Wide Midfielder", "W": "Wide Midfielder",
-    "CF": "Central Forward", "ST": "Central Forward", "9": "Central Forward",
-    "FW": "Central Forward", "STK": "Central Forward", "CFW": "Central Forward"
+    "CM": "Central Midfielder", "CDM": "Central Midfielder", "CAM": "Central Midfielder",
+    "DM": "Central Midfielder", "AM": "Central Midfielder",
+    "LW": "Wide Midfielder", "RW": "Wide Midfielder", "LM": "Wide Midfielder", "RM": "Wide Midfielder",
+    "WF": "Wide Midfielder",
+    "CF": "Central Forward", "ST": "Central Forward", "FW": "Central Forward"
 }
 
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
-    t = str(tok).upper()
-    t = t.replace(".", "").replace("-", "").replace(" ", "")
+    t = str(tok).upper().replace(".", "").replace("-", "").replace(" ", "")
     return t
 
 def parse_first_position(cell) -> str:
@@ -96,9 +89,8 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(cell) -> str:
     tok = parse_first_position(cell)
-    return RAW_TO_SIX.get(tok, "Wide Midfielder")  # safe default
+    return RAW_TO_SIX.get(tok, "Wide Midfielder")
 
-# ================== Default template mapping ==================
 DEFAULT_TEMPLATE = {
     "Goalkeeper": "Goalkeeper",
     "Wide Defender": "Wide Defender, Full Back",
@@ -107,7 +99,6 @@ DEFAULT_TEMPLATE = {
     "Wide Midfielder": "Wide Midfielder, Touchline Winger",
     "Central Forward": "Striker, All Round CF"
 }
-
 # ========== Metric sets ==========
 position_metrics = {
     # ================== GOALKEEPER ==================
