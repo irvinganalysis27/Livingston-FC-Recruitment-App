@@ -717,7 +717,7 @@ df_all_raw.columns = (
 # ✅ No extra “Birth Date” handling block needed anymore
 
 # ---------- Preprocess and create the working copy ----------
-df_all = preprocess_df(df_all_raw)
+df_all = df_all_raw.copy()
 df = df_all.copy()
 
 # ============================================================
