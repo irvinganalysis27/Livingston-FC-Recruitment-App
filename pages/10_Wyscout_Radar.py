@@ -965,6 +965,55 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 
+# ================== AI PLAYER SUMMARY ==================
+from openai import OpenAI
+client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
+
+with st.expander("🧠 AI Summary", expanded=False):
+    st.markdown(
+        "Generate a short summary of this player's performance based on their metrics."
+    )
+
+    if st.button("✨ Generate AI Summary", key="ai_summary_btn"):
+        player_row = plot_data.loc[plot_data["Player"] == st.session_state.selected_player]
+        if player_row.empty:
+            st.warning("Player data not found.")
+        else:
+            player_dict = player_row.to_dict(orient="records")[0]
+
+            # Compose a descriptive prompt
+            prompt = f"""
+            You are an expert football scout analysing performance metrics from Wyscout data.
+            Write a concise 3–4 sentence report summarising {player_dict.get('Player')}’s
+            playing profile and performance in the selected template metrics.
+
+            Use British English, professional scouting tone, no unnecessary adjectives.
+            Reference key areas of strength and potential weakness using metric context.
+            Example style: 'Shows strong output in ball progression and attacking efficiency
+            while defensive duels remain below positional average.'
+
+            Player data summary:
+            {player_dict}
+            """
+
+            with st.spinner("Analysing player metrics..."):
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are an expert football analyst."},
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.5,
+                        max_tokens=250,
+                    )
+                    summary_text = response.choices[0].message.content.strip()
+                    st.success("✅ Summary generated successfully")
+                    st.markdown(f"**AI Summary for {player_dict.get('Player')}**\n\n{summary_text}")
+                except Exception as e:
+                    st.error(f"Failed to generate summary: {e}")
+
+
 # ================== Ranking table ==================
 st.markdown("### Players Ranked by Z-Score")
 cols_for_table = ["Player", "Positions played", "Age", "Team", "Team within selected timeframe",
