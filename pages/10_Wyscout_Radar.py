@@ -591,14 +591,11 @@ position_metrics = {
     }
 }
 
-# Colors for genre backgrounds / labels
+# ========= FIXED GROUP COLOURS (match Statsbomb) =========
 group_colors = {
-    "Off The Ball": "#8b5cf6",  # purple
-    "Attacking":    "#3b82f6",  # blue
-    "Possession":   "#f9a8d4",  # pink
-    "Defensive":    "#6366f1",  # indigo
-    "Goalkeeping":  "#a16207",  # cyan
-}
+    "Attacking":  "crimson",
+    "Possession": "seagreen",
+    "Defensive":  "royalblue",
 
 # ================== File upload ==================
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
