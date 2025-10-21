@@ -62,6 +62,51 @@ rows = list_favourites(only_visible=not show_hidden)
 if selected_statuses and len(selected_statuses) < len(COLOUR_CHOICES):
     rows = [r for r in rows if r.get("colour") in selected_statuses]
 
+# ============================================================
+# ➕ ADD NEW PLAYER MANUALLY
+# ============================================================
+with st.expander("➕ Add New Player to Favourites", expanded=False):
+    st.markdown("Use this form to manually add a new player record into Supabase and Google Sheets.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        new_player = st.text_input("Player Name*", key="new_player_name")
+        new_team = st.text_input("Team", key="new_player_team")
+        new_league = st.text_input("League", key="new_player_league")
+
+    with c2:
+        new_position = st.selectbox(
+            "Position Group",
+            ["Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"],
+            key="new_player_pos"
+        )
+
+    c3, _ = st.columns([1, 4])
+    with c3:
+        if st.button("💾 Create Player", key="create_new_player"):
+            if not new_player.strip():
+                st.warning("⚠️ Please enter a player name before creating a record.")
+            else:
+                payload = {
+                    "player": new_player.strip(),
+                    "team": new_team.strip(),
+                    "league": new_league.strip(),
+                    "position": new_position.strip(),
+                    "colour": "🟣 Needs Checked",
+                    "initial_watch_comment": "",
+                    "second_watch_comment": "",
+                    "visible": True,
+                    "updated_by": st.session_state.get("user_initials", ""),
+                    "source": "manual-add",
+                }
+
+                ok = upsert_favourite(payload, log_to_sheet=True)
+                if ok:
+                    toast_ok(f"✅ Added {new_player} to favourites.")
+                    st.rerun()
+                else:
+                    toast_err(f"❌ Failed to add {new_player}.")
+
 # ========= Render current list (cards) =========
 if not rows:
     st.info("No favourites found for the selected filters.")
