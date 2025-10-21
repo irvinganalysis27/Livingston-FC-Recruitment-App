@@ -3,16 +3,36 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+from pathlib import Path
+from PIL import Image
+from datetime import datetime, timezone
 
-# --- Basic password protection ---
-PASSWORD = "cowboy"
+# ========= PAGE CONFIG =========
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
+# ========= AUTH / BRANDING =========
+from auth import check_password
+from branding import show_branding
+
+# --- Password gate ---
+if not check_password():
+    st.stop()
+
+# --- Club branding header ---
+show_branding()
 st.title("⚽ Radar Chart and Ranking App")
 
-pwd = st.text_input("Enter password:", type="password")
-if pwd != PASSWORD:
-    st.warning("Please enter the correct password to access the app.")
-    st.stop()
+# ========= PATHS =========
+APP_DIR = Path(__file__).parent
+ROOT_DIR = APP_DIR.parent
+ASSETS_DIR = ROOT_DIR / "assets"
+
+def open_image(path: Path):
+    """Safe image loader."""
+    try:
+        return Image.open(path)
+    except Exception:
+        return None
 
 # ================== Color helpers for tercile gradient bars ==================
 def _hex_to_rgb(h):
