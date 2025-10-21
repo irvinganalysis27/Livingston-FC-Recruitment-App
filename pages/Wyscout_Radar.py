@@ -18,6 +18,23 @@ if not check_password():
 show_branding()
 st.title("⚽ Alternate Radar Chart and Ranking App")
 
+# ========= USER INSTRUCTIONS =========
+st.markdown("""
+### 📋 How to Download Data from Wyscout
+
+1. **Open Wyscout**
+2. Click the **menu (top centre)**.
+3. Choose **Advanced Search**.
+4. Under *Competition*, select your **League**.
+5. Choose the **most recent season**.
+6. At the top-right, set **Display → All**.
+7. Click **Download → Excel**.
+8. If there are too many players (over ~500), use the **Position filters (left side)** to narrow down the list.
+
+Once downloaded, upload that Excel file below to generate the radar charts and ranking table.
+""")
+st.divider()
+
 # ================== Color helpers for tercile gradient bars ==================
 def _hex_to_rgb(h):
     h = h.lstrip("#")
