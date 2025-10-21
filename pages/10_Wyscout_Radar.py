@@ -567,11 +567,9 @@ position_metrics = {
 
 # Colors for genre backgrounds / labels
 group_colors = {
-    "Off The Ball": "#8b5cf6",  # purple
-    "Attacking":    "#3b82f6",  # blue
-    "Possession":   "#f9a8d4",  # pink
-    "Defensive":    "#6366f1",  # indigo
-    "Goalkeeping":  "#a16207",  # cyan
+    "Attacking": "crimson",
+    "Possession": "seagreen",
+    "Defensive": "royalblue",
 }
 
 # ================== File upload ==================
@@ -806,163 +804,147 @@ if selected_position_template != current_template_name:
     st.rerun()
 
 # ================== Chart ==================
-def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
-    row = plot_data[plot_data["Player"] == player_name]
-    if row.empty:
+def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
+    import matplotlib.patches as mpatches
+    from matplotlib import colormaps as mcm
+    import matplotlib.colors as mcolors
+
+    if not isinstance(group_colors, dict) or len(group_colors) == 0:
+        group_colors = {
+            "Attacking": "crimson",
+            "Possession": "seagreen",
+            "Defensive": "royalblue",
+        }
+
+    # Get player row safely
+    row_df = plot_data.loc[plot_data["Player"] == player_name]
+    if row_df.empty:
         st.error(f"No player named '{player_name}' found.")
         return
 
-    # order & data for the chosen template
-    sel_metrics_loc = list(metric_groups.keys())
-    raw         = row[sel_metrics_loc].values.flatten()
-    percentiles = row[[m + " (percentile)" for m in sel_metrics_loc]].values.flatten()
-    groups      = [metric_groups[m] for m in sel_metrics_loc]
+    row = row_df.iloc[0]
 
-    n = len(sel_metrics_loc)
-    if n == 0:
-        st.warning("No metrics available for this template.")
+    # Get all metric names (with valid percentile cols)
+    group_order = ["Possession", "Defensive", "Attacking", "Off The Ball"]
+    ordered_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
+
+    valid_metrics, valid_pcts = [], []
+    for m in ordered_metrics:
+        pct_col = f"{m} (percentile)"
+        if m in row.index and pct_col in row.index:
+            valid_metrics.append(m)
+            valid_pcts.append(pct_col)
+
+    if not valid_metrics:
+        st.warning("No valid metrics available to plot for this player.")
         return
 
-    step   = 2 * np.pi / n
-    angles = np.linspace(0, 2*np.pi, n, endpoint=False)
+    # Retrieve numeric values safely
+    raw_vals = pd.to_numeric(row[valid_metrics], errors="coerce").fillna(0).to_numpy()
+    pct_vals = pd.to_numeric(row[valid_pcts], errors="coerce").fillna(50).to_numpy()  # default neutral 50
 
-    # bar colours from percentile (your red→orange→green gradients by tercile)
-    bar_colors = [percentile_to_color(p) for p in percentiles]
+    n = len(valid_metrics)
+    if n == 0:
+        st.warning("No valid numeric metrics found for this player.")
+        return
 
-    # figure
+    # Groups and colours
+    groups = [metric_groups.get(m, "Unknown") for m in valid_metrics]
+    cmap = mcm.get_cmap("RdYlGn")
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+    bar_colors = [cmap(norm(v)) for v in pct_vals]
+
+    # Angles for radar
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+
+    # --- Plot setup ---
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-    fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
-    ax.set_theta_offset(np.pi/2)
+    fig.patch.set_facecolor("white")
+    ax.set_theta_offset(np.pi / 2)
     ax.set_theta_direction(-1)
-
-    # keep scale 0..100; hide the outer ring by not placing a tick at 100
     ax.set_ylim(0, 100)
-    ax.set_yticks([20, 40, 60, 80])      # <- no 100 tick => no outer ring line
-    ax.yaxis.grid(True, alpha=0.12)
-    ax.set_xticks([])                     # we'll place metric labels manually
+    ax.set_yticklabels([])
+    ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
-    ax.patch.set_linewidth(0)
 
-    # ===== Background wedges (contiguous runs per genre), coloured by AVG percentile =====
-    # Make wedges align to the FIRST/LAST bar of a run, and trim edges to create visible gaps.
-    bar_width = step * 0.90               # MUST match bar() width below
-    bar_half  = bar_width / 2.0
-    gap_each_side = step * SECTION_GAP_FRAC  # angular trim on EACH side of a section wedge
-
-    # Build contiguous runs of the same genre around the circle
-    runs, run_start = [], 0
-    for i in range(1, n):
-        if groups[i] != groups[i - 1]:
-            runs.append((run_start, i - 1, groups[i - 1]))
-            run_start = i
-    runs.append((run_start, n - 1, groups[-1]))
-
-    def _draw_wedge(edge_start, edge_end, color, label_text=None, label_r=None):
-        """Fill a wedge between two angular edges; optional label outside."""
-        width  = edge_end - edge_start
-        center = edge_start + width / 2.0
-        ax.bar([center], [100], width=width, bottom=0,
-               color=color, alpha=GENRE_BG_ALPHA,
-               edgecolor=None, linewidth=0, zorder=0)
-        if label_text is not None and label_r is not None:
-            ax.text(center, label_r, label_text,
-                    ha="center", va="center",
-                    rotation=0, rotation_mode="anchor",
-                    fontsize=12, fontweight="bold",
-                    color="black", zorder=20, clip_on=False)  # plain black text
-
-    two_pi = 2 * np.pi
-    for start_idx, end_idx, g in runs:
-        # Average percentile across this section -> background colour
-        run_avg = float(np.nanmean(percentiles[start_idx:end_idx+1]))
-        bg_color = percentile_to_color(run_avg)
-
-        # Wedge edges aligned to bars, then trimmed to make the section gap larger
-        start_edge = (angles[start_idx] - bar_half) + gap_each_side
-        end_edge   = (angles[end_idx]   + bar_half) - gap_each_side
-
-        # In case a tiny run is narrower than 2*gap, clamp minimally
-        if end_edge - start_edge <= step * 0.10:
-            mid = (start_edge + end_edge) / 2.0
-            start_edge = mid - step * 0.05
-            end_edge   = mid + step * 0.05
-
-        # Normalise and handle wrap-around
-        while start_edge < 0:
-            start_edge += two_pi
-            end_edge   += two_pi
-        while end_edge <= start_edge:
-            end_edge += two_pi
-
-        # Draw (split if crossing 2π) and place the black label on the head piece
-        if end_edge > two_pi:
-            _draw_wedge(start_edge, two_pi, bg_color)  # tail
-            _draw_wedge(0.0, end_edge - two_pi, bg_color, g, GENRE_LABEL_R)  # head + label
-        else:
-            _draw_wedge(start_edge, end_edge, bg_color, g, GENRE_LABEL_R)
-
-    # ===== Bars (percentiles) =====
+    # --- Bars ---
     ax.bar(
-        angles, percentiles,
-        width=bar_width,
-        color=bar_colors, edgecolor=bar_colors,
-        alpha=0.95, zorder=10
+        angles, pct_vals,
+        width=2 * np.pi / n * 0.85,
+        color=bar_colors,
+        edgecolor="black",
+        linewidth=0.6,
+        alpha=0.9
     )
 
-    # raw values printed at mid radius
-    for ang, val in zip(angles, raw):
-        try:
-            txt = f"{float(val):.2f}"
-        except Exception:
-            txt = "-"
-        ax.text(ang, 50, txt,
-                ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold",
-                zorder=15)
+    # Raw values inside the chart
+    for ang, raw_val in zip(angles, raw_vals):
+        txt = f"{raw_val:.2f}" if np.isfinite(raw_val) else "-"
+        ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
-    # metric labels just inside the outer ring
-    for i, ang in enumerate(angles):
-        label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
-        ax.text(ang, 104, label,
-                ha="center", va="center",
-                color="black", fontsize=10, fontweight="bold",
-                zorder=15)
+    # Metric labels
+    for ang, m in zip(angles, valid_metrics):
+        label = DISPLAY_NAMES.get(m, m)
+        label = label.replace(" per 90", "").replace(", %", " (%)")
+        color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
+        ax.text(ang, 108, label, ha="center", va="center", color=color, fontsize=10, fontweight="bold")
 
-    # ===== Title & badge (unchanged) =====
-    age      = row["Age"].values[0]
-    height   = row["Height"].values[0]
-    team     = row["Team within selected timeframe"].values[0]
-    mins     = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
-    rank_val = int(row["Rank"].values[0]) if "Rank" in row else None
+    # --- Legend ---
+    present_groups = list(dict.fromkeys(groups))
+    patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
+    if patches:
+        fig.subplots_adjust(top=0.86, bottom=0.08)
+        ax.legend(
+            handles=patches,
+            loc="upper center", bbox_to_anchor=(0.5, -0.06),
+            ncol=min(len(patches), 4), frameon=False
+        )
 
-    age_str    = f"{int(age)} years old" if not pd.isnull(age) else ""
-    height_str = f"{int(height)} cm"     if not pd.isnull(height) else ""
-    parts = [player_name] + [p for p in (age_str, height_str) if p]
-    line1 = " | ".join(parts)
+    # --- Player Info ---
+    weighted_z = float(row.get("Weighted Z Score", 0) or 0)
+    score_100 = row.get("Score (0–100)")
+    score_100 = float(score_100) if pd.notnull(score_100) else None
 
-    team_str = f"{team}" if pd.notnull(team) else ""
-    mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
-    rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
-    line2 = " | ".join([p for p in (team_str, mins_str, rank_str) if p])
+    age = row.get("Age", np.nan)
+    height = row.get("Height", np.nan)
+    team = row.get("Team within selected timeframe", "") or ""
+    mins = row.get("Minutes played", np.nan)
+    role = row.get("Six-Group Position", "") or ""
+    rank_v = int(row.get("Rank", 0)) if pd.notnull(row.get("Rank", 0)) else None
 
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
+    comp = row.get("Competition_norm") or row.get("Competition") or ""
 
-    z_scores = (percentiles - 50) / 15
-    avg_z = float(np.nanmean(z_scores))
-    if   avg_z >= 1.0:  badge = ("Excellent", "#228B22")
-    elif avg_z >= 0.3:  badge = ("Good",      "#1E90FF")
-    elif avg_z >= -0.3: badge = ("Average",   "#DAA520")
-    else:               badge = ("Below Average", "#DC143C")
+    # Title text
+    top_parts = [player_name]
+    if role: top_parts.append(role)
+    if pd.notnull(age): top_parts.append(f"{int(age)} years old")
+    if pd.notnull(height): top_parts.append(f"{int(height)} cm")
+    line1 = " | ".join(top_parts)
 
-    st.markdown(
-        f"<div style='text-align:center; margin-top: 20px;'>"
-        f"<span style='font-size:24px; font-weight:bold;'>Average Z Score, {avg_z:.2f}</span><br>"
-        f"<span style='background-color:{badge[1]}; color:white; padding:5px 10px; border-radius:8px; font-size:20px;'>{badge[0]}</span></div>",
-        unsafe_allow_html=True
-    )
+    bottom_parts = []
+    if team: bottom_parts.append(team)
+    if comp: bottom_parts.append(comp)
+    if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
+    if rank_v: bottom_parts.append(f"Rank #{rank_v}")
+    if score_100 is not None:
+        bottom_parts.append(f"{score_100:.0f}/100")
+    else:
+        bottom_parts.append(f"Z {weighted_z:.2f}")
+    line2 = " | ".join(bottom_parts)
 
-    st.pyplot(fig)
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
+
+    # Logo overlay if available
+    try:
+        if "logo" in globals() and logo is not None:
+            imagebox = OffsetImage(np.array(logo), zoom=0.18)
+            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
+            ax.add_artist(ab)
+    except Exception:
+        pass
+
+    st.pyplot(fig, width="stretch")
 
 # draw chart
 if st.session_state.selected_player:
