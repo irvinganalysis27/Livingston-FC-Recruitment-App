@@ -86,26 +86,30 @@ SIX_GROUPS = [
     "Striker",
 ]
 
-# --- Short token mapping (e.g. from abbreviations like CB, CDM, etc.) ---
-RAW_TO_SIX = {
+# --- Short token mapping (abbreviations) ---
+RAW_TO_SIMPLE = {
     "GK": "Goalkeeper", "GKP": "Goalkeeper",
 
     "CB": "Centre Back", "RCB": "Centre Back", "LCB": "Centre Back",
-    "CBR": "Centre Back", "CBL": "Centre Back", "CD": "Centre Back",
+    "CBR": "Centre Back", "CBL": "Centre Back", "CD": "Centre Back", "SW": "Centre Back",
 
-    "RB": "Full Back", "LB": "Full Back", "RWB": "Full Back", "LWB": "Full Back",
+    "RB": "Full Back", "LB": "Full Back",
+    "RWB": "Full Back", "LWB": "Full Back", "RFB": "Full Back", "LFB": "Full Back",
 
     "DM": "Number 6", "CDM": "Number 6", "RDM": "Number 6", "LDM": "Number 6",
+    "DMF": "Number 6",
 
     "CM": "Number 8", "RCM": "Number 8", "LCM": "Number 8",
+    "CMF": "Number 8",
 
-    "RW": "Winger", "LW": "Winger", "RM": "Winger", "LM": "Winger", "RWF": "Winger", "LWF": "Winger",
+    "RW": "Winger", "LW": "Winger", "RM": "Winger", "LM": "Winger",
+    "RWF": "Winger", "LWF": "Winger", "W": "Winger", "RWG": "Winger", "LWG": "Winger",
 
-    "ST": "Striker", "CF": "Striker", "FW": "Striker", "9": "Striker",
+    "ST": "Striker", "CF": "Striker", "FW": "Striker", "STK": "Striker", "9": "Striker",
 }
 
-# --- Full Wyscout text mapping ---
-Wyscout_TO_Simplified = {
+# --- Wyscout full-text mapping (common labels seen in exports) ---
+Wyscout_TO_SIMPLE = {
     # Goalkeepers
     "Goalkeeper": "Goalkeeper",
 
@@ -115,14 +119,14 @@ Wyscout_TO_Simplified = {
     "Centre Back (Left)": "Centre Back",
     "Central Defender": "Centre Back",
 
-    # Full Backs
+    # Full Backs / Wing Backs
     "Right Back": "Full Back",
     "Left Back": "Full Back",
     "Wing Back (Right)": "Full Back",
     "Wing Back (Left)": "Full Back",
     "Full Back": "Full Back",
 
-    # Number 6s (Defensive Mids)
+    # Number 6 (defensive mids)
     "Defensive Midfielder": "Number 6",
     "Defensive Midfielder (Centre)": "Number 6",
     "Defensive Midfielder (Left)": "Number 6",
@@ -130,14 +134,14 @@ Wyscout_TO_Simplified = {
     "Holding Midfielder": "Number 6",
     "Anchor Midfielder": "Number 6",
 
-    # Number 8s (Box-to-box / Central)
+    # Number 8 (central/box-to-box)
     "Central Midfielder": "Number 8",
     "Central Midfielder (Left)": "Number 8",
     "Central Midfielder (Right)": "Number 8",
     "Box-to-Box Midfielder": "Number 8",
     "Midfielder": "Number 8",
 
-    # Wingers / Wide players
+    # Wingers / Wide
     "Right Winger": "Winger",
     "Left Winger": "Winger",
     "Wide Midfielder (Right)": "Winger",
@@ -147,75 +151,69 @@ Wyscout_TO_Simplified = {
     "Attacking Midfielder (Right)": "Winger",
     "Attacking Midfielder (Left)": "Winger",
 
-    # Strikers / Forwards
+    # Strikers / Forwards (and central AM used as a 10)
     "Centre Forward": "Striker",
     "Forward": "Striker",
     "Striker": "Striker",
     "Second Striker": "Striker",
-    "Attacking Midfielder (Centre)": "Striker",  # often plays as a 10
+    "Attacking Midfielder (Centre)": "Striker",
 }
 
-# --- Helper to clean tokens like 'CB ' or 'CM, ST' ---
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
-    t = str(tok).upper()
-    t = t.replace(".", "").replace("-", "").replace(" ", "")
+    t = str(tok).upper().replace(".", "").replace("-", "").replace(" ", "")
     return t
 
-def parse_first_position(cell) -> str:
+def _parse_first_token(cell) -> str:
     if pd.isna(cell):
         return ""
     first = re.split(r"[,/]", str(cell))[0].strip()
     return _clean_pos_token(first)
 
-# --- Main mapping function (handles all cases) ---
-def map_first_position_to_group(cell) -> str:
-    """Smartly map Wyscout position names or abbreviations into 7 simplified roles."""
+def map_wyscout_to_simple(cell) -> str:
+    """Robust mapping of Wyscout position strings / abbreviations to 7 roles."""
     if pd.isna(cell):
         return ""
 
-    cell_str = str(cell).strip()
+    raw = str(cell).strip()
 
-    # --- Direct Wyscout name match ---
-    if cell_str in Wyscout_TO_Simplified:
-        return Wyscout_TO_Simplified[cell_str]
+    # 1) Direct full-text match
+    if raw in Wyscout_TO_SIMPLE:
+        return Wyscout_TO_SIMPLE[raw]
 
-    # --- Handle multi-position strings like "Centre Back / Right Back" ---
-    parts = re.split(r"[,/]", cell_str)
-    for p in parts:
-        p = p.strip()
-        if p in Wyscout_TO_Simplified:
-            return Wyscout_TO_Simplified[p]
+    # 2) If multi-position string like "CM / DM", try each part
+    for part in re.split(r"[,/]", raw):
+        p = part.strip()
+        if p in Wyscout_TO_SIMPLE:
+            return Wyscout_TO_SIMPLE[p]
 
-    # --- Fallback to short-code mapping ---
-    tok = parse_first_position(cell)
-    if tok in RAW_TO_SIX:
-        raw_pos = RAW_TO_SIX[tok]
-        if raw_pos == "Central Midfielder":
-            return "Number 8"
-        return raw_pos
+    # 3) Abbreviation fallback
+    tok = _parse_first_token(raw)
+    if tok in RAW_TO_SIMPLE:
+        return RAW_TO_SIMPLE[tok]
 
-    # --- Fuzzy keyword matching (last resort) ---
-    up = cell_str.upper()
-    if "DEFENSIVE MID" in up:
+    # 4) Keyword heuristics (case-insensitive)
+    up = raw.upper()
+    if "KEEP" in up or "GK" == tok:
+        return "Goalkeeper"
+    if "DEFENSIVE MID" in up or "HOLDING" in up or re.search(r"\bCDM\b|\bDM\b", up):
         return "Number 6"
-    if "CENTRAL MID" in up or "BOX" in up:
+    if "CENTRAL MID" in up or "BOX" in up or re.search(r"\bCM\b", up):
         return "Number 8"
     if "WING" in up or "WIDE" in up:
         return "Winger"
-    if "FORWARD" in up or "STRIKER" in up:
+    if "FORWARD" in up or "STRIKER" in up or re.search(r"\bCF\b|\bST\b", up):
         return "Striker"
     if "BACK" in up:
-        if "CENT" in up:
-            return "Centre Back"
         return "Full Back"
-    if "KEEP" in up:
-        return "Goalkeeper"
+    if "CENTRE BACK" in up or "CENTER BACK" in up or re.search(r"\bCB\b|\bSW\b", up):
+        return "Centre Back"
 
-    return "Winger"  # safe fallback
+    # 5) Last-resort safe default
+    return "Winger"
 
-# --- Default radar templates for each simplified role ---
+# --- Default radar template to use for each simplified role ---
 DEFAULT_TEMPLATE = {
     "Goalkeeper": "Goalkeeper",
     "Centre Back": "Central Defender, All Round",
@@ -689,14 +687,42 @@ if not uploaded_file:
 df = pd.read_excel(uploaded_file)
 
 # ================== Position helpers/filters ==================
-if "Position" in df.columns:
-    df["Positions played"] = df["Position"].astype(str)
+# Try to find the best column from the Wyscout export that holds the position text.
+POSITION_SOURCE_CANDIDATES = [
+    "Position",
+    "Positions",
+    "Role",
+    "Role detailed",
+    "Main position",
+    "Positions played",
+]
+
+pos_col = next((c for c in POSITION_SOURCE_CANDIDATES if c in df.columns), None)
+
+# Keep original text for reference
+if pos_col:
+    df["Positions played"] = df[pos_col].astype(str)
 else:
     df["Positions played"] = np.nan
 
-df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group) if "Position" in df.columns else np.nan
+# Create the simplified role column used by the rest of the app
+if pos_col:
+    df["Six-Group Position"] = df[pos_col].apply(map_wyscout_to_simple)
+else:
+    df["Six-Group Position"] = np.nan
 
-# Minutes
+# --- Debug (collapsible): see what we mapped and what raw values exist
+with st.expander("Position mapping — diagnostics", expanded=False):
+    if pos_col:
+        st.write("**Source column:**", pos_col)
+        st.write("**Unique raw values (top 30):**")
+        raw_counts = df[pos_col].fillna("NA").value_counts().head(30)
+        st.dataframe(raw_counts.to_frame("count"))
+    mapped_counts = df["Six-Group Position"].fillna("NA").value_counts()
+    st.write("**Mapped role counts:**")
+    st.dataframe(mapped_counts.to_frame("count"))
+
+# Minutes filter
 minutes_col = "Minutes played"
 min_minutes = st.number_input("Minimum minutes to include", min_value=0, value=1000, step=50)
 df["_minutes_numeric"] = pd.to_numeric(df.get(minutes_col, np.nan), errors="coerce")
@@ -705,7 +731,7 @@ if df.empty:
     st.warning("No players meet the minutes threshold. Lower the minimum.")
     st.stop()
 
-# Age
+# Age filter
 if "Age" in df.columns:
     df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
     if df["_age_numeric"].notna().any():
@@ -722,22 +748,27 @@ else:
 
 st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
 
-# 6-group include filter
-available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
+# --- Include filter (ALWAYS show all 7 options; display live counts) ---
+role_counts = df["Six-Group Position"].value_counts()
+def _fmt_role(opt: str) -> str:
+    return f"{opt} ({int(role_counts.get(opt, 0))})"
+
 selected_groups = st.multiselect(
-    "Choose Position Group",
+    "Include groups",
     options=SIX_GROUPS,
     default=[],
+    format_func=_fmt_role,
+    label_visibility="collapsed",
 )
+
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
-        st.warning("No players after 6-group filter. Clear filters or choose different groups.")
+        st.warning("No players after position filter. Clear filters or choose different groups.")
         st.stop()
 
-# Track if exactly one group is selected
+# Track if exactly one group is selected (for default template selection)
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
-
 # ================== Session state for selections ==================
 if "selected_player" not in st.session_state:
     st.session_state.selected_player = None
