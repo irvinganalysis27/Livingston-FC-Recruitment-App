@@ -8,6 +8,7 @@ from PIL import Image
 from datetime import datetime, timezone
 from auth import check_password
 from branding import show_branding
+from openai import OpenAI
 
 # ========= PAGE CONFIG =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
@@ -18,6 +19,9 @@ if not check_password():
 
 show_branding()
 st.title("Wyscout Radar")
+
+# ========= OPENAI CLIENT =========
+client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 # ========= PATHS =========
 APP_DIR = Path(__file__).parent
@@ -966,53 +970,73 @@ if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 
 # ================== AI PLAYER SUMMARY ==================
-from openai import OpenAI
-client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
+def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
+    """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
+    try:
+        row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
+    except IndexError:
+        return "No data available for this player."
 
-with st.expander("🧠 AI Summary", expanded=False):
-    st.markdown(
-        "Generate a short summary of this player's performance based on their metrics."
-    )
+    role = str(row.get("Six-Group Position", "player"))
+    league = str(row.get("Competition_norm", ""))
+    age = row.get("Age", "")
+    team = str(row.get("Team", ""))
+    mins = row.get("Minutes played", 0)
 
-    if st.button("✨ Generate AI Summary", key="ai_summary_btn"):
-        player_row = plot_data.loc[plot_data["Player"] == st.session_state.selected_player]
-        if player_row.empty:
-            st.warning("Player data not found.")
-        else:
-            player_dict = player_row.to_dict(orient="records")[0]
+    # Collect numeric metrics
+    metric_percentiles = {
+        m: row.get(f"{m} (percentile)", np.nan)
+        for m in metrics.keys()
+        if f"{m} (percentile)" in row.index
+    }
+    metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
 
-            # Compose a descriptive prompt
-            prompt = f"""
-            You are an expert football scout analysing performance metrics from Wyscout data.
-            Write a concise 3–4 sentence report summarising {player_dict.get('Player')}’s
-            playing profile and performance in the selected template metrics.
+    # --- Build dynamic prompt ---
+    prompt = f"""
+    You are writing a detailed but concise player scouting report in the style of Tom Irving,
+    a professional football recruitment analyst known for honest, critical, and realistic assessments.
 
-            Use British English, professional scouting tone, no unnecessary adjectives.
-            Reference key areas of strength and potential weakness using metric context.
-            Example style: 'Shows strong output in ball progression and attacking efficiency
-            while defensive duels remain below positional average.'
+    Write a 5–6 sentence paragraph about {player_name}, a {role.lower()} aged {age}, currently playing in {league} for {team}.
 
-            Player data summary:
-            {player_dict}
-            """
+    You have access to percentile data (0–100) for performance metrics:
+    {metric_text}
 
-            with st.spinner("Analysing player metrics..."):
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": "You are an expert football analyst."},
-                            {"role": "user", "content": prompt},
-                        ],
-                        temperature=0.5,
-                        max_tokens=250,
-                    )
-                    summary_text = response.choices[0].message.content.strip()
-                    st.success("✅ Summary generated successfully")
-                    st.markdown(f"**AI Summary for {player_dict.get('Player')}**\n\n{summary_text}")
-                except Exception as e:
-                    st.error(f"Failed to generate summary: {e}")
+    Tone and writing style rules:
+    - Do NOT start with cliches like “is an exciting” or “is a talented” player.
+    - Vary the opening line. It can start with what kind of player he looks like, what stands out, or even what’s missing.
+    - If metrics are low (below 40th percentile), acknowledge weaknesses clearly. Use natural phrasing like:
+        • “Struggles to impact games consistently.” 
+        • “Can look limited when the game becomes physical.”
+        • “Output doesn’t yet match his effort.”
+    - If metrics are high (above 70th percentile), highlight them naturally:
+        • “Ranks among the best in his league for dribbles and chance creation.”
+        • “Shows real control under pressure and moves play forward quickly.”
+    - Keep a balanced tone — be fair, but never overly generous. You're not writing marketing material.
+    - Combine data insight with realistic football language (movement, body shape, pressing work, mentality).
+    - Vary phrasing so no two reports feel copy-pasted.
+    - End with one strong, definitive sentence that sums up his player type or potential fit — e.g.:
+        • “A physically strong, low-risk defender who could suit a compact system.”
+        • “A creative wide player with flashes of quality but inconsistent end product.”
+        • “Profiles as a hard-working forward who fits the pressing style but lacks a ruthless edge.”
 
+    Write in Tom’s natural tone, as seen in these examples:
+    - “He’s got a good base technically but sometimes forces play when it’s not on.”
+    - “Not the most dynamic athlete, but his awareness and timing stand out.”
+    - “There’s something raw but promising about him — a player who could develop quickly in the right setup.”
+
+    Be honest, concise, and analytical. Avoid repetition. Write like a human scout.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=350,
+            temperature=0.85,  # slightly higher for more creative, human tone
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ AI summary generation failed: {e}"
 
 # ================== Ranking table ==================
 st.markdown("### Players Ranked by Z-Score")
