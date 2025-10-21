@@ -603,32 +603,44 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
             df["Positions played"] = df["Position"].astype(str)
     else:
         df["Positions played"] = np.nan
-    
+
     if "Team within selected timeframe" not in df.columns:
         df["Team within selected timeframe"] = df["Team"] if "Team" in df.columns else np.nan
     if "Height" not in df.columns:
         df["Height"] = np.nan
-    
+
     # Map base position
     if "Position" in df.columns:
         df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     else:
         df["Six-Group Position"] = np.nan
-    
-    # ✅ Only duplicate *true* Centre Midfielders (not DMs or AMs)
-    cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-    if cm_mask.any():
-        cm_rows = df.loc[cm_mask].copy()
-        cm_as_6 = cm_rows.copy()
-        cm_as_6["Six-Group Position"] = "Number 6"
-        cm_as_8 = cm_rows.copy()
-        cm_as_8["Six-Group Position"] = "Number 8"
-    
-        # Keep everyone else (don’t remove 6s/8s)
-        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-    
-    return df
 
+    # ✅ Only duplicate true Centre Midfielders once — skip if already has 6/8 versions
+    if "Six-Group Position" in df.columns:
+        cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+
+        # only proceed if CM rows exist and no 6/8 already present for those players
+        if cm_mask.any():
+            cm_players = df.loc[cm_mask, "Player"].unique().tolist()
+
+            # check if any of these players already have a 6 or 8 row
+            existing = df[
+                df["Player"].isin(cm_players)
+                & df["Six-Group Position"].isin(["Number 6", "Number 8"])
+            ]["Player"].unique().tolist()
+
+            # filter out players that already have been duplicated
+            new_players = [p for p in cm_players if p not in existing]
+
+            if new_players:
+                cm_rows = df.loc[df["Player"].isin(new_players) & cm_mask].copy()
+                cm_as_6 = cm_rows.copy()
+                cm_as_6["Six-Group Position"] = "Number 6"
+                cm_as_8 = cm_rows.copy()
+                cm_as_8["Six-Group Position"] = "Number 8"
+                df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
+    return df
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
 def load_data_once():
