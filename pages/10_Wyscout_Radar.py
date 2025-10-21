@@ -4,36 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 
-# ========= AUTH & BRANDING =========
-from auth import check_password
-from branding import show_branding
+# --- Basic password protection ---
+PASSWORD = "cowboy"
 
-st.set_page_config(page_title="Alternate Radar (Manual Upload)", layout="centered")
+st.title("⚽ Radar Chart and Ranking App")
 
-# Password protection
-if not check_password():
+pwd = st.text_input("Enter password:", type="password")
+if pwd != PASSWORD:
+    st.warning("Please enter the correct password to access the app.")
     st.stop()
-
-# Branding banner
-show_branding()
-st.title("⚽ Alternate Radar Chart and Ranking App")
-
-# ========= USER INSTRUCTIONS =========
-st.markdown("""
-### 📋 How to Download Data from Wyscout
-
-1. **Open Wyscout**
-2. Click the **menu (top centre)**.
-3. Choose **Advanced Search**.
-4. Under *Competition*, select your **League**.
-5. Choose the **most recent season**.
-6. At the top-right, set **Display → All**.
-7. Click **Download → Excel**.
-8. If there are too many players (over ~500), use the **Position filters (left side)** to narrow down the list.
-
-Once downloaded, upload that Excel file below to generate the radar charts and ranking table.
-""")
-st.divider()
 
 # ================== Color helpers for tercile gradient bars ==================
 def _hex_to_rgb(h):
@@ -50,6 +29,7 @@ def _lerp(c1, c2, t):
     b = int(b1 + (b2 - b1) * t)
     return _rgb_to_hex(r, g, b)
 
+# band endpoints (light -> deep) for each tercile
 BAND_PALETTES = {
     "low":  ("#fee2e2", "#ef4444"),  # red
     "mid":  ("#fff7ed", "#f59e0b"),  # orange
@@ -57,6 +37,7 @@ BAND_PALETTES = {
 }
 
 def percentile_to_color(p):
+    """Map 0..100 percentile to a gradient within terciles (low/mid/high)."""
     p = 0 if p is None else float(p)
     if p < 33.3334:
         lo, hi = BAND_PALETTES["low"]
@@ -71,9 +52,16 @@ def percentile_to_color(p):
         t = (p - 66.6667) / 33.3333
         return _lerp(lo, hi, t)
 
-GENRE_BG_ALPHA   = 0.14
-GENRE_LABEL_R    = 118
-SECTION_GAP_FRAC = 0.15
+# background wedge opacity + outside genre label radius
+GENRE_BG_ALPHA   = 0.14      # a touch stronger so averages read well
+GENRE_LABEL_R    = 118       # outside the 0..100 ring
+SECTION_GAP_FRAC = 0.15      # fraction of one bar's step trimmed from EACH side of a section
+
+# ================== 6-position mapping ==================
+SIX_GROUPS = [
+    "Goalkeeper", "Wide Defender", "Central Defender",
+    "Central Midfielder", "Wide Midfielder", "Central Forward"
+]
 
 RAW_TO_SIX = {
     "GK": "Goalkeeper", "GKP": "Goalkeeper", "GOALKEEPER": "Goalkeeper",
@@ -571,9 +559,11 @@ position_metrics = {
 
 # Colors for genre backgrounds / labels
 group_colors = {
-    "Attacking": "crimson",
-    "Possession": "seagreen",
-    "Defensive": "royalblue",
+    "Off The Ball": "#8b5cf6",  # purple
+    "Attacking":    "#3b82f6",  # blue
+    "Possession":   "#f9a8d4",  # pink
+    "Defensive":    "#6366f1",  # indigo
+    "Goalkeeping":  "#a16207",  # cyan
 }
 
 # ================== File upload ==================
@@ -584,118 +574,14 @@ if not uploaded_file:
 df = pd.read_excel(uploaded_file)
 
 # ================== Position helpers/filters ==================
-# Try to find the best column from the Wyscout export that holds the position text.
-POSITION_SOURCE_CANDIDATES = [
-    "Position",
-    "Positions",
-    "Role",
-    "Role detailed",
-    "Main position",
-    "Positions played",
-]
-
-pos_col = next((c for c in POSITION_SOURCE_CANDIDATES if c in df.columns), None)
-
-# Keep original text for reference
-if pos_col:
-    df["Positions played"] = df[pos_col].astype(str)
+if "Position" in df.columns:
+    df["Positions played"] = df["Position"].astype(str)
 else:
     df["Positions played"] = np.nan
 
-# ================== Simplified Wyscout → 7-position mapping ==================
-SIMPLE_POSITIONS = [
-    "Goalkeeper", "Centre Back", "Full Back", 
-    "Number 6", "Number 8", "Winger", "Striker"
-]
+df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group) if "Position" in df.columns else np.nan
 
-Wyscout_TO_SIMPLE = {
-    # Goalkeepers
-    "Goalkeeper": "Goalkeeper",
-    "GK": "Goalkeeper",
-
-    # Centre Backs
-    "Centre Back": "Centre Back",
-    "Central Defender": "Centre Back",
-    "Defender (Centre)": "Centre Back",
-    "Left Centre Back": "Centre Back",
-    "Right Centre Back": "Centre Back",
-    "CB": "Centre Back",
-
-    # Full Backs
-    "Right Back": "Full Back",
-    "Left Back": "Full Back",
-    "Wing Back": "Full Back",
-    "Right Wing Back": "Full Back",
-    "Left Wing Back": "Full Back",
-    "RB": "Full Back",
-    "LB": "Full Back",
-    "RWB": "Full Back",
-    "LWB": "Full Back",
-
-    # Number 6 (Defensive Mids)
-    "Defensive Midfielder": "Number 6",
-    "Holding Midfielder": "Number 6",
-    "Central Defensive Midfielder": "Number 6",
-    "DM": "Number 6",
-    "CDM": "Number 6",
-
-    # Number 8 (Box-to-Box)
-    "Central Midfielder": "Number 8",
-    "Box-to-Box Midfielder": "Number 8",
-    "CM": "Number 8",
-
-    # Wingers
-    "Left Midfielder": "Winger",
-    "Right Midfielder": "Winger",
-    "Left Winger": "Winger",
-    "Right Winger": "Winger",
-    "Wide Midfielder": "Winger",
-    "Inverted Winger": "Winger",
-    "RW": "Winger",
-    "LW": "Winger",
-
-    # Strikers
-    "Centre Forward": "Striker",
-    "Forward": "Striker",
-    "Attacking Midfielder": "Striker",
-    "Second Striker": "Striker",
-    "CF": "Striker",
-    "ST": "Striker",
-    "9": "Striker",
-}
-
-def clean_position_name(pos: str) -> str:
-    if pd.isna(pos):
-        return ""
-    pos = str(pos).strip().title()
-    pos = re.sub(r"\s*\(.*?\)", "", pos).strip()  # remove (Centre), (Left), etc.
-    return pos
-
-def map_wyscout_to_simple(pos: str) -> str:
-    pos_clean = clean_position_name(pos)
-    for k, v in Wyscout_TO_SIMPLE.items():
-        if k.lower() in pos_clean.lower():
-            return v
-    return "Winger"  # default if unknown
-
-# Create the simplified role column used by the rest of the app
-if pos_col:
-    df["Six-Group Position"] = df[pos_col].apply(map_wyscout_to_simple)
-else:
-    df["Six-Group Position"] = np.nan
-
-# --- Debug (collapsible): see what we mapped and what raw values exist
-with st.expander("Position mapping — diagnostics", expanded=False):
-    if pos_col:
-        st.write("**Source column:**", pos_col)
-        st.write("**Unique raw values (top 30):**")
-        raw_counts = df[pos_col].fillna("NA").value_counts().head(30)
-        st.dataframe(raw_counts.to_frame("count"))
-    mapped_counts = df["Six-Group Position"].fillna("NA").value_counts()
-    st.write("**Mapped role counts:**")
-    st.dataframe(mapped_counts.to_frame("count"))
-
-# Minutes filter
+# Minutes
 minutes_col = "Minutes played"
 min_minutes = st.number_input("Minimum minutes to include", min_value=0, value=1000, step=50)
 df["_minutes_numeric"] = pd.to_numeric(df.get(minutes_col, np.nan), errors="coerce")
@@ -704,7 +590,7 @@ if df.empty:
     st.warning("No players meet the minutes threshold. Lower the minimum.")
     st.stop()
 
-# Age filter
+# Age
 if "Age" in df.columns:
     df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
     if df["_age_numeric"].notna().any():
@@ -721,27 +607,18 @@ else:
 
 st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, {len(df)}")
 
-# --- Include filter (ALWAYS show all 7 options; display live counts) ---
-role_counts = df["Six-Group Position"].value_counts()
-def _fmt_role(opt: str) -> str:
-    return f"{opt} ({int(role_counts.get(opt, 0))})"
-
-selected_groups = st.multiselect(
-    "Include groups",
-    options=SIX_GROUPS,
-    default=[],
-    format_func=_fmt_role,
-    label_visibility="collapsed",
-)
-
+# 6-group include filter
+available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
+selected_groups = st.multiselect("Include groups", options=available_groups, default=[], label_visibility="collapsed")
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
-        st.warning("No players after position filter. Clear filters or choose different groups.")
+        st.warning("No players after 6-group filter. Clear filters or choose different groups.")
         st.stop()
 
-# Track if exactly one group is selected (for default template selection)
+# Track if exactly one group is selected
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
+
 # ================== Session state for selections ==================
 if "selected_player" not in st.session_state:
     st.session_state.selected_player = None
@@ -921,147 +798,163 @@ if selected_position_template != current_template_name:
     st.rerun()
 
 # ================== Chart ==================
-def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
-    import matplotlib.patches as mpatches
-    from matplotlib import colormaps as mcm
-    import matplotlib.colors as mcolors
-
-    if not isinstance(group_colors, dict) or len(group_colors) == 0:
-        group_colors = {
-            "Attacking": "crimson",
-            "Possession": "seagreen",
-            "Defensive": "royalblue",
-        }
-
-    # Get player row safely
-    row_df = plot_data.loc[plot_data["Player"] == player_name]
-    if row_df.empty:
+def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors):
+    row = plot_data[plot_data["Player"] == player_name]
+    if row.empty:
         st.error(f"No player named '{player_name}' found.")
         return
 
-    row = row_df.iloc[0]
+    # order & data for the chosen template
+    sel_metrics_loc = list(metric_groups.keys())
+    raw         = row[sel_metrics_loc].values.flatten()
+    percentiles = row[[m + " (percentile)" for m in sel_metrics_loc]].values.flatten()
+    groups      = [metric_groups[m] for m in sel_metrics_loc]
 
-    # Get all metric names (with valid percentile cols)
-    group_order = ["Possession", "Defensive", "Attacking", "Off The Ball"]
-    ordered_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
-
-    valid_metrics, valid_pcts = [], []
-    for m in ordered_metrics:
-        pct_col = f"{m} (percentile)"
-        if m in row.index and pct_col in row.index:
-            valid_metrics.append(m)
-            valid_pcts.append(pct_col)
-
-    if not valid_metrics:
-        st.warning("No valid metrics available to plot for this player.")
-        return
-
-    # Retrieve numeric values safely
-    raw_vals = pd.to_numeric(row[valid_metrics], errors="coerce").fillna(0).to_numpy()
-    pct_vals = pd.to_numeric(row[valid_pcts], errors="coerce").fillna(50).to_numpy()  # default neutral 50
-
-    n = len(valid_metrics)
+    n = len(sel_metrics_loc)
     if n == 0:
-        st.warning("No valid numeric metrics found for this player.")
+        st.warning("No metrics available for this template.")
         return
 
-    # Groups and colours
-    groups = [metric_groups.get(m, "Unknown") for m in valid_metrics]
-    cmap = mcm.get_cmap("RdYlGn")
-    norm = mcolors.Normalize(vmin=0, vmax=100)
-    bar_colors = [cmap(norm(v)) for v in pct_vals]
+    step   = 2 * np.pi / n
+    angles = np.linspace(0, 2*np.pi, n, endpoint=False)
 
-    # Angles for radar
-    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    # bar colours from percentile (your red→orange→green gradients by tercile)
+    bar_colors = [percentile_to_color(p) for p in percentiles]
 
-    # --- Plot setup ---
+    # figure
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-    ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
-    ax.set_theta_offset(np.pi / 2)
+    ax.set_facecolor("white")
+    ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
-    ax.set_ylim(0, 100)
-    ax.set_yticklabels([])
-    ax.set_xticks([])
-    ax.spines["polar"].set_visible(False)
 
-    # --- Bars ---
+    # keep scale 0..100; hide the outer ring by not placing a tick at 100
+    ax.set_ylim(0, 100)
+    ax.set_yticks([20, 40, 60, 80])      # <- no 100 tick => no outer ring line
+    ax.yaxis.grid(True, alpha=0.12)
+    ax.set_xticks([])                     # we'll place metric labels manually
+    ax.spines["polar"].set_visible(False)
+    ax.patch.set_linewidth(0)
+
+    # ===== Background wedges (contiguous runs per genre), coloured by AVG percentile =====
+    # Make wedges align to the FIRST/LAST bar of a run, and trim edges to create visible gaps.
+    bar_width = step * 0.90               # MUST match bar() width below
+    bar_half  = bar_width / 2.0
+    gap_each_side = step * SECTION_GAP_FRAC  # angular trim on EACH side of a section wedge
+
+    # Build contiguous runs of the same genre around the circle
+    runs, run_start = [], 0
+    for i in range(1, n):
+        if groups[i] != groups[i - 1]:
+            runs.append((run_start, i - 1, groups[i - 1]))
+            run_start = i
+    runs.append((run_start, n - 1, groups[-1]))
+
+    def _draw_wedge(edge_start, edge_end, color, label_text=None, label_r=None):
+        """Fill a wedge between two angular edges; optional label outside."""
+        width  = edge_end - edge_start
+        center = edge_start + width / 2.0
+        ax.bar([center], [100], width=width, bottom=0,
+               color=color, alpha=GENRE_BG_ALPHA,
+               edgecolor=None, linewidth=0, zorder=0)
+        if label_text is not None and label_r is not None:
+            ax.text(center, label_r, label_text,
+                    ha="center", va="center",
+                    rotation=0, rotation_mode="anchor",
+                    fontsize=12, fontweight="bold",
+                    color="black", zorder=20, clip_on=False)  # plain black text
+
+    two_pi = 2 * np.pi
+    for start_idx, end_idx, g in runs:
+        # Average percentile across this section -> background colour
+        run_avg = float(np.nanmean(percentiles[start_idx:end_idx+1]))
+        bg_color = percentile_to_color(run_avg)
+
+        # Wedge edges aligned to bars, then trimmed to make the section gap larger
+        start_edge = (angles[start_idx] - bar_half) + gap_each_side
+        end_edge   = (angles[end_idx]   + bar_half) - gap_each_side
+
+        # In case a tiny run is narrower than 2*gap, clamp minimally
+        if end_edge - start_edge <= step * 0.10:
+            mid = (start_edge + end_edge) / 2.0
+            start_edge = mid - step * 0.05
+            end_edge   = mid + step * 0.05
+
+        # Normalise and handle wrap-around
+        while start_edge < 0:
+            start_edge += two_pi
+            end_edge   += two_pi
+        while end_edge <= start_edge:
+            end_edge += two_pi
+
+        # Draw (split if crossing 2π) and place the black label on the head piece
+        if end_edge > two_pi:
+            _draw_wedge(start_edge, two_pi, bg_color)  # tail
+            _draw_wedge(0.0, end_edge - two_pi, bg_color, g, GENRE_LABEL_R)  # head + label
+        else:
+            _draw_wedge(start_edge, end_edge, bg_color, g, GENRE_LABEL_R)
+
+    # ===== Bars (percentiles) =====
     ax.bar(
-        angles, pct_vals,
-        width=2 * np.pi / n * 0.85,
-        color=bar_colors,
-        edgecolor="black",
-        linewidth=0.6,
-        alpha=0.9
+        angles, percentiles,
+        width=bar_width,
+        color=bar_colors, edgecolor=bar_colors,
+        alpha=0.95, zorder=10
     )
 
-    # Raw values inside the chart
-    for ang, raw_val in zip(angles, raw_vals):
-        txt = f"{raw_val:.2f}" if np.isfinite(raw_val) else "-"
-        ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
+    # raw values printed at mid radius
+    for ang, val in zip(angles, raw):
+        try:
+            txt = f"{float(val):.2f}"
+        except Exception:
+            txt = "-"
+        ax.text(ang, 50, txt,
+                ha="center", va="center",
+                color="black", fontsize=10, fontweight="bold",
+                zorder=15)
 
-    # Metric labels
-    for ang, m in zip(angles, valid_metrics):
-        label = m
-        label = label.replace(" per 90", "").replace(", %", " (%)")
-        color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
-        ax.text(ang, 108, label, ha="center", va="center", color=color, fontsize=10, fontweight="bold")
+    # metric labels just inside the outer ring
+    for i, ang in enumerate(angles):
+        label = sel_metrics_loc[i].replace(" per 90", "").replace(", %", " (%)")
+        ax.text(ang, 104, label,
+                ha="center", va="center",
+                color="black", fontsize=10, fontweight="bold",
+                zorder=15)
 
-    # --- Legend ---
-    present_groups = list(dict.fromkeys(groups))
-    patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
-    if patches:
-        fig.subplots_adjust(top=0.86, bottom=0.08)
-        ax.legend(
-            handles=patches,
-            loc="upper center", bbox_to_anchor=(0.5, -0.06),
-            ncol=min(len(patches), 4), frameon=False
-        )
+    # ===== Title & badge (unchanged) =====
+    age      = row["Age"].values[0]
+    height   = row["Height"].values[0]
+    team     = row["Team within selected timeframe"].values[0]
+    mins     = row["Minutes played"].values[0] if "Minutes played" in row else np.nan
+    rank_val = int(row["Rank"].values[0]) if "Rank" in row else None
 
-    # --- Player Info ---
-    weighted_z = float(row.get("Weighted Z Score", 0) or 0)
-    score_100 = row.get("Score (0–100)")
-    score_100 = float(score_100) if pd.notnull(score_100) else None
+    age_str    = f"{int(age)} years old" if not pd.isnull(age) else ""
+    height_str = f"{int(height)} cm"     if not pd.isnull(height) else ""
+    parts = [player_name] + [p for p in (age_str, height_str) if p]
+    line1 = " | ".join(parts)
 
-    age = row.get("Age", np.nan)
-    height = row.get("Height", np.nan)
-    team = row.get("Team within selected timeframe", "") or ""
-    mins = row.get("Minutes played", np.nan)
-    role = row.get("Six-Group Position", "") or ""
-    rank_v = int(row.get("Rank", 0)) if pd.notnull(row.get("Rank", 0)) else None
+    team_str = f"{team}" if pd.notnull(team) else ""
+    mins_str = f"{int(mins)} mins" if pd.notnull(mins) else ""
+    rank_str = f"Rank #{rank_val}" if rank_val is not None else ""
+    line2 = " | ".join([p for p in (team_str, mins_str, rank_str) if p])
 
-    comp = row.get("Competition_norm") or row.get("Competition") or ""
+    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.12)
 
-    # Title text
-    top_parts = [player_name]
-    if role: top_parts.append(role)
-    if pd.notnull(age): top_parts.append(f"{int(age)} years old")
-    if pd.notnull(height): top_parts.append(f"{int(height)} cm")
-    line1 = " | ".join(top_parts)
+    z_scores = (percentiles - 50) / 15
+    avg_z = float(np.nanmean(z_scores))
+    if   avg_z >= 1.0:  badge = ("Excellent", "#228B22")
+    elif avg_z >= 0.3:  badge = ("Good",      "#1E90FF")
+    elif avg_z >= -0.3: badge = ("Average",   "#DAA520")
+    else:               badge = ("Below Average", "#DC143C")
 
-    bottom_parts = []
-    if team: bottom_parts.append(team)
-    if comp: bottom_parts.append(comp)
-    if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
-    if rank_v: bottom_parts.append(f"Rank #{rank_v}")
-    if score_100 is not None:
-        bottom_parts.append(f"{score_100:.0f}/100")
-    else:
-        bottom_parts.append(f"Z {weighted_z:.2f}")
-    line2 = " | ".join(bottom_parts)
+    st.markdown(
+        f"<div style='text-align:center; margin-top: 20px;'>"
+        f"<span style='font-size:24px; font-weight:bold;'>Average Z Score, {avg_z:.2f}</span><br>"
+        f"<span style='background-color:{badge[1]}; color:white; padding:5px 10px; border-radius:8px; font-size:20px;'>{badge[0]}</span></div>",
+        unsafe_allow_html=True
+    )
 
-    ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
-
-    # Logo overlay if available
-    try:
-        if "logo" in globals() and logo is not None:
-            imagebox = OffsetImage(np.array(logo), zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-    except Exception:
-        pass
-
-    st.pyplot(fig, width="stretch")
+    st.pyplot(fig)
 
 # draw chart
 if st.session_state.selected_player:
