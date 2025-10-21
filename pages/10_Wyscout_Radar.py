@@ -75,21 +75,45 @@ GENRE_BG_ALPHA   = 0.14
 GENRE_LABEL_R    = 118
 SECTION_GAP_FRAC = 0.15
 
-# ================== 6-position mapping ==================
+# ================== Position Mapping (same as main app) ==================
 SIX_GROUPS = [
-    "Goalkeeper", "Wide Defender", "Central Defender",
-    "Central Midfielder", "Wide Midfielder", "Central Forward"
+    "Goalkeeper",
+    "Centre Back",
+    "Full Back",
+    "Number 6",
+    "Number 8",
+    "Winger",
+    "Striker",
 ]
 
+# Map Wyscout position codes / text into your simplified 7-position model
 RAW_TO_SIX = {
-    "GK": "Goalkeeper", "GKP": "Goalkeeper", "GOALKEEPER": "Goalkeeper",
-    "RB": "Wide Defender", "LB": "Wide Defender", "RWB": "Wide Defender", "LWB": "Wide Defender",
-    "CB": "Central Defender", "RCB": "Central Defender", "LCB": "Central Defender",
-    "CM": "Central Midfielder", "CDM": "Central Midfielder", "CAM": "Central Midfielder",
-    "DM": "Central Midfielder", "AM": "Central Midfielder",
-    "LW": "Wide Midfielder", "RW": "Wide Midfielder", "LM": "Wide Midfielder", "RM": "Wide Midfielder",
-    "WF": "Wide Midfielder",
-    "CF": "Central Forward", "ST": "Central Forward", "FW": "Central Forward"
+    # Goalkeepers
+    "GK": "Goalkeeper", "GOALKEEPER": "Goalkeeper", "GKP": "Goalkeeper",
+
+    # Centre Backs
+    "CB": "Centre Back", "RCB": "Centre Back", "LCB": "Centre Back",
+    "CBR": "Centre Back", "CBL": "Centre Back", "CD": "Centre Back", "DEFENDER CENTRAL": "Centre Back",
+
+    # Full Backs
+    "RB": "Full Back", "LB": "Full Back", "RWB": "Full Back", "LWB": "Full Back",
+    "RFB": "Full Back", "LFB": "Full Back", "WIDE DEFENDER": "Full Back",
+
+    # Number 6 (Defensive Midfielders)
+    "CDM": "Number 6", "DM": "Number 6", "RDM": "Number 6", "LDM": "Number 6",
+    "DEFENSIVE MIDFIELDER": "Number 6", "HOLDING MIDFIELDER": "Number 6",
+
+    # Number 8 (Box-to-box / central mids)
+    "CM": "Number 8", "CMF": "Number 8", "RCM": "Number 8", "LCM": "Number 8",
+    "CENTRAL MIDFIELDER": "Number 8", "MIDFIELDER CENTRAL": "Number 8", "BOX TO BOX": "Number 8",
+
+    # Wingers
+    "RW": "Winger", "LW": "Winger", "RWF": "Winger", "LWF": "Winger", "RM": "Winger", "LM": "Winger",
+    "WINGER": "Winger", "WIDE MIDFIELDER": "Winger", "WIDE FORWARD": "Winger",
+
+    # Strikers
+    "CF": "Striker", "ST": "Striker", "FW": "Striker", "STRIKER": "Striker", "FORWARD": "Striker",
+    "ATTACKER": "Striker", "CENTRE FORWARD": "Striker", "9": "Striker",
 }
 
 def _clean_pos_token(tok: str) -> str:
@@ -110,11 +134,12 @@ def map_first_position_to_group(cell) -> str:
 
 DEFAULT_TEMPLATE = {
     "Goalkeeper": "Goalkeeper",
-    "Wide Defender": "Wide Defender, Full Back",
-    "Central Defender": "Central Defender, All Round",
-    "Central Midfielder": "Central Midfielder, All Round CM",
-    "Wide Midfielder": "Wide Midfielder, Touchline Winger",
-    "Central Forward": "Striker, All Round CF"
+    "Centre Back": "Central Defender, All Round",
+    "Full Back": "Wide Defender, Full Back",
+    "Number 6": "Central Midfielder, Defensive",
+    "Number 8": "Central Midfielder, All Round CM",
+    "Winger": "Wide Midfielder, Touchline Winger",
+    "Striker": "Striker, All Round CF",
 }
 # ========== Metric sets ==========
 position_metrics = {
@@ -615,7 +640,11 @@ st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining, 
 
 # 6-group include filter
 available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
-selected_groups = st.multiselect("Include groups", options=available_groups, default=[], label_visibility="collapsed")
+selected_groups = st.multiselect(
+    "Choose Position Group",
+    options=SIX_GROUPS,
+    default=[],
+)
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
