@@ -602,6 +602,82 @@ if pos_col:
 else:
     df["Positions played"] = np.nan
 
+# ================== Simplified Wyscout → 7-position mapping ==================
+SIMPLE_POSITIONS = [
+    "Goalkeeper", "Centre Back", "Full Back", 
+    "Number 6", "Number 8", "Winger", "Striker"
+]
+
+Wyscout_TO_SIMPLE = {
+    # Goalkeepers
+    "Goalkeeper": "Goalkeeper",
+    "GK": "Goalkeeper",
+
+    # Centre Backs
+    "Centre Back": "Centre Back",
+    "Central Defender": "Centre Back",
+    "Defender (Centre)": "Centre Back",
+    "Left Centre Back": "Centre Back",
+    "Right Centre Back": "Centre Back",
+    "CB": "Centre Back",
+
+    # Full Backs
+    "Right Back": "Full Back",
+    "Left Back": "Full Back",
+    "Wing Back": "Full Back",
+    "Right Wing Back": "Full Back",
+    "Left Wing Back": "Full Back",
+    "RB": "Full Back",
+    "LB": "Full Back",
+    "RWB": "Full Back",
+    "LWB": "Full Back",
+
+    # Number 6 (Defensive Mids)
+    "Defensive Midfielder": "Number 6",
+    "Holding Midfielder": "Number 6",
+    "Central Defensive Midfielder": "Number 6",
+    "DM": "Number 6",
+    "CDM": "Number 6",
+
+    # Number 8 (Box-to-Box)
+    "Central Midfielder": "Number 8",
+    "Box-to-Box Midfielder": "Number 8",
+    "CM": "Number 8",
+
+    # Wingers
+    "Left Midfielder": "Winger",
+    "Right Midfielder": "Winger",
+    "Left Winger": "Winger",
+    "Right Winger": "Winger",
+    "Wide Midfielder": "Winger",
+    "Inverted Winger": "Winger",
+    "RW": "Winger",
+    "LW": "Winger",
+
+    # Strikers
+    "Centre Forward": "Striker",
+    "Forward": "Striker",
+    "Attacking Midfielder": "Striker",
+    "Second Striker": "Striker",
+    "CF": "Striker",
+    "ST": "Striker",
+    "9": "Striker",
+}
+
+def clean_position_name(pos: str) -> str:
+    if pd.isna(pos):
+        return ""
+    pos = str(pos).strip().title()
+    pos = re.sub(r"\s*\(.*?\)", "", pos).strip()  # remove (Centre), (Left), etc.
+    return pos
+
+def map_wyscout_to_simple(pos: str) -> str:
+    pos_clean = clean_position_name(pos)
+    for k, v in Wyscout_TO_SIMPLE.items():
+        if k.lower() in pos_clean.lower():
+            return v
+    return "Winger"  # default if unknown
+
 # Create the simplified role column used by the rest of the app
 if pos_col:
     df["Six-Group Position"] = df[pos_col].apply(map_wyscout_to_simple)
