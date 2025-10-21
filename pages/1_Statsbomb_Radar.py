@@ -1780,7 +1780,7 @@ else:
 
         for _, row in favourite_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
-            player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣🟠]\s*", "", player_raw).strip()
             team = row.get("Team", "")
             league = row.get("League", "")
             position = row.get("Positions played", "")
