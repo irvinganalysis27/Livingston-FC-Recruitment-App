@@ -615,30 +615,40 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-    # ✅ Only duplicate true Centre Midfielders once — skip if already has 6/8 versions
+    # ✅ Only duplicate true Centre Midfielders once (for each unique player-team combo)
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"].eq("Centre Midfield")
 
-        # only proceed if CM rows exist and no 6/8 already present for those players
         if cm_mask.any():
-            cm_players = df.loc[cm_mask, "Player"].unique().tolist()
+            # Deduplicate by player + team (avoids multiple club rows repeating)
+            cm_rows = (
+                df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
+                .drop_duplicates(subset=["Player", "Team"])
+            )
+            if not cm_rows.empty:
+                cm_as_6 = df.loc[
+                    df["Player"].isin(cm_rows["Player"])
+                    & df["Team"].isin(cm_rows["Team"])
+                    & cm_mask
+                ].copy()
+                cm_as_8 = cm_as_6.copy()
 
-            # check if any of these players already have a 6 or 8 row
-            existing = df[
-                df["Player"].isin(cm_players)
-                & df["Six-Group Position"].isin(["Number 6", "Number 8"])
-            ]["Player"].unique().tolist()
-
-            # filter out players that already have been duplicated
-            new_players = [p for p in cm_players if p not in existing]
-
-            if new_players:
-                cm_rows = df.loc[df["Player"].isin(new_players) & cm_mask].copy()
-                cm_as_6 = cm_rows.copy()
                 cm_as_6["Six-Group Position"] = "Number 6"
-                cm_as_8 = cm_rows.copy()
                 cm_as_8["Six-Group Position"] = "Number 8"
-                df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
+                # Only add if they don't already exist
+                already_6_8 = df[
+                    (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
+                    & df["Player"].isin(cm_rows["Player"])
+                ]
+                new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
+                new_rows = new_rows[
+                    ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                        already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                    )
+                ]
+
+                df = pd.concat([df, new_rows], ignore_index=True)
 
     return df
 # ---------- Cached Data Loader ----------
