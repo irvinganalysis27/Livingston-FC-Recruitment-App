@@ -1,5 +1,3 @@
-# pages/3_Team_Rankings.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,7 +10,7 @@ from auth import check_password
 from branding import show_branding
 
 # ============================================================
-# Setup & Protection
+# Setup
 # ============================================================
 if not check_password():
     st.stop()
@@ -42,6 +40,7 @@ def _ensure_db():
     """)
     conn.commit()
     conn.close()
+
 _ensure_db()
 
 def get_favourites():
@@ -52,10 +51,8 @@ def get_favourites():
 
 def add_favourite(player, team=None, league=None, position=None):
     conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        "INSERT OR REPLACE INTO favourites (player, team, league, position) VALUES (?,?,?,?)",
-        (player, team, league, position)
-    )
+    conn.execute("INSERT OR REPLACE INTO favourites (player, team, league, position) VALUES (?,?,?,?)",
+                 (player, team, league, position))
     conn.commit()
     conn.close()
 
@@ -74,7 +71,7 @@ def load_one_file(p: Path) -> pd.DataFrame:
 def load_statsbomb(path: Path) -> pd.DataFrame:
     if path.is_file():
         return load_one_file(path)
-    frames = [load_one_file(f) for f in sorted(p for p in path.iterdir() if p.is_file())]
+    frames = [load_one_file(f) for f in sorted(path.iterdir()) if f.is_file()]
     return pd.concat(frames, ignore_index=True, sort=False)
 
 def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
@@ -90,84 +87,79 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
 # Position Mapping
 # ============================================================
 RAW_TO_GROUP = {
-    "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
+    "LEFTBACK": "Full Back", "RIGHTBACK": "Full Back", "LEFTWINGBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
     "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
     "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8",
-    "LEFTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
-    "LEFTWING": "Winger", "LEFTMIDFIELDER": "Winger",
-    "RIGHTWING": "Winger", "RIGHTMIDFIELDER": "Winger",
+    "CENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield", "RIGHTCENTREMIDFIELDER": "Centre Midfield",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8",
+    "LEFTWING": "Winger", "RIGHTWING": "Winger",
+    "LEFTMIDFIELDER": "Winger", "RIGHTMIDFIELDER": "Winger",
     "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper",
-}
-FRIENDLY_TO_GROUP = {
-    "FULLBACK": "Full Back", "FULL BACK": "Full Back",
-    "CENTREBACK": "Centre Back", "CENTRE BACK": "Centre Back",
-    "NUMBER6": "Number 6", "NO6": "Number 6", "DM": "Number 6",
-    "NUMBER8": "Number 8", "NO8": "Number 8", "CM": "Number 8",
-    "WINGER": "Winger", "STRIKER": "Striker", "FORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper", "GK": "Goalkeeper",
+    "GOALKEEPER": "Goalkeeper"
 }
 
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok): return ""
     t = str(tok).upper().strip()
     t = re.sub(r"[.\-_/]", " ", t)
-    return re.sub(r"\s+", " ", t)
+    return re.sub(r"\s+", "", t)
 
 def map_first_position_to_group(primary_pos_cell) -> str:
-    t = _clean_pos_token(primary_pos_cell)
-    sb_key = t.replace(" ", "")
-    if sb_key in RAW_TO_GROUP:
-        return RAW_TO_GROUP[sb_key]
-    if t in FRIENDLY_TO_GROUP:
-        return FRIENDLY_TO_GROUP[t]
-    if sb_key in FRIENDLY_TO_GROUP:
-        return FRIENDLY_TO_GROUP[sb_key]
-    return None
+    return RAW_TO_GROUP.get(_clean_pos_token(primary_pos_cell), None)
 
 # ============================================================
-# Position Metric Templates
+# Metric Templates
 # ============================================================
 position_metrics = {
-    "Goalkeeper": [
-        "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
-        "Shots Faced", "Shots Faced OT%", "Positive Outcome%", "Goalkeeper OBV"
-    ],
-    "Centre Back": [
-        "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV",
-        "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-        "Defensive Actions", "Aggressive Actions", "Fouls", "Aerial Wins", "Aerial Win%"
-    ],
-    "Full Back": [
-        "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Deep Progressions",
-        "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-        "Defensive Actions", "Aerial Win%", "PAdj Pressures", "PAdj Tack&Int"
-    ],
-    "Number 6": [
-        "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions",
-        "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-        "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-        "Aggressive Actions", "Aerial Win%", "Pressure Regains"
-    ],
-    "Number 8": [
-        "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
-        "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV",
-        "Pressure Regains", "PAdj Pressures", "Aggressive Actions"
-    ],
-    "Winger": [
-        "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted",
-        "NP Goals", "OP Passes Into Box", "Successful Box Cross%",
-        "Passing%", "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won"
-    ],
-    "Striker": [
-        "NP Goals", "xG", "Shots", "xG/Shot", "Goal Conversion%",
-        "Touches In Box", "xG Assisted", "Fouls Won", "Deep Completions",
-        "OP Key Passes", "Aerial Win%", "Aerial Wins"
-    ]
+    "Goalkeeper": {
+        "metrics": [
+            "Goals Conceded", "PSxG Faced", "GSAA", "Save%", "xSv%", "Shot Stopping%",
+            "Shots Faced", "Shots Faced OT%", "Positive Outcome%", "Goalkeeper OBV"
+        ]
+    },
+    "Centre Back": {
+        "metrics": [
+            "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
+            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%", "Defensive Actions",
+            "Aggressive Actions", "Fouls", "Aerial Wins", "Aerial Win%"
+        ]
+    },
+    "Full Back": {
+        "metrics": [
+            "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Deep Progressions",
+            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV", "Defensive Actions",
+            "Aerial Win%", "PAdj Pressures", "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions"
+        ]
+    },
+    "Number 6": {
+        "metrics": [
+            "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV",
+            "Pr. Pass% Dif.", "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
+            "Aggressive Actions", "Aerial Win%", "Pressure Regains"
+        ]
+    },
+    "Number 8": {
+        "metrics": [
+            "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals", "Passing%", "Deep Progressions",
+            "OP Passes Into Box", "Pass OBV", "OBV", "Pressure Regains", "PAdj Pressures", "Aggressive Actions"
+        ]
+    },
+    "Winger": {
+        "metrics": [
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%", "Successful Dribbles",
+            "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions"
+        ]
+    },
+    "Striker": {
+        "metrics": [
+            "NP Goals", "xG", "Shots", "xG/Shot", "Goal Conversion%", "Touches In Box",
+            "xG Assisted", "Fouls Won", "Deep Completions", "OP Key Passes", "Aerial Win%",
+            "Aerial Wins", "Aggressive Actions"
+        ]
+    }
 }
 
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
@@ -177,15 +169,14 @@ LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 # ============================================================
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    rename_map = {}
-    if "Name" in df.columns: rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
-    if rename_map: df.rename(columns=rename_map, inplace=True)
+
+    rename_map = {"Name": "Player", "Primary Position": "Position", "Minutes": "Minutes played"}
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
 
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
-        df["Competition_norm"] = df["Competition"].astype(str)
+        df["Competition_norm"] = df["Competition"]
 
+    # Merge league multipliers
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
@@ -196,23 +187,26 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         df["Multiplier"] = 1.0
 
-    if "Secondary Position" in df.columns:
-        df["Positions played"] = df["Position"].fillna("") + np.where(
-            df["Secondary Position"].notna(), ", " + df["Secondary Position"].astype(str), ""
-        )
-    else:
-        df["Positions played"] = df["Position"]
-
+    # Position mapping
     df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+
+    # ✅ Duplicate Centre Midfielders into both Number 6 and Number 8
+    cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+    if cm_mask.any():
+        cm_as_6 = df.loc[cm_mask].copy()
+        cm_as_8 = df.loc[cm_mask].copy()
+        cm_as_6["Six-Group Position"] = "Number 6"
+        cm_as_8["Six-Group Position"] = "Number 8"
+        df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
     return df
 
 # ============================================================
-# Compute Scores (League + Position)
+# Compute Scores (matches radar logic)
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
-    df = df_all.copy()
     pos_col = "Six-Group Position"
-    league_col = "Competition_norm"
+    df = df_all.copy()
 
     df["Minutes played"] = pd.to_numeric(df.get("Minutes played", 0), errors="coerce").fillna(0)
     eligible = df[df["Minutes played"] >= min_minutes].copy()
@@ -223,53 +217,61 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     df["Weighted Z Score"] = 0.0
     df["Score (0–100)"] = 50.0
 
-    for (league, position), idx in df.groupby([league_col, pos_col]).groups.items():
-        if pd.isna(league) or pd.isna(position):
-            continue
-
-        metrics = position_metrics.get(position, [])
+    for position, template in position_metrics.items():
+        metrics = template["metrics"]
         existing = [m for m in metrics if m in df.columns]
         if not existing:
             continue
 
         for m in existing:
-            df[m] = pd.to_numeric(df[m], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0)
+            df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
-        elig_mask = (eligible[league_col] == league) & (eligible[pos_col] == position)
-        elig_pos = eligible.loc[elig_mask, existing]
+        elig_pos = eligible[eligible[pos_col] == position]
         if elig_pos.empty:
-            elig_pos = eligible.loc[eligible[league_col] == league, existing]
-        if elig_pos.empty:
-            elig_pos = eligible[existing]
+            continue
 
-        mean_vals = elig_pos.mean()
-        std_vals = elig_pos.std().replace(0, 1)
+        means = elig_pos[existing].mean()
+        stds = elig_pos[existing].std().replace(0, 1)
 
-        mask_lp = (df[league_col] == league) & (df[pos_col] == position)
-        Z = ((df.loc[mask_lp, existing] - mean_vals) / std_vals).fillna(0)
+        mask = df[pos_col] == position
+        Z = (df.loc[mask, existing] - means) / stds
         for m in (LOWER_IS_BETTER & set(existing)):
-            Z[m] = -Z[m]
-        df.loc[mask_lp, "Avg Z Score"] = Z.mean(axis=1).astype(float)
+            Z[m] *= -1
 
+        df.loc[mask, "Avg Z Score"] = Z.mean(axis=1).fillna(0)
+
+    # Weighted Z
     mult = pd.to_numeric(df.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     az = df["Avg Z Score"]
-    df["Weighted Z Score"] = np.where(az >= 0, az * mult, az / mult)
+    df["Weighted Z Score"] = np.where(az > 0, az * mult, az / mult)
 
+    # LFC multiplier for Scottish Premiership
+    df["LFC Multiplier"] = mult
+    df.loc[df["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
+    lfc_mult = df["LFC Multiplier"]
+    df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
+
+    # Anchors by position
     anchors = (
-        df.groupby([league_col, pos_col], dropna=False)["Weighted Z Score"]
-        .agg(_lo="min", _hi="max").reset_index()
+        eligible.groupby(pos_col)["Weighted Z Score"]
+        .agg(_min="min", _max="max")
+        .fillna(0)
     )
-    df = df.merge(anchors, on=[league_col, pos_col], how="left")
+    df = df.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
     def to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
-        return float(np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
 
     df["Score (0–100)"] = [
-        to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_lo"], df["_hi"])
+        to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_min"], df["_max"])
     ]
-    df.drop(columns=["_lo", "_hi"], inplace=True, errors="ignore")
+    df["LFC Score (0–100)"] = [
+        to100(v, lo, hi) for v, lo, hi in zip(df["LFC Weighted Z"], df["_min"], df["_max"])
+    ]
+
+    df.drop(columns=["_min", "_max"], inplace=True, errors="ignore")
     return df
 
 # ============================================================
@@ -288,40 +290,31 @@ try:
     clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
     selected_club = st.selectbox("Select Club", clubs)
 
-    df_team = df_all[
-        (df_all[league_col] == selected_league)
-        & (df_all["Team"] == selected_club)
-    ].copy()
+    df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
     if df_team.empty:
         st.warning("No players found for this team.")
         st.stop()
 
-    df_team["Minutes played"] = (
-        pd.to_numeric(df_team["Minutes played"], errors="coerce")
-        .replace([np.inf, -np.inf], np.nan).fillna(0).astype(int)
-    )
-    df_team["Score (0–100)"] = pd.to_numeric(df_team["Score (0–100)"], errors="coerce").fillna(0)
-
-    df_team["Rank in Team"] = (
-        df_team["Score (0–100)"].rank(ascending=False, method="min").fillna(0).astype(int)
-    )
+    df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
+    df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
     st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
     min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
-    default_display_min = min(600, max_val)
     selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
-        min_value=min_val, max_value=max_val, value=default_display_min, step=50
+        min_value=min_val, max_value=max_val,
+        value=min(600, max_val), step=50
     )
-    df_team = df_team[df_team["Minutes played"] >= selected_min_display].copy()
+    df_team = df_team[df_team["Minutes played"] >= selected_min_display]
 
-    avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
+    avg_score = df_team["LFC Score (0–100)"].mean() if "LFC Score (0–100)" in df_team else np.nan
     st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}" if not np.isnan(avg_score)
                 else f"### {selected_club} ({selected_league}) — No eligible players")
 
     cols_for_table = [
-        "Player", "Six-Group Position", "Positions played", "Team", league_col, "Multiplier",
-        "Avg Z Score", "Weighted Z Score", "Score (0–100)", "Age", "Minutes played", "Rank in Team"
+        "Player", "Six-Group Position", "Team", league_col, "Multiplier",
+        "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
+        "Score (0–100)", "LFC Score (0–100)", "Age", "Minutes played", "Rank in Team"
     ]
     for c in cols_for_table:
         if c not in df_team.columns:
@@ -333,31 +326,26 @@ try:
         league_col: "League",
         "Multiplier": "League Weight",
         "Avg Z Score": "Z Avg",
-        "Weighted Z Score": "Z Weighted"
+        "Weighted Z Score": "Z Weighted",
+        "LFC Weighted Z": "Z LFC Weighted"
     }, inplace=True)
 
     favs_in_db = {row[0] for row in get_favourites()}
     z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-    edited = st.data_editor(
+    st.data_editor(
         z_ranking,
         column_config={
-            "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Mark as favourite"),
+            "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite"),
             "League Weight": st.column_config.NumberColumn("League Weight", format="%.3f"),
             "Z Avg": st.column_config.NumberColumn("Z Avg", format="%.3f"),
             "Z Weighted": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
             "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
+            "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
         },
         hide_index=False,
         width="stretch",
     )
-
-    for _, r in edited.iterrows():
-        p = r["Player"]
-        if r["⭐ Favourite"] and p not in favs_in_db:
-            add_favourite(p, r.get("Team"), r.get("League"), r.get("Position"))
-        elif not r["⭐ Favourite"] and p in favs_in_db:
-            remove_favourite(p)
 
 except Exception as e:
     st.error(f"❌ Could not load data: {e}")
