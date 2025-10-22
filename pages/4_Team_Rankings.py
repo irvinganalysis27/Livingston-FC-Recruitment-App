@@ -214,9 +214,8 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         eligible = df.copy()
 
     df["Avg Z Score"] = 0.0
-    df["Weighted Z Score"] = 0.0
-    df["Score (0–100)"] = 50.0
 
+    # --- Step 1: Per-position Z-scores (baseline = all leagues) ---
     for position, template in position_metrics.items():
         metrics = template["metrics"]
         existing = [m for m in metrics if m in df.columns]
@@ -227,7 +226,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
         elig_pos = eligible[eligible[pos_col] == position]
-        if elig_pos.empty:
+        if elig_pos.empty():
             continue
 
         means = elig_pos[existing].mean()
@@ -237,32 +236,32 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         Z = (df.loc[mask, existing] - means) / stds
         for m in (LOWER_IS_BETTER & set(existing)):
             Z[m] *= -1
-
         df.loc[mask, "Avg Z Score"] = Z.mean(axis=1).fillna(0)
 
-    # Weighted Z
+    # --- Step 2: Weighted Z ---
     mult = pd.to_numeric(df.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     az = df["Avg Z Score"]
     df["Weighted Z Score"] = np.where(az > 0, az * mult, az / mult)
 
-    # LFC multiplier for Scottish Premiership
+    # --- Step 3: LFC multiplier (1.20 for Scottish Premiership) ---
     df["LFC Multiplier"] = mult
     df.loc[df["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
     lfc_mult = df["LFC Multiplier"]
     df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
 
-    # Anchors by position
+    # --- Step 4: Anchors (based on Weighted Z Score) ---
     anchors = (
-        eligible.groupby(pos_col)["Weighted Z Score"]
+        eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
         .agg(_min="min", _max="max")
         .fillna(0)
     )
     df = df.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
+    # --- Step 5: Convert to 0–100 scale ---
     def to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
-        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+        return np.clip((v - lo) / (hi - lo) * 100, 0.0, 100.0)
 
     df["Score (0–100)"] = [
         to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_min"], df["_max"])
