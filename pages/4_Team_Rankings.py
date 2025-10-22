@@ -401,10 +401,10 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 # ============================================================
 # Main UI
 # ============================================================
-try:
-    df_all_raw = load_statsbomb(DATA_PATH)
-    df_all_raw = add_age_column(df_all_raw)
-    df_all = preprocess(df_all_raw)
+from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
+
+    df_all_raw = load_data_once()
+    df_all = preprocess_df(df_all_raw)
     df_all = compute_scores(df_all, min_minutes=600)
 
     league_col = "Competition_norm"
