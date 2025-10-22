@@ -1101,9 +1101,6 @@ for _, r in edited.iterrows():
     elif not r["⭐ Favourite"] and p in favs_in_db:
         hide_favourite(p)
 
-except Exception as e:
-    st.error(f"❌ Could not load data: {e}")
-
 # ============================================================
 # 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
 # ============================================================
