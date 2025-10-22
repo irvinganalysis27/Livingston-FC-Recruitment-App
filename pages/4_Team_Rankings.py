@@ -277,26 +277,66 @@ try:
         (df_all[league_col] == selected_league)
         & (df_all["Team"] == selected_club)
     ].copy()
+
     if df_team.empty:
         st.warning("No players found for this team.")
         st.stop()
 
-    df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+    # ✅ Clean up numeric columns before ranking
+    for c in ["Score (0–100)", "Minutes played"]:
+        if c in df_team.columns:
+            df_team[c] = (
+                pd.to_numeric(df_team[c], errors="coerce")
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0)
+            )
 
+    # ✅ Safe ranking
+    df_team["Rank in Team"] = (
+        df_team["Score (0–100)"]
+        .rank(ascending=False, method="min")
+        .fillna(0)
+        .astype(int)
+    )
+
+    # ---------- Optional minutes filter ----------
     st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
-    df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
-    min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
+
+    df_team["Minutes played"] = (
+        pd.to_numeric(df_team["Minutes played"], errors="coerce")
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0)
+        .astype(int)
+    )
+
+    if df_team["Minutes played"].empty:
+        st.warning("No valid minute data found.")
+        st.stop()
+
+    min_val = int(df_team["Minutes played"].min())
+    max_val = int(df_team["Minutes played"].max())
     default_display_min = min(600, max_val)
+
     selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
-        min_value=min_val, max_value=max_val,
-        value=default_display_min, step=50
+        min_value=min_val,
+        max_value=max_val,
+        value=default_display_min,
+        step=50,
     )
+
     df_team = df_team[df_team["Minutes played"] >= selected_min_display].copy()
 
+    if df_team.empty:
+        st.warning("No players available — try lowering your minimum minutes filter.")
+        st.stop()
+
+    # ---------- Team average ----------
     avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
-    st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}" if not np.isnan(avg_score)
-                else f"### {selected_club} ({selected_league}) — No eligible players")
+    if not np.isnan(avg_score):
+        st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
+    else:
+        st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
     # ---------- Table ----------
     cols_for_table = [
