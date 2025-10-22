@@ -187,6 +187,10 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 # Position-specific ranking logic (with LFC variant + improved weighting logic)
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
+    """
+    Compute position-specific Z-scores and rankings using only relevant metrics per position.
+    Matches the Radar page logic exactly.
+    """
     pos_col = "Six-Group Position"
     if pos_col not in df_all.columns:
         df_all[pos_col] = np.nan
@@ -194,70 +198,124 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     df_all = df_all.copy()
     mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
 
-    # --- Eligible baseline set ---
+    # --- Define position-specific metrics (copied from Radar page) ---
+    position_metrics = {
+        "Centre Back": [
+            "NP Goals", "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
+            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
+            "Defensive Actions", "Aggressive Actions", "Fouls", "Aerial Wins", "Aerial Win%",
+        ],
+        "Full Back": [
+            "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Crossing%", "Deep Progressions",
+            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
+            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
+            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
+        ],
+        "Number 6": [
+            "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
+            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
+            "Aggressive Actions", "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains",
+        ],
+        "Number 8": [
+            "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
+            "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
+            "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90", "Aggressive Actions",
+        ],
+        "Winger": [
+            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
+            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
+            "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
+            "Player Season Fhalf Pressures 90",
+        ],
+        "Striker": [
+            "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot", "Goal Conversion%",
+            "Touches In Box", "xG Assisted", "Fouls Won", "Deep Completions", "OP Key Passes",
+            "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90",
+        ]
+    }
+
+    # --- Eligible baseline set (600+ minutes) ---
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
 
-    # --- Compute per-position mean/std using eligible only ---
-    num_cols = df_all.select_dtypes(include=[np.number]).columns.tolist()
-    baseline_stats = eligible.groupby(pos_col)[num_cols].agg(["mean", "std"]).fillna(0)
-    baseline_stats.columns = baseline_stats.columns.map("_".join)
+    # --- Initialize storage for Z-scores ---
+    df_all["Avg Z Score"] = 0.0
+    df_all["Weighted Z Score"] = 0.0
+    df_all["LFC Weighted Z"] = 0.0
+    df_all["Score (0–100)"] = 50.0
+    df_all["LFC Score (0–100)"] = 50.0
 
-    metric_cols = [c for c in num_cols if c not in ["Age", "Height", "Minutes played", "Multiplier"]]
-    raw_z = pd.DataFrame(index=df_all.index, columns=metric_cols, dtype=float)
-
-    for m in metric_cols:
-        mean_col = f"{m}_mean"
-        std_col = f"{m}_std"
-        if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
+    # --- Process each position separately ---
+    for position, metrics in position_metrics.items():
+        # Filter to players in this position
+        pos_mask = df_all[pos_col] == position
+        if not pos_mask.any():
             continue
-        mean_vals = df_all[pos_col].map(baseline_stats[mean_col])
-        std_vals = df_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
-        z = (df_all[m] - mean_vals) / std_vals
-        if m in LOWER_IS_BETTER:
-            z *= -1
-        raw_z[m] = z.fillna(0)
 
-    # --- Average Z-scores ---
-    df_all["Avg Z Score"] = raw_z.mean(axis=1).fillna(0)
+        # Ensure all metrics exist
+        for m in metrics:
+            if m not in df_all.columns:
+                df_all[m] = 0
+            df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
 
-    # --- Apply league multipliers with correct logic ---
+        # Get eligible players for this position (for baseline stats)
+        eligible_pos = eligible[eligible[pos_col] == position]
+        if eligible_pos.empty:
+            eligible_pos = df_all[pos_mask].copy()
+
+        # Compute mean/std from eligible players only
+        baseline_stats = eligible_pos[metrics].agg(["mean", "std"]).fillna(0)
+        baseline_stats.columns = baseline_stats.columns.map(lambda x: f"{x[0]}_{x[1]}")
+
+        # Compute Z-scores for all players in this position
+        raw_z = pd.DataFrame(index=df_all[pos_mask].index, columns=metrics, dtype=float)
+        
+        for m in metrics:
+            mean_col = f"{m}_mean"
+            std_col = f"{m}_std"
+            
+            if mean_col not in baseline_stats.index or std_col not in baseline_stats.index:
+                raw_z[m] = 0
+                continue
+            
+            mean_val = baseline_stats[mean_col]
+            std_val = baseline_stats[std_col] if baseline_stats[std_col] != 0 else 1
+            
+            z = (df_all.loc[pos_mask, m] - mean_val) / std_val
+            
+            # Invert for "lower is better" metrics
+            if m in LOWER_IS_BETTER:
+                z *= -1
+            
+            raw_z[m] = z.fillna(0)
+
+        # Average Z-score for this position
+        avg_z = raw_z.mean(axis=1).fillna(0)
+        df_all.loc[pos_mask, "Avg Z Score"] = avg_z
+
+    # --- Apply league multipliers (same logic for all positions) ---
     mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     avg_z = df_all["Avg Z Score"]
 
     df_all["Weighted Z Score"] = np.select(
-        [
-            avg_z > 0,
-            avg_z < 0
-        ],
-        [
-            avg_z * mult,   # strong leagues boost positives; weak leagues dampen positives
-            avg_z / mult    # strong leagues soften negatives; weak leagues amplify negatives
-        ],
+        [avg_z > 0, avg_z < 0],
+        [avg_z * mult, avg_z / mult],
         default=0.0
     )
 
     # --- LFC weighted variant (Scotland Premiership = 1.20) ---
-    lfc_mult = mult.copy()
-    df_all["LFC Multiplier"] = lfc_mult
+    df_all["LFC Multiplier"] = mult.copy()
     df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
-
     lfc_mult = df_all["LFC Multiplier"]
 
     df_all["LFC Weighted Z"] = np.select(
-        [
-            avg_z > 0,
-            avg_z < 0
-        ],
-        [
-            avg_z * lfc_mult,
-            avg_z / lfc_mult
-        ],
+        [avg_z > 0, avg_z < 0],
+        [avg_z * lfc_mult, avg_z / lfc_mult],
         default=0.0
     )
 
-    # --- Anchors (based on standard weighted scores) ---
+    # --- Anchors per position (based on standard weighted scores) ---
     eligible = df_all[mins >= min_minutes].copy()
     if eligible.empty:
         eligible = df_all.copy()
@@ -269,12 +327,12 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     )
 
     if not anchors.empty:
-        df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
+        df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left", suffixes=('', '_anchor'))
     else:
         df_all["_scale_min"] = 0.0
         df_all["_scale_max"] = 1.0
 
-    # --- Convert both versions to 0–100 scale ---
+    # --- Convert to 0–100 scale ---
     def _to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
@@ -293,7 +351,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         df_all[["Score (0–100)", "LFC Score (0–100)"]]
         .apply(pd.to_numeric, errors="coerce")
         .round(1)
-        .fillna(0)
+        .fillna(50.0)
     )
 
     df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
