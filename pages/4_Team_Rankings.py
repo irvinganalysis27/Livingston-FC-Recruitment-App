@@ -146,6 +146,41 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         df["Positions played"] = df["Position"]
 
     df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+        # ✅ Duplicate Centre Midfielders into Number 6 and Number 8
+    if "Six-Group Position" in df.columns:
+        cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+        
+        if cm_mask.any():
+            # Deduplicate by player + team (avoids multiple club rows repeating)
+            cm_rows = (
+                df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
+                .drop_duplicates(subset=["Player", "Team"])
+            )
+            if not cm_rows.empty:
+                cm_as_6 = df.loc[
+                    df["Player"].isin(cm_rows["Player"])
+                    & df["Team"].isin(cm_rows["Team"])
+                    & cm_mask
+                ].copy()
+                cm_as_8 = cm_as_6.copy()
+                
+                cm_as_6["Six-Group Position"] = "Number 6"
+                cm_as_8["Six-Group Position"] = "Number 8"
+                
+                # Only add if they don't already exist
+                already_6_8 = df[
+                    (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
+                    & df["Player"].isin(cm_rows["Player"])
+                ]
+                new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
+                new_rows = new_rows[
+                    ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                        already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                    )
+                ]
+                
+                df = pd.concat([df, new_rows], ignore_index=True)
+    
     return df
 
 # ============================================================
