@@ -118,19 +118,30 @@ LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
+    # --- Rename columns to expected schema ---
     rename_map = {}
-    if "Name" in df.columns: rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+    if "Name" in df.columns:
+        rename_map["Name"] = "Player"
+    if "Primary Position" in df.columns:
+        rename_map["Primary Position"] = "Position"
+    if "Minutes" in df.columns:
+        rename_map["Minutes"] = "Minutes played"
+
+    # ✅ Include radar-style metric renames here
+    rename_map.update({
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
         "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-    if rename_map: df.rename(columns=rename_map, inplace=True)
+    })
 
+    if rename_map:
+        df.rename(columns=rename_map, inplace=True)
+
+    # --- League Normalisation ---
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
         df["Competition_norm"] = df["Competition"].astype(str)
 
-    # merge multipliers
+    # --- Merge league multipliers ---
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
@@ -141,6 +152,7 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         df["Multiplier"] = 1.0
 
+    # --- Positions played ---
     if "Secondary Position" in df.columns:
         df["Positions played"] = df["Position"].fillna("") + np.where(
             df["Secondary Position"].notna(), ", " + df["Secondary Position"].astype(str), ""
@@ -148,13 +160,14 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Positions played"] = df["Position"]
 
+    # --- Map to Six-Group Positions ---
     df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-        # ✅ Duplicate Centre Midfielders into Number 6 and Number 8
+
+    # ✅ Duplicate Centre Midfielders into Number 6 and Number 8
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-        
+
         if cm_mask.any():
-            # Deduplicate by player + team (avoids multiple club rows repeating)
             cm_rows = (
                 df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
                 .drop_duplicates(subset=["Player", "Team"])
@@ -166,11 +179,10 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
                     & cm_mask
                 ].copy()
                 cm_as_8 = cm_as_6.copy()
-                
+
                 cm_as_6["Six-Group Position"] = "Number 6"
                 cm_as_8["Six-Group Position"] = "Number 8"
-                
-                # Only add if they don't already exist
+
                 already_6_8 = df[
                     (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
                     & df["Player"].isin(cm_rows["Player"])
@@ -181,9 +193,9 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
                         already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
                     )
                 ]
-                
+
                 df = pd.concat([df, new_rows], ignore_index=True)
-    
+
     return df
 
 # ============================================================
