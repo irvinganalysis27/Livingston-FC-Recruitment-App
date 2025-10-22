@@ -401,10 +401,10 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 # ============================================================
 # Main UI
 # ============================================================
-try:
 # ✅ Import shared loader from Radar page
 from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
 
+try:
     # ✅ Use the same full StatsBomb dataset as Radar
     df_all_raw = load_data_once()
     df_all = preprocess_df(df_all_raw)
