@@ -1,15 +1,14 @@
-# pages/3_Team_Rankings.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import re
+import sqlite3
 from pathlib import Path
 from datetime import datetime
-import sqlite3
 
 from auth import check_password
 from branding import show_branding
+from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
 
 # ============================================================
 # Setup & Protection
@@ -22,7 +21,6 @@ st.title("🏆 Team Player Rankings")
 
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
-DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 DB_PATH = APP_DIR / "favourites.db"
 
 # ============================================================
@@ -31,7 +29,8 @@ DB_PATH = APP_DIR / "favourites.db"
 def _ensure_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
+    c.execute(
+        """
         CREATE TABLE IF NOT EXISTS favourites (
             player TEXT PRIMARY KEY,
             team TEXT,
@@ -39,21 +38,27 @@ def _ensure_db():
             position TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+        """
+    )
     conn.commit()
     conn.close()
+
 _ensure_db()
 
 def get_favourites():
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT player, team, league, position FROM favourites").fetchall()
+    rows = conn.execute(
+        "SELECT player, team, league, position FROM favourites"
+    ).fetchall()
     conn.close()
     return rows
 
 def add_favourite(player, team=None, league=None, position=None):
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT OR REPLACE INTO favourites (player, team, league, position) VALUES (?,?,?,?)",
-                 (player, team, league, position))
+    conn.execute(
+        "INSERT OR REPLACE INTO favourites (player, team, league, position) VALUES (?,?,?,?)",
+        (player, team, league, position),
+    )
     conn.commit()
     conn.close()
 
@@ -64,350 +69,16 @@ def remove_favourite(player):
     conn.close()
 
 # ============================================================
-# Data Loading
-# ============================================================
-def load_one_file(p: Path) -> pd.DataFrame:
-    return pd.read_excel(p) if p.suffix.lower() in {".xlsx", ".xls"} else pd.read_csv(p)
-
-def load_statsbomb(path: Path) -> pd.DataFrame:
-    if path.is_file():
-        return load_one_file(path)
-    frames = [load_one_file(f) for f in sorted(p for p in path.iterdir() if p.is_file())]
-    return pd.concat(frames, ignore_index=True, sort=False)
-
-def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
-    if "Birth Date" in df.columns:
-        today = datetime.today()
-        df["Age"] = pd.to_datetime(df["Birth Date"], errors="coerce").apply(
-            lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-            if pd.notna(dob) else np.nan
-        )
-    return df
-
-# ============================================================
-# Position & League Mapping
-# ============================================================
-RAW_TO_GROUP = {
-    "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "RIGHTBACK": "Full Back", "RIGHTWINGBACK": "Full Back",
-    "CENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back",
-    "DEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREMIDFIELDER": "Number 8", "LEFTCENTREMIDFIELDER": "Number 8", "RIGHTCENTREMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8",
-    "LEFTATTACKINGMIDFIELDER": "Number 8", "SECONDSTRIKER": "Number 8",
-    "LEFTWING": "Winger", "LEFTMIDFIELDER": "Winger",
-    "RIGHTWING": "Winger", "RIGHTMIDFIELDER": "Winger",
-    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
-    "GOALKEEPER": "Goalkeeper",
-}
-def _clean_pos_token(tok: str) -> str:
-    if pd.isna(tok): return ""
-    t = str(tok).upper().strip()
-    t = re.sub(r"[.\-_/]", " ", t)
-    return re.sub(r"\s+", "", t)
-
-def map_first_position_to_group(primary_pos_cell) -> str:
-    return RAW_TO_GROUP.get(_clean_pos_token(primary_pos_cell), None)
-
-LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
-
-# ============================================================
-# Preprocessing (League + Multiplier + Position)
-# ============================================================
-def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-
-    # --- Rename columns to expected schema ---
-    rename_map = {}
-    if "Name" in df.columns:
-        rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns:
-        rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns:
-        rename_map["Minutes"] = "Minutes played"
-
-    # ✅ Include Radar-style metric renames here
-    rename_map.update({
-        "Successful Box Cross %": "Successful Box Cross%",
-        "Player Season Box Cross Ratio": "Successful Box Cross%",
-        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
-        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
-        "Player Season Xgbuildup 90": "xGBuildup",
-    })
-
-    if rename_map:
-        df.rename(columns=rename_map, inplace=True)
-
-    # --- Derived / Calculated Metrics (match Radar page logic) ---
-    # ✅ Successful Dribbles = Total - Failed
-    if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
-        df["Successful Dribbles"] = (
-            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
-            - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
-        )
-
-    # ✅ Successful Box Cross% (rename or derive if missing)
-    if "Successful Box Cross %" in df.columns:
-        df.rename(columns={"Successful Box Cross %": "Successful Box Cross%"}, inplace=True)
-    elif "Player Season Box Cross Ratio" in df.columns:
-        df.rename(columns={"Player Season Box Cross Ratio": "Successful Box Cross%"}, inplace=True)
-    elif "Crossing%" in df.columns:
-        df["Successful Box Cross%"] = pd.to_numeric(df["Crossing%"], errors="coerce").fillna(0)
-    else:
-        df["Successful Box Cross%"] = 0
-
-    # ✅ Always ensure both exist (prevents KeyError)
-    for col in ["Successful Dribbles", "Successful Box Cross%"]:
-        if col not in df.columns:
-            df[col] = 0
-
-    # --- League Normalisation ---
-    if "Competition_norm" not in df.columns and "Competition" in df.columns:
-        df["Competition_norm"] = df["Competition"].astype(str)
-
-    # --- Merge league multipliers ---
-    try:
-        mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
-        if {"League", "Multiplier"}.issubset(mult.columns):
-            df = df.merge(mult, left_on="Competition_norm", right_on="League", how="left")
-            df["Multiplier"] = pd.to_numeric(df["Multiplier"], errors="coerce").fillna(1.0)
-        else:
-            df["Multiplier"] = 1.0
-    except Exception:
-        df["Multiplier"] = 1.0
-
-    # --- Positions played ---
-    if "Secondary Position" in df.columns:
-        df["Positions played"] = df["Position"].fillna("") + np.where(
-            df["Secondary Position"].notna(), ", " + df["Secondary Position"].astype(str), ""
-        )
-    else:
-        df["Positions played"] = df["Position"]
-
-    # --- Map to Six-Group Positions ---
-    df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-
-    # ✅ Duplicate Centre Midfielders into Number 6 and Number 8
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-
-        if cm_mask.any():
-            cm_rows = (
-                df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
-                .drop_duplicates(subset=["Player", "Team"])
-            )
-            if not cm_rows.empty:
-                cm_as_6 = df.loc[
-                    df["Player"].isin(cm_rows["Player"])
-                    & df["Team"].isin(cm_rows["Team"])
-                    & cm_mask
-                ].copy()
-                cm_as_8 = cm_as_6.copy()
-
-                cm_as_6["Six-Group Position"] = "Number 6"
-                cm_as_8["Six-Group Position"] = "Number 8"
-
-                already_6_8 = df[
-                    (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
-                    & df["Player"].isin(cm_rows["Player"])
-                ]
-                new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
-                new_rows = new_rows[
-                    ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                        already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                    )
-                ]
-
-                df = pd.concat([df, new_rows], ignore_index=True)
-
-    return df
-
-# ============================================================
-# Position-specific ranking logic (with LFC variant + improved weighting logic)
-# ============================================================
-def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
-    """
-    Compute position-specific Z-scores and rankings using only relevant metrics per position.
-    Matches the Radar page logic exactly.
-    """
-    pos_col = "Six-Group Position"
-    if pos_col not in df_all.columns:
-        df_all[pos_col] = np.nan
-
-    df_all = df_all.copy()
-    mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
-
-    # --- Define position-specific metrics (copied from Radar page) ---
-    position_metrics = {
-        "Centre Back": [
-            "NP Goals", "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
-            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-            "Defensive Actions", "Aggressive Actions", "Fouls", "Aerial Wins", "Aerial Win%",
-        ],
-        "Full Back": [
-            "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Crossing%", "Deep Progressions",
-            "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
-            "Defensive Actions", "Aerial Win%", "PAdj Pressures",
-            "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
-        ],
-        "Number 6": [
-            "xGBuildup", "xG Assisted", "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-            "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
-            "Aggressive Actions", "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains",
-        ],
-        "Number 8": [
-            "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
-            "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
-            "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90", "Aggressive Actions",
-        ],
-        "Winger": [
-            "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
-            "OP Passes Into Box", "Successful Box Cross%", "Passing%",
-            "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
-            "Player Season Fhalf Pressures 90",
-        ],
-        "Striker": [
-            "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot", "Goal Conversion%",
-            "Touches In Box", "xG Assisted", "Fouls Won", "Deep Completions", "OP Key Passes",
-            "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90",
-        ]
-    }
-
-    # --- Eligible baseline set (600+ minutes) ---
-    eligible = df_all[mins >= min_minutes].copy()
-    if eligible.empty:
-        eligible = df_all.copy()
-
-    # --- Initialize storage for Z-scores ---
-    df_all["Avg Z Score"] = 0.0
-    df_all["Weighted Z Score"] = 0.0
-    df_all["LFC Weighted Z"] = 0.0
-    df_all["Score (0–100)"] = 50.0
-    df_all["LFC Score (0–100)"] = 50.0
-
-    # --- Process each position separately ---
-    for position, metrics in position_metrics.items():
-        # Filter to players in this position
-        pos_mask = df_all[pos_col] == position
-        if not pos_mask.any():
-            continue
-
-        # Ensure all metrics exist
-        for m in metrics:
-            if m not in df_all.columns:
-                df_all[m] = 0
-            df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-
-        # Get eligible players for this position (for baseline stats)
-        eligible_pos = eligible[eligible[pos_col] == position]
-        if eligible_pos.empty:
-            eligible_pos = df_all[pos_mask].copy()
-
-        # Compute mean/std from eligible players only
-        baseline_stats = eligible_pos[metrics].agg(["mean", "std"]).fillna(0)
-        baseline_stats.columns = baseline_stats.columns.map(lambda x: f"{x[0]}_{x[1]}")
-
-        # Compute Z-scores for all players in this position
-        raw_z = pd.DataFrame(index=df_all[pos_mask].index, columns=metrics, dtype=float)
-        
-        for m in metrics:
-            mean_col = f"{m}_mean"
-            std_col = f"{m}_std"
-            
-            if mean_col not in baseline_stats.index or std_col not in baseline_stats.index:
-                raw_z[m] = 0
-                continue
-            
-            mean_val = baseline_stats[mean_col]
-            std_val = baseline_stats[std_col] if baseline_stats[std_col] != 0 else 1
-            
-            z = (df_all.loc[pos_mask, m] - mean_val) / std_val
-            
-            # Invert for "lower is better" metrics
-            if m in LOWER_IS_BETTER:
-                z *= -1
-            
-            raw_z[m] = z.fillna(0)
-
-        # Average Z-score for this position
-        avg_z = raw_z.mean(axis=1).fillna(0)
-        df_all.loc[pos_mask, "Avg Z Score"] = avg_z
-
-    # --- Apply league multipliers (same logic for all positions) ---
-    mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-    avg_z = df_all["Avg Z Score"]
-
-    df_all["Weighted Z Score"] = np.select(
-        [avg_z > 0, avg_z < 0],
-        [avg_z * mult, avg_z / mult],
-        default=0.0
-    )
-
-    # --- LFC weighted variant (Scotland Premiership = 1.20) ---
-    df_all["LFC Multiplier"] = mult.copy()
-    df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
-    lfc_mult = df_all["LFC Multiplier"]
-
-    df_all["LFC Weighted Z"] = np.select(
-        [avg_z > 0, avg_z < 0],
-        [avg_z * lfc_mult, avg_z / lfc_mult],
-        default=0.0
-    )
-
-    # --- Anchors per position (based on standard weighted scores) ---
-    eligible = df_all[mins >= min_minutes].copy()
-    if eligible.empty:
-        eligible = df_all.copy()
-
-    anchors = (
-        eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
-        .agg(_scale_min="min", _scale_max="max")
-        .fillna(0)
-    )
-
-    if not anchors.empty:
-        df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left", suffixes=('', '_anchor'))
-    else:
-        df_all["_scale_min"] = 0.0
-        df_all["_scale_max"] = 1.0
-
-    # --- Convert to 0–100 scale ---
-    def _to100(v, lo, hi):
-        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
-            return 50.0
-        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
-
-    df_all["Score (0–100)"] = [
-        _to100(v, lo, hi)
-        for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
-    ]
-    df_all["LFC Score (0–100)"] = [
-        _to100(v, lo, hi)
-        for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
-    ]
-
-    df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
-        df_all[["Score (0–100)", "LFC Score (0–100)"]]
-        .apply(pd.to_numeric, errors="coerce")
-        .round(1)
-        .fillna(50.0)
-    )
-
-    df_all.drop(columns=["_scale_min", "_scale_max"], inplace=True, errors="ignore")
-    return df_all
-
-# ============================================================
 # Main UI
 # ============================================================
 
-from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
-
 try:
-    # ✅ Use the same full StatsBomb dataset as Radar
+    # ✅ Load the same full StatsBomb dataset used on the Radar page
     df_all_raw = load_data_once()
     df_all = preprocess_df(df_all_raw)
+
+    # ✅ Recalculate ranking scores
+    from pages.1_Statsbomb_Radar import compute_scores
     df_all = compute_scores(df_all, min_minutes=600)
 
     # ---------- League & Team filters ----------
@@ -416,7 +87,9 @@ try:
     selected_league = st.selectbox("Select League", leagues)
 
     clubs = sorted(
-        df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique()
+        df_all.loc[df_all[league_col] == selected_league, "Team"]
+        .dropna()
+        .unique()
     )
     selected_club = st.selectbox("Select Club", clubs)
 
@@ -439,6 +112,7 @@ try:
     df_team["Minutes played"] = pd.to_numeric(
         df_team["Minutes played"], errors="coerce"
     ).fillna(0).astype(int)
+
     min_val = int(df_team["Minutes played"].min())
     max_val = int(df_team["Minutes played"].max())
 
