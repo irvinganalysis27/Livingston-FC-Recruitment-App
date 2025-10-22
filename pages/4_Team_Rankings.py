@@ -401,12 +401,16 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 # ============================================================
 # Main UI
 # ============================================================
-from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
+try:
+    # ✅ Import shared loader from Radar page
+    from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
 
+    # ✅ Use the same full StatsBomb dataset as Radar
     df_all_raw = load_data_once()
     df_all = preprocess_df(df_all_raw)
     df_all = compute_scores(df_all, min_minutes=600)
 
+    # ---------- League & Team filters ----------
     league_col = "Competition_norm"
     leagues = sorted(df_all[league_col].dropna().unique())
     selected_league = st.selectbox("Select League", leagues)
@@ -420,20 +424,18 @@ from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
         st.stop()
 
     df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
-    
-    # ---------- Optional minutes filter (safe numeric version) ----------
+
+    # ---------- Optional minutes filter ----------
     st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
-    
+
     df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
     min_val = int(df_team["Minutes played"].min())
     max_val = int(df_team["Minutes played"].max())
-    
-    # Safe default clamp
+
     default_display_min = st.session_state.get("display_minutes_input", 600)
     if default_display_min > max_val:
         default_display_min = max_val
-    
-    # Use number input safely
+
     selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
         min_value=min_val,
@@ -442,10 +444,8 @@ from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
         step=50,
         key="display_minutes_input"
     )
-    
-    # Apply the filter
+
     df_team = df_team[df_team["Minutes played"] >= selected_min_display].copy()
-    
     if df_team.empty:
         st.warning("No players available — try lowering your minimum minutes filter.")
         st.stop()
@@ -463,7 +463,6 @@ from pages.1_Statsbomb_Radar import load_data_once, preprocess_df
         st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
 
     # ---------- Table ----------
-
     cols_for_table = [
         "Player", "Six-Group Position", "Positions played",
         "Team", league_col, "Multiplier",
