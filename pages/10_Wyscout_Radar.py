@@ -957,7 +957,8 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if team: bottom_parts.append(team)
     if comp: bottom_parts.append(comp)
     if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
-    if rank_v: bottom_parts.append(f"Rank #{rank_v}")
+    if rank_v:
+        bottom_parts.append(f"Rank #{rank_v} | Avg Z Score {weighted_z:.2f}")
     if score_100 is not None:
         bottom_parts.append(f"{score_100:.0f}/100")
     elif not np.isnan(weighted_z):
