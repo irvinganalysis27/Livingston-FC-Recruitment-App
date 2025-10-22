@@ -208,6 +208,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     pos_col = "Six-Group Position"
     df = df_all.copy()
 
+    # --- Minutes + baseline setup ---
     df["Minutes played"] = pd.to_numeric(df.get("Minutes played", 0), errors="coerce").fillna(0)
     eligible = df[df["Minutes played"] >= min_minutes].copy()
     if eligible.empty:
@@ -222,20 +223,24 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         if not existing:
             continue
 
+        # Ensure metrics are numeric
         for m in existing:
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
         elig_pos = eligible[eligible[pos_col] == position]
-        if elig_pos.empty():
-            continue
+        if elig_pos.empty:
+            continue  # ✅ fixed (no parentheses)
 
         means = elig_pos[existing].mean()
         stds = elig_pos[existing].std().replace(0, 1)
 
         mask = df[pos_col] == position
         Z = (df.loc[mask, existing] - means) / stds
+
+        # invert metrics where lower is better
         for m in (LOWER_IS_BETTER & set(existing)):
             Z[m] *= -1
+
         df.loc[mask, "Avg Z Score"] = Z.mean(axis=1).fillna(0)
 
     # --- Step 2: Weighted Z ---
@@ -250,6 +255,12 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
 
     # --- Step 4: Anchors (based on Weighted Z Score) ---
+    eligible["Weighted Z Score"] = np.where(
+        eligible["Avg Z Score"] > 0,
+        eligible["Avg Z Score"] * pd.to_numeric(eligible["Multiplier"], errors="coerce").fillna(1.0),
+        eligible["Avg Z Score"] / pd.to_numeric(eligible["Multiplier"], errors="coerce").fillna(1.0)
+    )
+
     anchors = (
         eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
         .agg(_min="min", _max="max")
@@ -272,7 +283,6 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 
     df.drop(columns=["_min", "_max"], inplace=True, errors="ignore")
     return df
-
 # ============================================================
 # Main UI
 # ============================================================
