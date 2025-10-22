@@ -1,3 +1,5 @@
+# pages/3_Team_Rankings.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -85,7 +87,7 @@ def add_age_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# Position & League Mapping
+# Position Mapping
 # ============================================================
 RAW_TO_GROUP = {
     "LEFTBACK": "Full Back", "LEFTWINGBACK": "Full Back",
@@ -101,20 +103,34 @@ RAW_TO_GROUP = {
     "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
     "GOALKEEPER": "Goalkeeper",
 }
+FRIENDLY_TO_GROUP = {
+    "FULLBACK": "Full Back", "FULL BACK": "Full Back",
+    "CENTREBACK": "Centre Back", "CENTRE BACK": "Centre Back",
+    "NUMBER6": "Number 6", "NO6": "Number 6", "DM": "Number 6",
+    "NUMBER8": "Number 8", "NO8": "Number 8", "CM": "Number 8",
+    "WINGER": "Winger", "STRIKER": "Striker", "FORWARD": "Striker",
+    "GOALKEEPER": "Goalkeeper", "GK": "Goalkeeper",
+}
 
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok): return ""
     t = str(tok).upper().strip()
     t = re.sub(r"[.\-_/]", " ", t)
-    return re.sub(r"\s+", "", t)
+    return re.sub(r"\s+", " ", t)
 
 def map_first_position_to_group(primary_pos_cell) -> str:
-    return RAW_TO_GROUP.get(_clean_pos_token(primary_pos_cell), None)
-
-LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
+    t = _clean_pos_token(primary_pos_cell)
+    sb_key = t.replace(" ", "")
+    if sb_key in RAW_TO_GROUP:
+        return RAW_TO_GROUP[sb_key]
+    if t in FRIENDLY_TO_GROUP:
+        return FRIENDLY_TO_GROUP[t]
+    if sb_key in FRIENDLY_TO_GROUP:
+        return FRIENDLY_TO_GROUP[sb_key]
+    return None
 
 # ============================================================
-# Radar Metric Templates
+# Position Metric Templates
 # ============================================================
 position_metrics = {
     "Goalkeeper": [
@@ -154,12 +170,13 @@ position_metrics = {
     ]
 }
 
+LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
+
 # ============================================================
-# Preprocessing (League + Position)
+# Preprocessing
 # ============================================================
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-
     rename_map = {}
     if "Name" in df.columns: rename_map["Name"] = "Player"
     if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
@@ -169,7 +186,6 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
         df["Competition_norm"] = df["Competition"].astype(str)
 
-    # Merge league multipliers
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
@@ -191,71 +207,70 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# Compute Scores per Template
+# Compute Scores (League + Position)
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
+    df = df_all.copy()
     pos_col = "Six-Group Position"
-    df_all = df_all.copy()
+    league_col = "Competition_norm"
 
-    mins = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce").fillna(0)
-    eligible = df_all[mins >= min_minutes].copy()
+    df["Minutes played"] = pd.to_numeric(df.get("Minutes played", 0), errors="coerce").fillna(0)
+    eligible = df[df["Minutes played"] >= min_minutes].copy()
     if eligible.empty:
-        eligible = df_all.copy()
+        eligible = df.copy()
 
-    df_all["Avg Z Score"] = 0.0
-    df_all["Weighted Z Score"] = 0.0
-    df_all["Score (0–100)"] = 50.0
+    df["Avg Z Score"] = 0.0
+    df["Weighted Z Score"] = 0.0
+    df["Score (0–100)"] = 50.0
 
-    for position, metrics in position_metrics.items():
-        pos_mask = df_all[pos_col] == position
-        if not pos_mask.any():
+    for (league, position), idx in df.groupby([league_col, pos_col]).groups.items():
+        if pd.isna(league) or pd.isna(position):
             continue
 
-        # ✅ Only use metrics that actually exist in the dataset
-        existing_metrics = [m for m in metrics if m in df_all.columns]
-        if not existing_metrics:
+        metrics = position_metrics.get(position, [])
+        existing = [m for m in metrics if m in df.columns]
+        if not existing:
             continue
 
-        for m in existing_metrics:
-            df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+        for m in existing:
+            df[m] = pd.to_numeric(df[m], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        eligible_pos = eligible[eligible[pos_col] == position]
-        if eligible_pos.empty:
-            continue
+        elig_mask = (eligible[league_col] == league) & (eligible[pos_col] == position)
+        elig_pos = eligible.loc[elig_mask, existing]
+        if elig_pos.empty:
+            elig_pos = eligible.loc[eligible[league_col] == league, existing]
+        if elig_pos.empty:
+            elig_pos = eligible[existing]
 
-        mean_vals = eligible_pos[existing_metrics].mean()
-        std_vals = eligible_pos[existing_metrics].std().replace(0, 1)
+        mean_vals = elig_pos.mean()
+        std_vals = elig_pos.std().replace(0, 1)
 
-        z_scores = ((df_all.loc[pos_mask, existing_metrics] - mean_vals) / std_vals).fillna(0)
-        for m in LOWER_IS_BETTER:
-            if m in z_scores.columns:
-                z_scores[m] *= -1
+        mask_lp = (df[league_col] == league) & (df[pos_col] == position)
+        Z = ((df.loc[mask_lp, existing] - mean_vals) / std_vals).fillna(0)
+        for m in (LOWER_IS_BETTER & set(existing)):
+            Z[m] = -Z[m]
+        df.loc[mask_lp, "Avg Z Score"] = Z.mean(axis=1).astype(float)
 
-        df_all.loc[pos_mask, "Avg Z Score"] = z_scores.mean(axis=1)
-
-    mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-    avg_z = df_all["Avg Z Score"]
-    df_all["Weighted Z Score"] = np.where(avg_z >= 0, avg_z * mult, avg_z / mult)
-
-    # Convert to 0–100 scale within position
-    def _to100(v, lo, hi):
-        if hi <= lo:
-            return 50.0
-        return np.clip((v - lo) / (hi - lo) * 100, 0, 100)
+    mult = pd.to_numeric(df.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+    az = df["Avg Z Score"]
+    df["Weighted Z Score"] = np.where(az >= 0, az * mult, az / mult)
 
     anchors = (
-        df_all.groupby(pos_col)["Weighted Z Score"]
-        .agg(_scale_min="min", _scale_max="max")
-        .fillna(0)
+        df.groupby([league_col, pos_col], dropna=False)["Weighted Z Score"]
+        .agg(_lo="min", _hi="max").reset_index()
     )
-    df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
+    df = df.merge(anchors, on=[league_col, pos_col], how="left")
 
-    df_all["Score (0–100)"] = [
-        _to100(v, lo, hi)
-        for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
+    def to100(v, lo, hi):
+        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
+            return 50.0
+        return float(np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+
+    df["Score (0–100)"] = [
+        to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_lo"], df["_hi"])
     ]
-
-    return df_all
+    df.drop(columns=["_lo", "_hi"], inplace=True, errors="ignore")
+    return df
 
 # ============================================================
 # Main UI
@@ -277,72 +292,36 @@ try:
         (df_all[league_col] == selected_league)
         & (df_all["Team"] == selected_club)
     ].copy()
-
     if df_team.empty:
         st.warning("No players found for this team.")
         st.stop()
 
-    # ✅ Clean up numeric columns before ranking
-    for c in ["Score (0–100)", "Minutes played"]:
-        if c in df_team.columns:
-            df_team[c] = (
-                pd.to_numeric(df_team[c], errors="coerce")
-                .replace([np.inf, -np.inf], np.nan)
-                .fillna(0)
-            )
-
-    # ✅ Safe ranking
-    df_team["Rank in Team"] = (
-        df_team["Score (0–100)"]
-        .rank(ascending=False, method="min")
-        .fillna(0)
-        .astype(int)
-    )
-
-    # ---------- Optional minutes filter ----------
-    st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
-
     df_team["Minutes played"] = (
         pd.to_numeric(df_team["Minutes played"], errors="coerce")
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna(0)
-        .astype(int)
+        .replace([np.inf, -np.inf], np.nan).fillna(0).astype(int)
+    )
+    df_team["Score (0–100)"] = pd.to_numeric(df_team["Score (0–100)"], errors="coerce").fillna(0)
+
+    df_team["Rank in Team"] = (
+        df_team["Score (0–100)"].rank(ascending=False, method="min").fillna(0).astype(int)
     )
 
-    if df_team["Minutes played"].empty:
-        st.warning("No valid minute data found.")
-        st.stop()
-
-    min_val = int(df_team["Minutes played"].min())
-    max_val = int(df_team["Minutes played"].max())
+    st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
+    min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
     default_display_min = min(600, max_val)
-
     selected_min_display = st.number_input(
         "Show only players with at least this many minutes",
-        min_value=min_val,
-        max_value=max_val,
-        value=default_display_min,
-        step=50,
+        min_value=min_val, max_value=max_val, value=default_display_min, step=50
     )
-
     df_team = df_team[df_team["Minutes played"] >= selected_min_display].copy()
 
-    if df_team.empty:
-        st.warning("No players available — try lowering your minimum minutes filter.")
-        st.stop()
-
-    # ---------- Team average ----------
     avg_score = df_team["Score (0–100)"].mean() if not df_team.empty else np.nan
-    if not np.isnan(avg_score):
-        st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}")
-    else:
-        st.markdown(f"### {selected_club} ({selected_league}) — No eligible players")
+    st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}" if not np.isnan(avg_score)
+                else f"### {selected_club} ({selected_league}) — No eligible players")
 
-    # ---------- Table ----------
     cols_for_table = [
-        "Player", "Six-Group Position", "Team", league_col, "Multiplier",
-        "Avg Z Score", "Weighted Z Score", "Score (0–100)",
-        "Age", "Minutes played", "Rank in Team"
+        "Player", "Six-Group Position", "Positions played", "Team", league_col, "Multiplier",
+        "Avg Z Score", "Weighted Z Score", "Score (0–100)", "Age", "Minutes played", "Rank in Team"
     ]
     for c in cols_for_table:
         if c not in df_team.columns:
