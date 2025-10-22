@@ -1054,6 +1054,10 @@ cols_for_table = [
     "Score (0–100)", "LFC Score (0–100)",
     "Age", "Minutes played", "Rank in Team"
 ]
+
+# make sure df_team exists — replace with df if not defined
+df_team = df.copy() if 'df_team' not in locals() else df_team
+
 for c in cols_for_table:
     if c not in df_team.columns:
         df_team[c] = np.nan
@@ -1068,34 +1072,34 @@ z_ranking.rename(columns={
     "LFC Weighted Z": "Z LFC Weighted"
 }, inplace=True)
 
-    z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
-    z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
-    z_ranking["League Weight"] = pd.to_numeric(z_ranking["League Weight"], errors="coerce").fillna(1.0).round(3)
+z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
+z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
+z_ranking["League Weight"] = pd.to_numeric(z_ranking["League Weight"], errors="coerce").fillna(1.0).round(3)
 
-    favs_in_db = {row[0] for row in get_favourites()}
-    z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
+favs_in_db = {row[0] for row in list_favourites()}
+z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
 
-    edited = st.data_editor(
-        z_ranking,
-        column_config={
-            "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Mark as favourite"),
-            "League Weight": st.column_config.NumberColumn("League Weight", help="League weighting applied in ranking", format="%.3f"),
-            "Z Avg": st.column_config.NumberColumn("Z Avg", format="%.3f"),
-            "Z Weighted": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
-            "Z LFC Weighted": st.column_config.NumberColumn("Z LFC Weighted", format="%.3f"),
-            "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
-            "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
-        },
-        hide_index=False,
-        width="stretch",
-    )
+edited = st.data_editor(
+    z_ranking,
+    column_config={
+        "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Mark as favourite"),
+        "League Weight": st.column_config.NumberColumn("League Weight", help="League weighting applied in ranking", format="%.3f"),
+        "Z Avg": st.column_config.NumberColumn("Z Avg", format="%.3f"),
+        "Z Weighted": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
+        "Z LFC Weighted": st.column_config.NumberColumn("Z LFC Weighted", format="%.3f"),
+        "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
+        "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
+    },
+    hide_index=False,
+    width="stretch",
+)
 
-    for _, r in edited.iterrows():
-        p = r["Player"]
-        if r["⭐ Favourite"] and p not in favs_in_db:
-            add_favourite(p, r.get("Team"), r.get("League"), r.get("Positions played"))
-        elif not r["⭐ Favourite"] and p in favs_in_db:
-            remove_favourite(p)
+for _, r in edited.iterrows():
+    p = r["Player"]
+    if r["⭐ Favourite"] and p not in favs_in_db:
+        upsert_favourite({"player": p, "team": r.get("Team"), "league": r.get("League"), "position": r.get("Positions played")})
+    elif not r["⭐ Favourite"] and p in favs_in_db:
+        hide_favourite(p)
 
 except Exception as e:
     st.error(f"❌ Could not load data: {e}")
