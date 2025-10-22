@@ -208,13 +208,18 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     pos_col = "Six-Group Position"
     df = df_all.copy()
 
-    # --- Minutes + baseline setup ---
+    # --- Minutes setup ---
     df["Minutes played"] = pd.to_numeric(df.get("Minutes played", 0), errors="coerce").fillna(0)
     eligible = df[df["Minutes played"] >= min_minutes].copy()
     if eligible.empty:
         eligible = df.copy()
 
-    df["Avg Z Score"] = 0.0
+    # Ensure required columns exist
+    for col in ["Avg Z Score", "Weighted Z Score", "LFC Weighted Z"]:
+        if col not in df.columns:
+            df[col] = 0.0
+        if col not in eligible.columns:
+            eligible[col] = 0.0
 
     # --- Step 1: Per-position Z-scores (baseline = all leagues) ---
     for position, template in position_metrics.items():
@@ -229,7 +234,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 
         elig_pos = eligible[eligible[pos_col] == position]
         if elig_pos.empty:
-            continue  # ✅ fixed (no parentheses)
+            continue
 
         means = elig_pos[existing].mean()
         stds = elig_pos[existing].std().replace(0, 1)
@@ -237,7 +242,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         mask = df[pos_col] == position
         Z = (df.loc[mask, existing] - means) / stds
 
-        # invert metrics where lower is better
+        # Invert metrics where lower is better
         for m in (LOWER_IS_BETTER & set(existing)):
             Z[m] *= -1
 
@@ -254,7 +259,13 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     lfc_mult = df["LFC Multiplier"]
     df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
 
-    # --- Step 4: Anchors (based on Weighted Z Score) ---
+    # --- Step 4: Rebuild eligible Weighted Z before anchors ---
+    eligible = df[df["Minutes played"] >= min_minutes].copy()
+    if eligible.empty:
+        eligible = df.copy()
+
+    if "Avg Z Score" not in eligible.columns:
+        eligible["Avg Z Score"] = pd.to_numeric(eligible.get("Avg Z Score", 0), errors="coerce").fillna(0)
     eligible["Weighted Z Score"] = np.where(
         eligible["Avg Z Score"] > 0,
         eligible["Avg Z Score"] * pd.to_numeric(eligible["Multiplier"], errors="coerce").fillna(1.0),
