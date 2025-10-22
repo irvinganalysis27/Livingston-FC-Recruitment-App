@@ -127,15 +127,41 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     if "Minutes" in df.columns:
         rename_map["Minutes"] = "Minutes played"
 
-    # ✅ Include radar-style metric renames here
+    # ✅ Include Radar-style metric renames here
     rename_map.update({
+        "Successful Box Cross %": "Successful Box Cross%",
+        "Player Season Box Cross Ratio": "Successful Box Cross%",
+        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
         "Player Season Pressured Long Balls 90": "Pr. Long Balls",
         "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
-        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
+        "Player Season Xgbuildup 90": "xGBuildup",
     })
 
     if rename_map:
         df.rename(columns=rename_map, inplace=True)
+
+    # --- Derived / Calculated Metrics (match Radar page logic) ---
+    # ✅ Successful Dribbles = Total - Failed
+    if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
+        df["Successful Dribbles"] = (
+            pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
+            - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
+        )
+
+    # ✅ Successful Box Cross% (rename or derive if missing)
+    if "Successful Box Cross %" in df.columns:
+        df.rename(columns={"Successful Box Cross %": "Successful Box Cross%"}, inplace=True)
+    elif "Player Season Box Cross Ratio" in df.columns:
+        df.rename(columns={"Player Season Box Cross Ratio": "Successful Box Cross%"}, inplace=True)
+    elif "Crossing%" in df.columns:
+        df["Successful Box Cross%"] = pd.to_numeric(df["Crossing%"], errors="coerce").fillna(0)
+    else:
+        df["Successful Box Cross%"] = 0
+
+    # ✅ Always ensure both exist (prevents KeyError)
+    for col in ["Successful Dribbles", "Successful Box Cross%"]:
+        if col not in df.columns:
+            df[col] = 0
 
     # --- League Normalisation ---
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
