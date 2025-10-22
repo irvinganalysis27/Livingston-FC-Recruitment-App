@@ -24,13 +24,9 @@ from lib.favourites_repo import (
     get_supabase_client,
 )
 
-# ========= IMPORT NEW SCORING LOGIC =========
 from lib.scoring import (
     preprocess_for_scoring,
     compute_scores,
-    position_metrics,
-    group_colors,
-    DISPLAY_NAMES,
 )
 
 # ========= PASSWORD GATE =========
