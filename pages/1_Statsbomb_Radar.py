@@ -1135,19 +1135,37 @@ for m in sel_metrics:
     )
 percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
 
-# --- B) Raw Z-Scores for RANKING (full dataset by position, manual calc) ---
+# --- B) Raw Z-Scores for RANKING (eligible players only for baseline) ---
 pos_col = "Six-Group Position"
 
-# Compute Z per metric: (raw - mean)/std per position; invert lower-better
+# Define eligible baseline (600+ minutes)
+_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
+eligible = df_all[_mins_all >= 600].copy()
+if eligible.empty:
+    eligible = df_all.copy()
+
+# Compute per-position mean/std using eligible only
+baseline_stats = eligible.groupby(pos_col)[sel_metrics].agg(["mean", "std"]).fillna(0)
+baseline_stats.columns = baseline_stats.columns.map("_".join)
+
+# Compute Z per metric using baseline stats
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    z_per_group = df_all.groupby(pos_col)[m].transform(
-        lambda x: (x - x.mean()) / x.std() if x.std() != 0 else 0
-    )
+    mean_col = f"{m}_mean"
+    std_col = f"{m}_std"
+    
+    if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
+        raw_z_all[m] = 0
+        continue
+        
+    mean_vals = df_all[pos_col].map(baseline_stats[mean_col])
+    std_vals = df_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
+    z = (df_all[m] - mean_vals) / std_vals
+    
     if m in LOWER_IS_BETTER:
-        z_per_group *= -1
-    raw_z_all[m] = z_per_group.fillna(0)
+        z *= -1
+    raw_z_all[m] = z.fillna(0)
 
 # ---------- Average + Weighted Z (sign-aware) ----------
 avg_z_all = raw_z_all.mean(axis=1).fillna(0)
