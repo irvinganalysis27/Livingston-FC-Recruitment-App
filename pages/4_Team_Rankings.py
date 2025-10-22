@@ -211,19 +211,22 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         if not pos_mask.any():
             continue
 
-        for m in metrics:
-            if m not in df_all.columns:
-                df_all[m] = np.nan
+        # ✅ Only use metrics that actually exist in the dataset
+        existing_metrics = [m for m in metrics if m in df_all.columns]
+        if not existing_metrics:
+            continue
+
+        for m in existing_metrics:
             df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
 
         eligible_pos = eligible[eligible[pos_col] == position]
         if eligible_pos.empty:
             continue
 
-        mean_vals = eligible_pos[metrics].mean()
-        std_vals = eligible_pos[metrics].std().replace(0, 1)
+        mean_vals = eligible_pos[existing_metrics].mean()
+        std_vals = eligible_pos[existing_metrics].std().replace(0, 1)
 
-        z_scores = ((df_all.loc[pos_mask, metrics] - mean_vals) / std_vals).fillna(0)
+        z_scores = ((df_all.loc[pos_mask, existing_metrics] - mean_vals) / std_vals).fillna(0)
         for m in LOWER_IS_BETTER:
             if m in z_scores.columns:
                 z_scores[m] *= -1
