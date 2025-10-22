@@ -122,6 +122,9 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     if "Name" in df.columns: rename_map["Name"] = "Player"
     if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
     if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
+        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
+        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
+        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
     if rename_map: df.rename(columns=rename_map, inplace=True)
 
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
