@@ -1047,27 +1047,26 @@ plot_data.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_
 plot_data["Rank"] = np.arange(1, len(plot_data) + 1)
 
 # ---------- Table ----------
+cols_for_table = [
+    "Player", "Six-Group Position", "Positions played",
+    "Team", league_col, "Multiplier",
+    "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
+    "Score (0–100)", "LFC Score (0–100)",
+    "Age", "Minutes played", "Rank in Team"
+]
+for c in cols_for_table:
+    if c not in df_team.columns:
+        df_team[c] = np.nan
 
-    cols_for_table = [
-        "Player", "Six-Group Position", "Positions played",
-        "Team", league_col, "Multiplier",
-        "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
-        "Score (0–100)", "LFC Score (0–100)",
-        "Age", "Minutes played", "Rank in Team"
-    ]
-    for c in cols_for_table:
-        if c not in df_team.columns:
-            df_team[c] = np.nan
-
-    z_ranking = df_team[cols_for_table].copy()
-    z_ranking.rename(columns={
-        "Six-Group Position": "Position",
-        league_col: "League",
-        "Multiplier": "League Weight",
-        "Avg Z Score": "Z Avg",
-        "Weighted Z Score": "Z Weighted",
-        "LFC Weighted Z": "Z LFC Weighted"
-    }, inplace=True)
+z_ranking = df_team[cols_for_table].copy()
+z_ranking.rename(columns={
+    "Six-Group Position": "Position",
+    league_col: "League",
+    "Multiplier": "League Weight",
+    "Avg Z Score": "Z Avg",
+    "Weighted Z Score": "Z Weighted",
+    "LFC Weighted Z": "Z LFC Weighted"
+}, inplace=True)
 
     z_ranking["Age"] = pd.to_numeric(z_ranking["Age"], errors="coerce").round(0)
     z_ranking["Minutes played"] = pd.to_numeric(z_ranking["Minutes played"], errors="coerce").fillna(0).astype(int)
