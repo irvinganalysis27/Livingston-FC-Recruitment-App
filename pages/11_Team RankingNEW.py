@@ -865,6 +865,11 @@ selected_player = st.selectbox(
 st.session_state.selected_player = selected_player
 
 # ---------- Metrics + percentiles ----------
+# Default to first available position group if not set
+if "selected_position_template" not in st.session_state:
+    st.session_state.selected_position_template = list(position_metrics.keys())[0]
+
+selected_position_template = st.session_state.selected_position_template
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
 
