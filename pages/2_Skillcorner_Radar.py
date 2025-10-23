@@ -6,9 +6,17 @@ from pathlib import Path
 from datetime import datetime
 import re
 from openai import OpenAI
+from auth import check_password
+from branding import show_branding
 
-# ========= PAGE CONFIG =========
-st.set_page_config(page_title="SkillCorner Physical Radar", layout="centered")
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
+if not check_password():
+    st.stop()
+
+# ---------- Branding ----------
+show_branding()
 st.title("SkillCorner Radar")
 
 # ========= PATHS / CONFIG =========
