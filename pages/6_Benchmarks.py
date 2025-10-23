@@ -4,16 +4,16 @@ import numpy as np
 from pathlib import Path
 import re
 from datetime import datetime
-
 from auth import check_password
 from branding import show_branding
 
-# ============================================================
-# Setup & Protection
-# ============================================================
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
 st.title("📊 Position Benchmarks")
 
