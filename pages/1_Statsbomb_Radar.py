@@ -698,6 +698,18 @@ if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
     st.stop()
 
+# ✅ Filter for most recent record per player
+date_col = "Player Season Most Recent Match"
+if date_col in df_all_raw.columns:
+    df_all_raw[date_col] = pd.to_datetime(df_all_raw[date_col], errors="coerce")
+    df_all_raw.sort_values(date_col, ascending=False, inplace=True)
+    before = len(df_all_raw)
+    df_all_raw = df_all_raw.drop_duplicates(subset=["Name"], keep="first")
+    after = len(df_all_raw)
+    st.caption(f"✅ Filtered to most recent record per player using '{date_col}' — {before - after} duplicates removed.")
+else:
+    st.warning("⚠️ 'Player Season Most Recent Match' column not found — duplicates not filtered.")
+
 if "Competition" not in df_all_raw.columns:
     st.error("❌ Expected a 'Competition' column in your data.")
     st.stop()
