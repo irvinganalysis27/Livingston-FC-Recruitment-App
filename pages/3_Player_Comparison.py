@@ -10,7 +10,9 @@ from branding import show_branding
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
-# ---------- Protect page ----------
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
