@@ -17,3 +17,6 @@ show_branding()
 # ---------- Main content ----------
 st.title("Welcome Page")
 st.markdown("✅ You are logged in. Use the sidebar to navigate between pages.")
+
+# --- Persist session filters ---
+st.session_state.setdefault("filters_persist", True)
