@@ -9,12 +9,13 @@ from pathlib import Path
 from auth import check_password
 from branding import show_branding
 
-# ============================================================
-# Authentication & Branding
-# ============================================================
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
 st.title("Statsbomb Scatter Plot")
 
