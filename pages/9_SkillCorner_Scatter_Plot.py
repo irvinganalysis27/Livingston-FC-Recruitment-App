@@ -1,5 +1,3 @@
-# pages/10_SkillCorner_Scatter_Plot.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,14 +7,15 @@ import re
 from auth import check_password
 from branding import show_branding
 
-# ============================================================
-# Authentication & Branding
-# ============================================================
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
-st.title("📊 SkillCorner Physical Scatter Plot")
+st.title("SkillCorner Physical Scatter Plot")
 
 # ============================================================
 # Data Load
