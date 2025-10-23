@@ -18,17 +18,13 @@ from datetime import datetime, timezone
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
-# ========= PAGE CONFIG =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-# ========= AUTH / BRANDING =========
-from auth import check_password
-from branding import show_branding
-
-# Password gate (single controlled rerun)
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
 st.title("Statsbomb Radar")
 
