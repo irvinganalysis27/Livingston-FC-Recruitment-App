@@ -261,9 +261,13 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight (Gold) ---
+# --- Team Highlight (Gold, robust matching) ---
 if highlight_team and "Team" in df.columns:
-    team_mask = df["Team"].str.strip().eq(my_team_name)
+    # Clean both sides and match on lowercase to handle 'Livingston' vs 'Livingston FC'
+    df["_team_clean"] = df["Team"].astype(str).str.strip().str.lower()
+    team_variants = ["livingston", "livingston fc"]
+
+    team_mask = df["_team_clean"].isin(team_variants)
     if team_mask.any():
         team_df = df[team_mask]
         other_df = df[~team_mask]
@@ -274,7 +278,7 @@ if highlight_team and "Team" in df.columns:
             y=team_df[y_metric],
             mode="markers",
             marker=dict(color="#FFD700", size=14, symbol="circle"),
-            name=my_team_name,
+            name="Livingston FC",
             text=team_df["Name"] if "Name" in team_df.columns else team_df["Team"],
             hovertemplate="%{text}<br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
             showlegend=True,
