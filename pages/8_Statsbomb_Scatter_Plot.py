@@ -1,23 +1,23 @@
 # pages/9_Scatter_Plot.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import re
 from pathlib import Path
+import re
 from auth import check_password
 from branding import show_branding
 
+# ============================================================
+# Page Config & Authentication
+# ============================================================
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
-# ---------- Branding ----------
 show_branding()
-st.title("Statsbomb Scatter Plot")
+st.title("StatsBomb Scatter Plot")
 
 # ============================================================
 # Data Load
@@ -28,7 +28,7 @@ DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 @st.cache_data(ttl=86400)
 def load_data(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.astype(str).str.strip()
     return df
 
 try:
@@ -42,7 +42,7 @@ if df_all.empty:
     st.stop()
 
 # ============================================================
-# 🔧 Clean headers & remove irrelevant columns
+# Clean headers & drop irrelevant columns
 # ============================================================
 df_all.columns = (
     df_all.columns.astype(str)
@@ -54,11 +54,10 @@ df_all.columns = (
 drop_pattern = re.compile(r"(?i)(player season|account id)")
 cols_to_drop = [c for c in df_all.columns if drop_pattern.search(c)]
 if cols_to_drop:
-    print(f"[DEBUG] Dropping {len(cols_to_drop)} cols: {cols_to_drop[:5]} ...")
     df_all.drop(columns=cols_to_drop, inplace=True, errors="ignore")
 
 # ============================================================
-# 🧩 Map to Six-Group Positions
+# Position Mapping (Six-Group System)
 # ============================================================
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
@@ -69,25 +68,17 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
-    # Full backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    # Centre backs
     "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    # Defensive mids
     "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
     "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    # Central mids
-    "CENTREMIDFIELDER": "Centre Midfield", "RIGHTCENTREMIDFIELDER": "Centre Midfield",
-    "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    # Attacking mids / 10s
+    "CENTREMIDFIELDER": "Centre Midfield", "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
     "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
     "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
     "SECONDSTRIKER": "Number 8",
-    # Wingers
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
 }
 
@@ -107,7 +98,7 @@ if "Primary Position" in df_all.columns:
 else:
     df_all["Six-Group Position"] = np.nan
 
-# Duplicate "Centre Midfield" rows into both 6 and 8
+# Duplicate “Centre Midfield” rows into both Number 6 and Number 8
 if "Six-Group Position" in df_all.columns:
     cm_mask = df_all["Six-Group Position"] == "Centre Midfield"
     if cm_mask.any():
@@ -117,14 +108,14 @@ if "Six-Group Position" in df_all.columns:
         df_all = pd.concat([df_all, cm_as_6, cm_as_8], ignore_index=True)
 
 # ============================================================
-# Match column names
+# Column validation
 # ============================================================
 league_col = "Competition"
 minutes_col = "Minutes"
-position_col = "Six-Group Position"   # use the new mapped groups
+position_col = "Six-Group Position"
 
 if league_col not in df_all.columns or minutes_col not in df_all.columns or position_col not in df_all.columns:
-    st.error("❌ Could not find required columns in the dataset.")
+    st.error("❌ Could not find required columns in dataset.")
     st.stop()
 
 # ============================================================
@@ -134,35 +125,35 @@ st.markdown("#### Filters")
 
 # --- League Filter ---
 all_leagues = sorted(df_all[league_col].dropna().unique().tolist())
-if "scatter_league_sel" not in st.session_state:
-    st.session_state.scatter_league_sel = all_leagues.copy()
+if "sb_league_sel" not in st.session_state:
+    st.session_state.sb_league_sel = all_leagues.copy()
 
 b1, b2 = st.columns([1, 1])
 with b1:
     if st.button("Select all leagues"):
-        st.session_state.scatter_league_sel = all_leagues.copy()
+        st.session_state.sb_league_sel = all_leagues.copy()
 with b2:
     if st.button("Clear all leagues"):
-        st.session_state.scatter_league_sel = []
+        st.session_state.sb_league_sel = []
 
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    default=st.session_state.scatter_league_sel,
-    key="scatter_league_sel",
+    default=st.session_state.sb_league_sel,
+    key="sb_league_sel",
     label_visibility="collapsed",
 )
 
 # --- Minutes Filter ---
-min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50)
+min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50, key="sb_min_minutes")
 
-# --- Position Filter (Six groups) ---
+# --- Position Filter ---
 pos_groups = [g for g in SIX_GROUPS if g in df_all[position_col].unique()]
 selected_positions = st.multiselect(
     "Position Groups",
     options=pos_groups,
     default=pos_groups,
-    key="scatter_pos_sel",
+    key="sb_pos_sel",
 )
 
 # --- Apply filters ---
@@ -186,8 +177,8 @@ if not numeric_cols:
     st.stop()
 
 st.markdown("#### Choose metrics for X and Y axes")
-x_metric = st.selectbox("X-axis metric", options=numeric_cols, index=0)
-y_metric = st.selectbox("Y-axis metric", options=numeric_cols, index=1)
+x_metric = st.selectbox("X-axis metric", options=numeric_cols, index=0, key="sb_x_metric")
+y_metric = st.selectbox("Y-axis metric", options=numeric_cols, index=1, key="sb_y_metric")
 
 # ============================================================
 # Toggles
@@ -195,16 +186,16 @@ y_metric = st.selectbox("Y-axis metric", options=numeric_cols, index=1)
 st.markdown("#### Highlight Options")
 c1, c2, c3 = st.columns(3)
 with c1:
-    highlight_outliers = st.toggle("Highlight Outliers")
+    highlight_outliers = st.toggle("Highlight Outliers", key="sb_outliers")
 with c2:
-    highlight_all = st.toggle("Colour by Position Group")
+    highlight_all = st.toggle("Colour by Position Group", key="sb_color_pos")
 with c3:
-    highlight_team = st.toggle("Highlight My Team")
+    highlight_team = st.toggle("Highlight My Team", key="sb_team_highlight")
 
 my_team_name = "Livingston FC"
 
 # ============================================================
-# Compute Averages & Outliers
+# Averages & Outliers
 # ============================================================
 x_mean = df[x_metric].mean()
 y_mean = df[y_metric].mean()
@@ -227,11 +218,6 @@ else:
     color_col = None
     color_title = None
 
-if highlight_team and "Team" in df.columns:
-    df["_color"] = np.where(df["Team"].eq(my_team_name), "My Team", "Other")
-    color_col = "_color"
-    color_title = "Team Highlight"
-
 # ============================================================
 # Plotly Scatter
 # ============================================================
@@ -251,7 +237,7 @@ fig = px.scatter(
     color_discrete_sequence=px.colors.qualitative.Set2,
     hover_data=hover_data,
     size=minutes_col if minutes_col in df.columns else None,
-    opacity=0.75,
+    opacity=0.8,
     height=650,
     title=f"{y_metric} vs {x_metric}",
 )
@@ -275,35 +261,34 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight (Gold for Livingston, no extra tooltip) ---
-my_team_name = "Livingston"
-
+# --- Team Highlight (Gold) ---
 if highlight_team and "Team" in df.columns:
     team_mask = df["Team"].str.strip().eq(my_team_name)
     if team_mask.any():
         team_df = df[team_mask]
+        other_df = df[~team_mask]
 
-        # Draw Livingston dots (gold, no text label)
+        # Livingston FC (Gold)
         fig.add_scatter(
             x=team_df[x_metric],
             y=team_df[y_metric],
             mode="markers",
             marker=dict(color="#FFD700", size=14, symbol="circle"),
             name=my_team_name,
-            hoverinfo="skip",  # disables their own tooltip overlay
+            text=team_df["Name"] if "Name" in team_df.columns else team_df["Team"],
+            hovertemplate="%{text}<br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
             showlegend=True,
         )
 
-        # Fade all other teams slightly & remove “Other” from legend
-        other_df = df[~team_mask]
+        # Other players (keep tooltips)
         fig.add_scatter(
             x=other_df[x_metric],
             y=other_df[y_metric],
             mode="markers",
-            marker=dict(color="rgba(120,180,170,0.5)", size=10),
-            name="",  # no legend entry
-            hovertext=None,
-            hoverinfo="none",
+            marker=dict(color="rgba(120,180,170,0.6)", size=10),
+            name="Other Players",
+            text=other_df["Name"] if "Name" in other_df.columns else other_df["Team"],
+            hovertemplate="%{text}<br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
             showlegend=False,
         )
 
@@ -317,11 +302,11 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
-# Download CSV
+# Download Filtered Data
 # ============================================================
 st.download_button(
     "📥 Download Filtered Data (CSV)",
     df.to_csv(index=False).encode("utf-8"),
-    file_name="scatter_plot_data.csv",
+    file_name="statsbomb_scatter_plot_data.csv",
     mime="text/csv",
 )
