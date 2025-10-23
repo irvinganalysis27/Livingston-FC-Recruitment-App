@@ -9,14 +9,15 @@ import sqlite3
 from auth import check_password
 from branding import show_branding
 
-# ============================================================
-# Setup
-# ============================================================
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
-st.title("🏆 Team Player Rankings")
+st.title("Team Player Rankings")
 
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
