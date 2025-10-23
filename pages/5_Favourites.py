@@ -1,8 +1,16 @@
 import streamlit as st
 from datetime import datetime
+from auth import check_password
+from branding import show_branding
 
-# ========= Basic page chrome =========
-st.set_page_config(page_title="⭐ Watch List", layout="centered")
+st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
+
+# ---------- Authentication ----------
+if not check_password():
+    st.stop()
+
+# ---------- Branding ----------
+show_branding()
 st.title("⭐ Watch List")
 
 # ========= External Links =========
