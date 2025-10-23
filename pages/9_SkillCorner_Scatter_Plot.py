@@ -215,19 +215,31 @@ else:
 # ============================================================
 # Plotly Scatter with unified tooltip
 # ============================================================
+# Base layer — all points (with tooltip)
 fig = px.scatter(
     df,
     x=x_metric,
     y=y_metric,
     color=color_col,
     color_discrete_sequence=px.colors.qualitative.Set2,
-    size=minutes_col if minutes_col in df.columns else None,
     opacity=0.8,
     height=650,
     title=f"{y_metric} vs {x_metric} (Season Averages)",
 )
 
-# --- Average Lines ---
+# --- Apply custom tooltip for all points ---
+fig.update_traces(
+    text=df["Player"],
+    customdata=np.stack([df["Team"]], axis=-1),
+    hovertemplate=(
+        "%{text}<br>"
+        "Team: %{customdata[0]}<br>"
+        f"{x_metric}: "+"%{x:.2f}<br>"
+        f"{y_metric}: "+"%{y:.2f}<extra></extra>"
+    ),
+)
+
+# --- Average lines ---
 fig.add_shape(
     type="line", x0=x_mean, x1=x_mean,
     y0=df[y_metric].min(), y1=df[y_metric].max(),
@@ -259,7 +271,7 @@ if highlight_outliers:
         ),
     )
 
-# --- Team Highlight (Gold, with tooltip) ---
+# --- Team Highlight (Gold, tooltip consistent) ---
 if highlight_team and "Team" in df.columns:
     df["_team_clean"] = df["Team"].astype(str).str.strip().str.lower()
     team_variants = ["livingston", "livingston fc"]
