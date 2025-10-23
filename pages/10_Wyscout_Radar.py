@@ -10,13 +10,13 @@ from auth import check_password
 from branding import show_branding
 from openai import OpenAI
 
-# ========= PAGE CONFIG =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-# ========= AUTH / BRANDING =========
+# ---------- Authentication ----------
 if not check_password():
     st.stop()
 
+# ---------- Branding ----------
 show_branding()
 st.title("Wyscout Radar")
 
