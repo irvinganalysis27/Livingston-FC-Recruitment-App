@@ -261,7 +261,7 @@ if highlight_outliers:
         name="Outliers",
     )
 
-# --- Team Highlight (Gold, robust matching) ---
+# --- Team Highlight (Gold, robust matching + team on tooltip) ---
 if highlight_team and "Team" in df.columns:
     # Clean both sides and match on lowercase to handle 'Livingston' vs 'Livingston FC'
     df["_team_clean"] = df["Team"].astype(str).str.strip().str.lower()
@@ -280,11 +280,19 @@ if highlight_team and "Team" in df.columns:
             marker=dict(color="#FFD700", size=14, symbol="circle"),
             name="Livingston FC",
             text=team_df["Name"] if "Name" in team_df.columns else team_df["Team"],
-            hovertemplate="%{text}<br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
+            customdata=np.stack(
+                [team_df["Team"]], axis=-1
+            ),  # pass Team column as custom data
+            hovertemplate=(
+                "%{text}<br>"
+                "Team: %{customdata[0]}<br>"
+                "%{xaxis.title.text}: %{x:.2f}<br>"
+                "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
+            ),
             showlegend=True,
         )
 
-        # Other players (keep tooltips)
+        # Other players (keep hover info)
         fig.add_scatter(
             x=other_df[x_metric],
             y=other_df[y_metric],
@@ -292,7 +300,15 @@ if highlight_team and "Team" in df.columns:
             marker=dict(color="rgba(120,180,170,0.6)", size=10),
             name="Other Players",
             text=other_df["Name"] if "Name" in other_df.columns else other_df["Team"],
-            hovertemplate="%{text}<br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
+            customdata=np.stack(
+                [other_df["Team"]], axis=-1
+            ),
+            hovertemplate=(
+                "%{text}<br>"
+                "Team: %{customdata[0]}<br>"
+                "%{xaxis.title.text}: %{x:.2f}<br>"
+                "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
+            ),
             showlegend=False,
         )
 
