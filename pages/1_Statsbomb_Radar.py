@@ -41,6 +41,20 @@ def open_image(path: Path):
     except Exception:
         return None
 
+# ============================================================
+# ✅ Keep only the most recent season entry per player
+# ============================================================
+date_col = "Player Season Most Recent Match"
+if date_col in df_all.columns:
+    df_all[date_col] = pd.to_datetime(df_all[date_col], errors="coerce")
+    df_all.sort_values(date_col, ascending=False, inplace=True)
+    before = len(df_all)
+    df_all = df_all.drop_duplicates(subset=["Name"], keep="first")
+    after = len(df_all)
+    st.caption(f"✅ Filtered to most recent record per player using '{date_col}' — {before - after} duplicates removed.")
+else:
+    st.warning("⚠️ 'Player Season Most Recent Match' column not found — duplicates not filtered.")
+
 
 # ========= FIXED GROUP COLOURS =========
 group_colors = {
