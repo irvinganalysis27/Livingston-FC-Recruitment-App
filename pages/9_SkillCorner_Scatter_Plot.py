@@ -55,7 +55,6 @@ df_all.columns = (
     .str.replace(r"\s+", " ", regex=True)
 )
 
-# 🔹 Drop Competition ID (not needed)
 if "Competition ID" in df_all.columns:
     df_all.drop(columns=["Competition ID"], inplace=True)
 
@@ -106,6 +105,7 @@ df_player = (
 )
 
 df = df_player.copy()
+
 # ============================================================
 # Filters
 # ============================================================
@@ -136,7 +136,6 @@ selected_leagues = st.multiselect(
 )
 
 min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=60)
-
 pos_groups = sorted(df[position_col].dropna().unique().tolist())
 selected_positions = st.multiselect(
     "Position Groups",
@@ -161,15 +160,9 @@ if df.empty:
 # Metric Selection
 # ============================================================
 numeric_cols = sorted(df.select_dtypes(include=[np.number]).columns.tolist())
-
-# Remove irrelevant numeric ID columns
 exclude_metrics = {
-    "Competition ID",
-    "Competition Edition ID",
-    "Team ID",
-    "Player ID",
-    "Season ID",
-    "Match ID",
+    "Competition ID", "Competition Edition ID", "Team ID",
+    "Player ID", "Season ID", "Match ID",
 }
 numeric_cols = [c for c in numeric_cols if c not in exclude_metrics]
 
@@ -220,31 +213,21 @@ else:
     color_title = None
 
 # ============================================================
-# Plotly Scatter
+# Plotly Scatter with unified tooltip
 # ============================================================
-hover_data = {
-    "Player": True if "Player" in df.columns else False,
-    "Team": True if "Team" in df.columns else False,
-    league_col: True,
-    "Season": True if "Season" in df.columns else False,
-    x_metric: ":.2f",
-    y_metric: ":.2f",
-}
-
 fig = px.scatter(
     df,
     x=x_metric,
     y=y_metric,
     color=color_col,
     color_discrete_sequence=px.colors.qualitative.Set2,
-    hover_data=hover_data,
     size=minutes_col if minutes_col in df.columns else None,
     opacity=0.8,
     height=650,
     title=f"{y_metric} vs {x_metric} (Season Averages)",
 )
 
-# Average lines
+# --- Average Lines ---
 fig.add_shape(
     type="line", x0=x_mean, x1=x_mean,
     y0=df[y_metric].min(), y1=df[y_metric].max(),
@@ -256,42 +239,67 @@ fig.add_shape(
     line=dict(color="black", dash="dot"),
 )
 
-# Outliers
+# --- Outliers ---
 if highlight_outliers:
     outliers = df[df["_is_outlier"]]
     fig.add_scatter(
         x=outliers[x_metric],
         y=outliers[y_metric],
         mode="markers+text",
-        text=outliers["Player"] if "Player" in df.columns else None,
+        text=outliers["Player"],
         textposition="top center",
         marker=dict(color="red", size=12, symbol="star"),
         name="Outliers",
+        customdata=np.stack([outliers["Team"]], axis=-1),
+        hovertemplate=(
+            "%{text}<br>"
+            "Team: %{customdata[0]}<br>"
+            f"{x_metric}: "+"%{x:.2f}<br>"
+            f"{y_metric}: "+"%{y:.2f}<extra></extra>"
+        ),
     )
 
-# Team Highlight (Gold)
+# --- Team Highlight (Gold, with tooltip) ---
 if highlight_team and "Team" in df.columns:
-    team_mask = df["Team"].str.strip().eq(my_team_name)
+    df["_team_clean"] = df["Team"].astype(str).str.strip().str.lower()
+    team_variants = ["livingston", "livingston fc"]
+
+    team_mask = df["_team_clean"].isin(team_variants)
     if team_mask.any():
         team_df = df[team_mask]
+        other_df = df[~team_mask]
+
         fig.add_scatter(
             x=team_df[x_metric],
             y=team_df[y_metric],
             mode="markers",
             marker=dict(color="#FFD700", size=14, symbol="circle"),
-            name=my_team_name,
-            hoverinfo="skip",
+            name="Livingston FC",
+            text=team_df["Player"],
+            customdata=np.stack([team_df["Team"]], axis=-1),
+            hovertemplate=(
+                "%{text}<br>"
+                "Team: %{customdata[0]}<br>"
+                f"{x_metric}: "+"%{x:.2f}<br>"
+                f"{y_metric}: "+"%{y:.2f}<extra></extra>"
+            ),
             showlegend=True,
         )
-        other_df = df[~team_mask]
+
         fig.add_scatter(
             x=other_df[x_metric],
             y=other_df[y_metric],
             mode="markers",
-            marker=dict(color="rgba(120,180,170,0.5)", size=10),
-            name="",
-            hovertext=None,
-            hoverinfo="none",
+            marker=dict(color="rgba(120,180,170,0.6)", size=10),
+            name="Other Players",
+            text=other_df["Player"],
+            customdata=np.stack([other_df["Team"]], axis=-1),
+            hovertemplate=(
+                "%{text}<br>"
+                "Team: %{customdata[0]}<br>"
+                f"{x_metric}: "+"%{x:.2f}<br>"
+                f"{y_metric}: "+"%{y:.2f}<extra></extra>"
+            ),
             showlegend=False,
         )
 
