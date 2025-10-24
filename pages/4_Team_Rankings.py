@@ -137,10 +137,8 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     rename_map = {"Name": "Player", "Primary Position": "Position", "Minutes": "Minutes played"}
     df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
-
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
         df["Competition_norm"] = df["Competition"]
-
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
@@ -150,7 +148,6 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
             df["Multiplier"] = 1.0
     except Exception:
         df["Multiplier"] = 1.0
-
     df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
     cm_mask = df["Six-Group Position"].eq("Centre Midfield")
     if cm_mask.any():
@@ -162,7 +159,7 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ============================================================
-# Compute Scores (matches radar logic)
+# Compute Scores
 # ============================================================
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
@@ -181,14 +178,11 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
         existing = [m for m in metrics if m in df.columns]
         if not existing:
             continue
-
         for m in existing:
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
-
         elig_pos = eligible[eligible[pos_col] == position]
         if elig_pos.empty:
             continue
-
         means = elig_pos[existing].mean()
         stds = elig_pos[existing].std().replace(0, 1)
         mask = df[pos_col] == position
@@ -200,32 +194,27 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
     mult = pd.to_numeric(df.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     az = df["Avg Z Score"]
     df["Weighted Z Score"] = np.where(az > 0, az * mult, az / mult)
-
     df["LFC Multiplier"] = mult
     df.loc[df["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
     lfc_mult = df["LFC Multiplier"]
     df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
-
     anchors = (
         df.groupby(pos_col, dropna=False)["Weighted Z Score"]
         .agg(_min="min", _max="max")
         .fillna(0)
     )
     df = df.merge(anchors, left_on=pos_col, right_index=True, how="left")
-
     def to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
         return np.clip((v - lo) / (hi - lo) * 100, 0.0, 100.0)
-
     df["Score (0–100)"] = [to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_min"], df["_max"])]
     df["LFC Score (0–100)"] = [to100(v, lo, hi) for v, lo, hi in zip(df["LFC Weighted Z"], df["_min"], df["_max"])]
-
     df.drop(columns=["_min", "_max"], inplace=True, errors="ignore")
     return df
 
 # ============================================================
-# Load & Filter
+# Load + Filters
 # ============================================================
 df_all_raw = load_statsbomb(DATA_PATH)
 df_all_raw = add_age_column(df_all_raw)
@@ -245,6 +234,16 @@ if df_team.empty:
 
 df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
 df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+# ---------- ⏱ Filter by Minutes Played ----------
+st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
+min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
+selected_min_display = st.number_input(
+    "Show only players with at least this many minutes",
+    min_value=min_val, max_value=max_val,
+    value=min(600, max_val), step=50
+)
+df_team = df_team[df_team["Minutes played"] >= selected_min_display]
 
 # ============================================================
 # Supabase Favourites (identical to radar)
@@ -357,6 +356,7 @@ if not st.session_state.get("_last_sync_time") or time.time() - st.session_state
                 }
                 upsert_favourite(payload, log_to_sheet=True)
 
+        
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
         for _, row in non_fav_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
