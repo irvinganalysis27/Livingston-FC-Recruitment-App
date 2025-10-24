@@ -683,6 +683,12 @@ if current_single_group is not None and current_single_group != st.session_state
 
 # ================== Build metric pool & EC ==================
 current_template_name = st.session_state.selected_template or list(position_metrics.keys())[0]
+
+# --- Defensive fallback if session state has invalid key ---
+if current_template_name not in position_metrics:
+    current_template_name = list(position_metrics.keys())[0]
+    st.session_state.selected_template = current_template_name
+
 current_metrics = position_metrics[current_template_name]["metrics"]
 for m in current_metrics:
     if m not in df.columns:
