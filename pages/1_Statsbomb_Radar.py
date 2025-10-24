@@ -869,56 +869,31 @@ if "manual_override" not in st.session_state:
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
-# ---------- Auto-sync template with group (final persistent fix) ----------
-
-# Initialise tracking variables only once
-if "last_groups_tuple" not in st.session_state:
-    st.session_state.last_groups_tuple = tuple(selected_groups)
-if "manual_override" not in st.session_state:
-    st.session_state.manual_override = False
-if "template_select" not in st.session_state:
-    st.session_state.template_select = list(position_metrics.keys())[0]
-if "last_template_choice" not in st.session_state:
-    st.session_state.last_template_choice = st.session_state.template_select
-
-# --- Detect a *real* change in selected group (not on reload) ---
-group_changed = tuple(selected_groups) != st.session_state.last_groups_tuple
-
-# --- Only auto-change template if user hasn't manually overridden ---
-if group_changed and not st.session_state.manual_override:
-    if len(selected_groups) == 1:
-        pos = selected_groups[0]
-        if pos in position_metrics:
-            st.session_state.template_select = pos
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# --- Remember last chosen template (for future reloads) ---
-# If user manually picks a different template in the selectbox below, we mark manual_override=True there.
-
-# ---------- Template Section ----------
-st.markdown("#### 📊 Choose Radar Template")
+# ---------- Template Section (final stable version) ----------
+st.markdown("#### Choose Radar Template")
 
 template_names = list(position_metrics.keys())
-if st.session_state.template_select not in template_names:
+
+# Ensure template_select exists in session_state
+if "template_select" not in st.session_state:
     st.session_state.template_select = template_names[0]
 
-selected_position_template = st.selectbox(
-    "Radar Template",   # dummy label (required)
+# Use a temporary widget key so Streamlit doesn’t reset session_state
+selected_template_widget = st.selectbox(
+    "Radar Template",
     template_names,
-    index=template_names.index(st.session_state.template_select),
-    key="template_select",
-    label_visibility="collapsed"   # hides the text
+    index=template_names.index(st.session_state.template_select)
+        if st.session_state.template_select in template_names else 0,
+    key="template_widget_select",  # <— different key!
+    label_visibility="collapsed"
 )
 
-# Persist the user’s manual choice
-if selected_position_template != st.session_state.template_select:
-    st.session_state.template_select = selected_position_template
+# Detect if user changed it manually
+if selected_template_widget != st.session_state.template_select:
+    st.session_state.template_select = selected_template_widget
     st.session_state.manual_override = True
-
-# Handle manual override
-if st.session_state.template_select != st.session_state.last_template_choice:
-    st.session_state.manual_override = True
-    st.session_state.last_template_choice = st.session_state.template_select
 
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
