@@ -18,7 +18,6 @@ def check_password():
     if password == PASSWORD:
         st.session_state["authenticated"] = True
         st.success("✅ Access granted")
-        st.rerun()  # Rerun app so other pages load immediately
         return True
     elif password:
         st.warning("❌ Incorrect password")
