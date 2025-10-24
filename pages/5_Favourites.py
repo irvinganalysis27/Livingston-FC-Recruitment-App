@@ -26,6 +26,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# --- Make text areas show visible scrollbars ---
+st.markdown("""
+<style>
+textarea {
+    resize: vertical !important;
+    overflow-y: scroll !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #888 #f1f1f1 !important;
+    min-height: 60px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ========= External Links =========
 st.markdown(
     """
