@@ -147,6 +147,7 @@ else:
             )
 
             # --- Colour + Comments ---
+            # Row 1: Status (left), Initial Watch (right)
             c1, c2 = st.columns([1, 2])
             with c1:
                 current_colour = row.get("colour") or ""
@@ -158,25 +159,25 @@ else:
                     index=COLOUR_CHOICES.index(current_colour) if current_colour in COLOUR_CHOICES else 0,
                     key=f"colour_{player}",
                 )
-
+            
             with c2:
                 initial_comment = st.text_area(
                     "Initial Watch",
                     value=row.get("initial_watch_comment") or "",
                     key=f"initial_{player}",
                     placeholder="Initials + first comment…",
-                    height=80,
+                    height=100,  # taller and resizable
                 )
             
-            # Make the second box smaller width
-            c2a, c2b = st.columns([0.6, 0.4])
-            with c2a:
+            # Row 2: Second Watch sits below Initial Watch on the right
+            _, c2b = st.columns([1, 2])
+            with c2b:
                 second_comment = st.text_area(
                     "Second Watch",
                     value=row.get("second_watch_comment") or "",
                     key=f"second_{player}",
                     placeholder="Initials + second comment…",
-                    height=60,
+                    height=70,  # slightly shorter
                 )
 
             # --- Visibility + Actions ---
