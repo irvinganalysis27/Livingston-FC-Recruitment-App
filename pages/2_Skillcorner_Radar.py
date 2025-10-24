@@ -324,6 +324,66 @@ def plot_radial_bar_grouped(player_name: str):
 
 plot_radial_bar_grouped(selected_player)
 
+# ========= AI SCOUTING SUMMARY =========
+st.markdown("### 🧠 AI Scouting Summary")
+
+# --- Setup OpenAI client ---
+client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
+
+def generate_ai_summary(player_name: str, df: pd.DataFrame, percentiles: pd.DataFrame):
+    """Generate a short professional scouting summary for the selected player."""
+    try:
+        row = df.loc[df["Player"] == player_name].iloc[0]
+    except IndexError:
+        return "No data found for this player."
+
+    # Collect player info
+    position = str(row.get("Position Group Normalised", ""))
+    league = str(row.get("Competition", ""))
+    team = str(row.get("Team", ""))
+    mins = int(row.get("Minutes", 0))
+
+    # Get percentile values for metrics
+    pcts = percentiles.loc[df["Player"] == player_name, RADAR_METRICS].iloc[0].to_dict()
+    pct_text = ", ".join([f"{m}: {v:.0f}" for m, v in pcts.items() if pd.notnull(v)])
+
+    # Build natural-language prompt
+    prompt = f"""
+    You are a professional football recruitment analyst writing a concise scouting report 
+    in the realistic, honest tone of Tom Irving — analytical, grounded, and professional.
+
+    Write 5–6 sentences on {player_name}, a {position.lower()} playing for {team} in {league}, 
+    with {mins} minutes of tracked physical data.
+
+    Use these physical percentile metrics (0–100 scale):
+    {pct_text}
+
+    Tone and writing style guidelines:
+    - Use realistic football language, not clichés.
+    - Highlight clear physical traits like running load, explosiveness, or top speed.
+    - If the player ranks high (≥70th percentile) in multiple areas, describe them as strong or standout physically.
+    - If the player ranks low (<40th), note limitations naturally (e.g. “less active off the ball”, “lacks repeat sprints”).
+    - Keep the tone factual and balanced, not promotional.
+    - End with one strong sentence summarising their athletic profile type (e.g. “Profiles as an intense, high-output runner suited to pressing systems.”).
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.85,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"⚠️ AI summary generation failed: {e}"
+
+# --- Button and output ---
+if st.button("Generate AI Summary", key="ai_summary_btn"):
+    with st.spinner("Generating AI scouting report..."):
+        ai_report = generate_ai_summary(selected_player, df, percentile_df)
+        st.markdown(ai_report)
+
 # ========= RANKING TABLE =========
 st.markdown("### Players Ranked by Physical Composite (0–100)")
 rank_cols = ["Player", "Team", "Competition", "Position Group Normalised", "Minutes", "_score_0_100_global"] + RADAR_METRICS
