@@ -166,7 +166,7 @@ else:
                     value=row.get("initial_watch_comment") or "",
                     key=f"initial_{player}",
                     placeholder="Initials + first comment…",
-                    height=100,  # taller and resizable
+                    height=100,                # fixed height (forces scrollbar when text overflows)
                 )
             
             # Row 2: Second Watch sits below Initial Watch on the right
@@ -177,7 +177,7 @@ else:
                     value=row.get("second_watch_comment") or "",
                     key=f"second_{player}",
                     placeholder="Initials + second comment…",
-                    height=70,  # slightly shorter
+                    height=70,                 # fixed height
                 )
 
             # --- Visibility + Actions ---
