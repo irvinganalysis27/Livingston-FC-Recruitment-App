@@ -328,6 +328,14 @@ try:
     )
     df_team = df_team[df_team["Minutes played"] >= selected_min_display]
 
+    # --- Deduplicate players (keep the highest LFC Score row) ---
+if "Player" in df_team.columns and "LFC Score (0–100)" in df_team.columns:
+    df_team = (
+        df_team.sort_values("LFC Score (0–100)", ascending=False)
+               .drop_duplicates(subset=["Player"], keep="first")
+               .reset_index(drop=True)
+    )
+
     avg_score = df_team["LFC Score (0–100)"].mean() if "LFC Score (0–100)" in df_team else np.nan
     st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}" if not np.isnan(avg_score)
                 else f"### {selected_club} ({selected_league}) — No eligible players")
