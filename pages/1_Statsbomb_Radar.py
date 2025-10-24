@@ -869,16 +869,17 @@ if "manual_override" not in st.session_state:
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
-# ---------- Auto-sync template with group ----------
+# ---------- Auto-sync template with group (persistent fix) ----------
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# Only auto-change template if this is the first time or user hasn’t manually changed it
-if tuple(selected_groups) != st.session_state.last_groups_tuple and not st.session_state.manual_override:
-    if len(selected_groups) == 1:
+# ✅ Only run auto-sync once per *new* group change, not on page reload
+if tuple(selected_groups) != st.session_state.last_groups_tuple:
+    if len(selected_groups) == 1 and not st.session_state.get("manual_override", False):
         pos = selected_groups[0]
         if pos in position_metrics:
             st.session_state.template_select = pos
+    # update last_groups_tuple *after* syncing
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
 # ---------- Template Section ----------
