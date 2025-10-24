@@ -298,6 +298,34 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
 # ============================================================
 # Main UI
 # ============================================================
+try:
+    df_all_raw = load_statsbomb(DATA_PATH)
+    df_all_raw = add_age_column(df_all_raw)
+    df_all = preprocess(df_all_raw)
+    df_all = compute_scores(df_all, min_minutes=600)
+
+    league_col = "Competition_norm"
+    leagues = sorted(df_all[league_col].dropna().unique())
+    selected_league = st.selectbox("Select League", leagues)
+
+    clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
+    selected_club = st.selectbox("Select Club", clubs)
+
+    df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
+    if df_team.empty:
+        st.warning("No players found for this team.")
+        st.stop()
+
+    df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
+    df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+
+    st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
+    min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
+    selected_min_display = st.number_input(
+        "Show only players with at least this many minutes",
+        min_value=min_val, max_value=max_val,
+        value=min(600, max_val), step=50
+    )
     df_team = df_team[df_team["Minutes played"] >= selected_min_display]
 
     # --- Deduplicate players (keep the highest LFC Score row) ---
