@@ -1027,8 +1027,9 @@ selected_player = st.selectbox(
 st.session_state.selected_player = selected_player
 
 # ---------- Metrics + percentiles ----------
-metrics = position_metrics[selected_position_template]["metrics"]
-metric_groups = position_metrics[selected_position_template]["groups"]
+current_template_name = st.session_state.get("template_select", list(position_metrics.keys())[0])
+metrics = position_metrics[current_template_name]["metrics"]
+metric_groups = position_metrics[current_template_name]["groups"]
 
 # Ensure columns exist and are numeric in both df_all and df
 for m in metrics:
