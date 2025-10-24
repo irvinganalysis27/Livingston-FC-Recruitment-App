@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 import re
 from pathlib import Path
-from datetime import datetime
-import sqlite3
+from datetime import datetime, timezone
+import time
 
 from auth import check_password
 from branding import show_branding
+from supabase import create_client
+from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites, get_supabase_client
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -19,49 +21,12 @@ if not check_password():
 show_branding()
 st.title("Team Player Rankings")
 
+# ============================================================
+# Paths & setup
+# ============================================================
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
-DB_PATH = APP_DIR / "favourites.db"
-
-# ============================================================
-# Favourites DB
-# ============================================================
-def _ensure_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS favourites (
-            player TEXT PRIMARY KEY,
-            team TEXT,
-            league TEXT,
-            position TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-_ensure_db()
-
-def get_favourites():
-    conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT player, team, league, position FROM favourites").fetchall()
-    conn.close()
-    return rows
-
-def add_favourite(player, team=None, league=None, position=None):
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("INSERT OR REPLACE INTO favourites (player, team, league, position) VALUES (?,?,?,?)",
-                 (player, team, league, position))
-    conn.commit()
-    conn.close()
-
-def remove_favourite(player):
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("DELETE FROM favourites WHERE player=?", (player,))
-    conn.commit()
-    conn.close()
 
 # ============================================================
 # Data Loading
@@ -170,14 +135,12 @@ LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 # ============================================================
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-
     rename_map = {"Name": "Player", "Primary Position": "Position", "Minutes": "Minutes played"}
     df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
 
     if "Competition_norm" not in df.columns and "Competition" in df.columns:
         df["Competition_norm"] = df["Competition"]
 
-    # Merge league multipliers
     try:
         mult = pd.read_excel(ROOT_DIR / "league_multipliers.xlsx")
         if {"League", "Multiplier"}.issubset(mult.columns):
@@ -188,10 +151,7 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         df["Multiplier"] = 1.0
 
-    # Position mapping
     df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
-
-    # ✅ Duplicate Centre Midfielders into both Number 6 and Number 8
     cm_mask = df["Six-Group Position"].eq("Centre Midfield")
     if cm_mask.any():
         cm_as_6 = df.loc[cm_mask].copy()
@@ -199,7 +159,6 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         cm_as_6["Six-Group Position"] = "Number 6"
         cm_as_8["Six-Group Position"] = "Number 8"
         df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-
     return df
 
 # ============================================================
@@ -208,165 +167,200 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame:
     pos_col = "Six-Group Position"
     df = df_all.copy()
-
-    # --- Minutes setup ---
     df["Minutes played"] = pd.to_numeric(df.get("Minutes played", 0), errors="coerce").fillna(0)
     eligible = df[df["Minutes played"] >= min_minutes].copy()
     if eligible.empty:
         eligible = df.copy()
 
-    # Ensure required columns exist
     for col in ["Avg Z Score", "Weighted Z Score", "LFC Weighted Z"]:
         if col not in df.columns:
             df[col] = 0.0
-        if col not in eligible.columns:
-            eligible[col] = 0.0
 
-    # --- Step 1: Per-position Z-scores (baseline = all leagues) ---
     for position, template in position_metrics.items():
         metrics = template["metrics"]
         existing = [m for m in metrics if m in df.columns]
         if not existing:
             continue
 
-        # Ensure metrics are numeric
         for m in existing:
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
         elig_pos = eligible[eligible[pos_col] == position]
-        if elig_pos.empty:
+        if elig_pos.empty():
             continue
 
         means = elig_pos[existing].mean()
         stds = elig_pos[existing].std().replace(0, 1)
-
         mask = df[pos_col] == position
         Z = (df.loc[mask, existing] - means) / stds
-
-        # Invert metrics where lower is better
         for m in (LOWER_IS_BETTER & set(existing)):
             Z[m] *= -1
-
         df.loc[mask, "Avg Z Score"] = Z.mean(axis=1).fillna(0)
 
-    # --- Step 2: Weighted Z ---
     mult = pd.to_numeric(df.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
     az = df["Avg Z Score"]
     df["Weighted Z Score"] = np.where(az > 0, az * mult, az / mult)
 
-    # --- Step 3: LFC multiplier (1.20 for Scottish Premiership) ---
     df["LFC Multiplier"] = mult
     df.loc[df["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
     lfc_mult = df["LFC Multiplier"]
     df["LFC Weighted Z"] = np.where(az > 0, az * lfc_mult, az / lfc_mult)
 
-    # --- Step 4: Rebuild eligible Weighted Z before anchors ---
-    eligible = df[df["Minutes played"] >= min_minutes].copy()
-    if eligible.empty:
-        eligible = df.copy()
-
-    if "Avg Z Score" not in eligible.columns:
-        eligible["Avg Z Score"] = pd.to_numeric(eligible.get("Avg Z Score", 0), errors="coerce").fillna(0)
-    eligible["Weighted Z Score"] = np.where(
-        eligible["Avg Z Score"] > 0,
-        eligible["Avg Z Score"] * pd.to_numeric(eligible["Multiplier"], errors="coerce").fillna(1.0),
-        eligible["Avg Z Score"] / pd.to_numeric(eligible["Multiplier"], errors="coerce").fillna(1.0)
-    )
-
     anchors = (
-        eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
+        df.groupby(pos_col, dropna=False)["Weighted Z Score"]
         .agg(_min="min", _max="max")
         .fillna(0)
     )
     df = df.merge(anchors, left_on=pos_col, right_index=True, how="left")
 
-    # --- Step 5: Convert to 0–100 scale ---
     def to100(v, lo, hi):
         if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
             return 50.0
         return np.clip((v - lo) / (hi - lo) * 100, 0.0, 100.0)
 
-    df["Score (0–100)"] = [
-        to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_min"], df["_max"])
-    ]
-    df["LFC Score (0–100)"] = [
-        to100(v, lo, hi) for v, lo, hi in zip(df["LFC Weighted Z"], df["_min"], df["_max"])
-    ]
+    df["Score (0–100)"] = [to100(v, lo, hi) for v, lo, hi in zip(df["Weighted Z Score"], df["_min"], df["_max"])]
+    df["LFC Score (0–100)"] = [to100(v, lo, hi) for v, lo, hi in zip(df["LFC Weighted Z"], df["_min"], df["_max"])]
 
     df.drop(columns=["_min", "_max"], inplace=True, errors="ignore")
     return df
+
 # ============================================================
-# Main UI
+# Load & Filter
 # ============================================================
-try:
-    df_all_raw = load_statsbomb(DATA_PATH)
-    df_all_raw = add_age_column(df_all_raw)
-    df_all = preprocess(df_all_raw)
-    df_all = compute_scores(df_all, min_minutes=600)
+df_all_raw = load_statsbomb(DATA_PATH)
+df_all_raw = add_age_column(df_all_raw)
+df_all = preprocess(df_all_raw)
+df_all = compute_scores(df_all, min_minutes=600)
 
-    league_col = "Competition_norm"
-    leagues = sorted(df_all[league_col].dropna().unique())
-    selected_league = st.selectbox("Select League", leagues)
+league_col = "Competition_norm"
+leagues = sorted(df_all[league_col].dropna().unique())
+selected_league = st.selectbox("Select League", leagues)
+clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
+selected_club = st.selectbox("Select Club", clubs)
 
-    clubs = sorted(df_all.loc[df_all[league_col] == selected_league, "Team"].dropna().unique())
-    selected_club = st.selectbox("Select Club", clubs)
+df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
+if df_team.empty:
+    st.warning("No players found for this team.")
+    st.stop()
 
-    df_team = df_all[(df_all[league_col] == selected_league) & (df_all["Team"] == selected_club)].copy()
-    if df_team.empty:
-        st.warning("No players found for this team.")
-        st.stop()
+df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
+df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
 
-    df_team["Minutes played"] = pd.to_numeric(df_team["Minutes played"], errors="coerce").fillna(0).astype(int)
-    df_team["Rank in Team"] = df_team["Score (0–100)"].rank(ascending=False, method="min").astype(int)
+# ============================================================
+# Supabase Favourites (identical to radar)
+# ============================================================
+def get_favourites_with_colours_live():
+    sb = get_supabase_client()
+    if sb is None:
+        return {}
+    try:
+        res = sb.table("favourites").select("*").execute()
+        if not res.data:
+            return {}
+        return {
+            r.get("player"): {
+                "colour": r.get("colour", ""),
+                "comment": r.get("comment", ""),
+                "visible": bool(r.get("visible", True)),
+            }
+            for r in res.data
+            if r.get("player")
+        }
+    except Exception as e:
+        st.warning(f"⚠️ Could not load favourites: {e}")
+        return {}
 
-    st.markdown("#### ⏱ Filter by Minutes Played (Display Only)")
-    min_val, max_val = int(df_team["Minutes played"].min()), int(df_team["Minutes played"].max())
-    selected_min_display = st.number_input(
-        "Show only players with at least this many minutes",
-        min_value=min_val, max_value=max_val,
-        value=min(600, max_val), step=50
-    )
-    df_team = df_team[df_team["Minutes played"] >= selected_min_display]
+COLOUR_EMOJI = {
+    "🟣 Needs Checked": "🟣", "🟡 Monitor": "🟡", "🟢 Go": "🟢", "🟠 Out Of Reach": "🟠", "🔴 No Further Interest": "🔴",
+    "Needs Checked": "🟣", "Monitor": "🟡", "Go": "🟢", "No Further Interest": "🔴",
+    "🟣": "🟣", "🟡": "🟡", "🟢": "🟢", "🟠": "🟠", "🔴": "🔴",
+}
 
-    avg_score = df_team["LFC Score (0–100)"].mean() if "LFC Score (0–100)" in df_team else np.nan
-    st.markdown(f"### {selected_club} ({selected_league}) — Average {avg_score:.1f}" if not np.isnan(avg_score)
-                else f"### {selected_club} ({selected_league}) — No eligible players")
+def colourize_player_name(name: str, favs_dict: dict) -> str:
+    data = favs_dict.get(name)
+    if not data:
+        return name
+    emoji = COLOUR_EMOJI.get(str(data.get("colour", "")).strip(), "")
+    return f"{emoji} {name}" if emoji else name
 
-    cols_for_table = [
-        "Player", "Six-Group Position", "Team", league_col, "Multiplier",
-        "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
-        "Score (0–100)", "LFC Score (0–100)", "Age", "Minutes played", "Rank in Team"
-    ]
-    for c in cols_for_table:
-        if c not in df_team.columns:
-            df_team[c] = np.nan
+# ============================================================
+# Display Table
+# ============================================================
+favs = get_favourites_with_colours_live()
+df_team["Player (coloured)"] = df_team["Player"].apply(lambda n: colourize_player_name(n, favs))
+df_team["⭐ Favourite"] = df_team["Player"].apply(lambda n: bool(favs.get(n, {}).get("visible", False)))
 
-    z_ranking = df_team[cols_for_table].copy()
-    z_ranking.rename(columns={
-        "Six-Group Position": "Position",
-        league_col: "League",
-        "Multiplier": "League Weight",
-        "Avg Z Score": "Z Avg",
-        "Weighted Z Score": "Z Weighted",
-        "LFC Weighted Z": "Z LFC Weighted"
-    }, inplace=True)
+sig_parts = (selected_league, selected_club, len(df_team))
+editor_key = f"team_rankings_editor_{hash(sig_parts)}"
 
-    favs_in_db = {row[0] for row in get_favourites()}
-    z_ranking["⭐ Favourite"] = z_ranking["Player"].isin(favs_in_db)
+edited_df = st.data_editor(
+    df_team[
+        ["⭐ Favourite", "Player (coloured)", "Six-Group Position", "Team", "Competition_norm",
+         "Multiplier", "Avg Z Score", "Weighted Z Score", "LFC Weighted Z",
+         "Score (0–100)", "LFC Score (0–100)", "Age", "Minutes played", "Rank in Team"]
+    ],
+    column_config={
+        "Player (coloured)": st.column_config.TextColumn("Player"),
+        "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite", help="Syncs to Supabase"),
+        "Multiplier": st.column_config.NumberColumn("League Weight", format="%.3f"),
+        "Avg Z Score": st.column_config.NumberColumn("Z Avg", format="%.3f"),
+        "Weighted Z Score": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
+        "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
+    },
+    hide_index=False,
+    width="stretch",
+    key=editor_key,
+)
 
-    st.data_editor(
-        z_ranking,
-        column_config={
-            "⭐ Favourite": st.column_config.CheckboxColumn("⭐ Favourite"),
-            "League Weight": st.column_config.NumberColumn("League Weight", format="%.3f"),
-            "Z Avg": st.column_config.NumberColumn("Z Avg", format="%.3f"),
-            "Z Weighted": st.column_config.NumberColumn("Z Weighted", format="%.3f"),
-            "Score (0–100)": st.column_config.NumberColumn("Score (0–100)", format="%.1f"),
-            "LFC Score (0–100)": st.column_config.NumberColumn("LFC Score (0–100)", format="%.1f"),
-        },
-        hide_index=False,
-        width="stretch",
-    )
+# ============================================================
+# Sync with Supabase (identical to radar)
+# ============================================================
+@st.cache_data(ttl=5, show_spinner=False)
+def load_favourites_cached():
+    return get_favourites_with_colours_live()
 
-except Exception as e:
-    st.error(f"❌ Could not load data: {e}")
+favs_live = load_favourites_cached()
+
+if not st.session_state.get("_last_sync_time") or time.time() - st.session_state["_last_sync_time"] >= 3:
+    st.session_state["_last_sync_time"] = time.time()
+
+    if "⭐ Favourite" not in edited_df.columns:
+        st.warning("⚠️ Could not find '⭐ Favourite' column — skipping sync.")
+    else:
+        favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
+        deleted_players = {p for p, d in favs_live.items() if not d.get("visible", True)}
+
+        for _, row in favourite_rows.iterrows():
+            player_raw = str(row.get("Player (coloured)", "")).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣🟠]\s*", "", player_raw).strip()
+            team = row.get("Team", "")
+            league = row.get("Competition_norm", "")
+            position = row.get("Six-Group Position", "")
+
+            prev_data = favs_live.get(player_name, {})
+            prev_visible = bool(prev_data.get("visible", False))
+
+            if player_name in deleted_players and not prev_visible:
+                continue
+
+            if not prev_visible:
+                payload = {
+                    "player": player_name,
+                    "team": team,
+                    "league": league,
+                    "position": position,
+                    "colour": prev_data.get("colour", "🟣 Needs Checked"),
+                    "comment": prev_data.get("comment", ""),
+                    "visible": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "team-page",
+                }
+                upsert_favourite(payload, log_to_sheet=True)
+
+        non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
+        for _, row in non_fav_rows.iterrows():
+            player_raw = str(row.get("Player (coloured)", "")).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣🟠]\s*", "", player_raw).strip()
+            old_visible = favs_live.get(player_name, {}).get("visible", False)
+            if old_visible:
+                hide_f
