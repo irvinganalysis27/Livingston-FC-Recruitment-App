@@ -186,7 +186,7 @@ def compute_scores(df_all: pd.DataFrame, min_minutes: int = 600) -> pd.DataFrame
             df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
         elig_pos = eligible[eligible[pos_col] == position]
-        if elig_pos.empty():
+        if elig_pos.empty:
             continue
 
         means = elig_pos[existing].mean()
