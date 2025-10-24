@@ -846,6 +846,9 @@ selected_groups = st.multiselect(
     key="pos_group_multiselect"
 )
 
+# ✅ persist across page switches
+st.session_state.selected_groups = selected_groups
+
 # Apply filter if groups selected
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
@@ -867,12 +870,15 @@ if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
 # ---------- Auto-sync template with group ----------
-if tuple(selected_groups) != st.session_state.last_groups_tuple:
+if "last_groups_tuple" not in st.session_state:
+    st.session_state.last_groups_tuple = tuple(selected_groups)
+
+# Only auto-change template if this is the first time or user hasn’t manually changed it
+if tuple(selected_groups) != st.session_state.last_groups_tuple and not st.session_state.manual_override:
     if len(selected_groups) == 1:
         pos = selected_groups[0]
         if pos in position_metrics:
             st.session_state.template_select = pos
-            st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
 # ---------- Template Section ----------
