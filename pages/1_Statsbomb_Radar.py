@@ -869,18 +869,31 @@ if "manual_override" not in st.session_state:
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
-# ---------- Auto-sync template with group (persistent fix) ----------
+# ---------- Auto-sync template with group (final persistent fix) ----------
+
+# Initialise tracking variables only once
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple(selected_groups)
+if "manual_override" not in st.session_state:
+    st.session_state.manual_override = False
+if "template_select" not in st.session_state:
+    st.session_state.template_select = list(position_metrics.keys())[0]
+if "last_template_choice" not in st.session_state:
+    st.session_state.last_template_choice = st.session_state.template_select
 
-# ✅ Only run auto-sync once per *new* group change, not on page reload
-if tuple(selected_groups) != st.session_state.last_groups_tuple:
-    if len(selected_groups) == 1 and not st.session_state.get("manual_override", False):
+# --- Detect a *real* change in selected group (not on reload) ---
+group_changed = tuple(selected_groups) != st.session_state.last_groups_tuple
+
+# --- Only auto-change template if user hasn't manually overridden ---
+if group_changed and not st.session_state.manual_override:
+    if len(selected_groups) == 1:
         pos = selected_groups[0]
         if pos in position_metrics:
             st.session_state.template_select = pos
-    # update last_groups_tuple *after* syncing
     st.session_state.last_groups_tuple = tuple(selected_groups)
+
+# --- Remember last chosen template (for future reloads) ---
+# If user manually picks a different template in the selectbox below, we mark manual_override=True there.
 
 # ---------- Template Section ----------
 st.markdown("#### 📊 Choose Radar Template")
@@ -896,6 +909,11 @@ selected_position_template = st.selectbox(
     key="template_select",
     label_visibility="collapsed"   # hides the text
 )
+
+# Persist the user’s manual choice
+if selected_position_template != st.session_state.template_select:
+    st.session_state.template_select = selected_position_template
+    st.session_state.manual_override = True
 
 # Handle manual override
 if st.session_state.template_select != st.session_state.last_template_choice:
