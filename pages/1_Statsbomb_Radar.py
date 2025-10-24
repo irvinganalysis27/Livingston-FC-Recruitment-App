@@ -846,9 +846,6 @@ selected_groups = st.multiselect(
     key="pos_group_multiselect"
 )
 
-# ✅ persist across page switches
-st.session_state.selected_groups = selected_groups
-
 # Apply filter if groups selected
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
@@ -869,31 +866,34 @@ if "manual_override" not in st.session_state:
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
+# ---------- Auto-sync template with group ----------
+if tuple(selected_groups) != st.session_state.last_groups_tuple:
+    if len(selected_groups) == 1:
+        pos = selected_groups[0]
+        if pos in position_metrics:
+            st.session_state.template_select = pos
+            st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# ---------- Template Section (final stable version) ----------
-st.markdown("#### Choose Radar Template")
+# ---------- Template Section ----------
+st.markdown("#### 📊 Choose Radar Template")
 
 template_names = list(position_metrics.keys())
-
-# Ensure template_select exists in session_state
-if "template_select" not in st.session_state:
+if st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
-# Use a temporary widget key so Streamlit doesn’t reset session_state
-selected_template_widget = st.selectbox(
-    "Radar Template",
+selected_position_template = st.selectbox(
+    "Radar Template",   # dummy label (required)
     template_names,
-    index=template_names.index(st.session_state.template_select)
-        if st.session_state.template_select in template_names else 0,
-    key="template_widget_select",  # <— different key!
-    label_visibility="collapsed"
+    index=template_names.index(st.session_state.template_select),
+    key="template_select",
+    label_visibility="collapsed"   # hides the text
 )
 
-# Detect if user changed it manually
-if selected_template_widget != st.session_state.template_select:
-    st.session_state.template_select = selected_template_widget
+# Handle manual override
+if st.session_state.template_select != st.session_state.last_template_choice:
     st.session_state.manual_override = True
+    st.session_state.last_template_choice = st.session_state.template_select
 
 # ---------- Build metric pool for Essential Criteria ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
@@ -1027,9 +1027,8 @@ selected_player = st.selectbox(
 st.session_state.selected_player = selected_player
 
 # ---------- Metrics + percentiles ----------
-current_template_name = st.session_state.get("template_select", list(position_metrics.keys())[0])
-metrics = position_metrics[current_template_name]["metrics"]
-metric_groups = position_metrics[current_template_name]["groups"]
+metrics = position_metrics[selected_position_template]["metrics"]
+metric_groups = position_metrics[selected_position_template]["groups"]
 
 # Ensure columns exist and are numeric in both df_all and df
 for m in metrics:
