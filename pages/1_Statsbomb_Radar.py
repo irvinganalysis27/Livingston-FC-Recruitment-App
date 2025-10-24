@@ -1830,7 +1830,7 @@ else:
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
         for _, row in non_fav_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
-            player_name = re.sub(r"^[🟢🟡🔴🟣]\s*", "", player_raw).strip()
+            player_name = re.sub(r"^[🟢🟡🔴🟣🟠]\s*", "", player_raw).strip()
 
             old_visible = favs_live.get(player_name, {}).get("visible", False)
             if old_visible:
