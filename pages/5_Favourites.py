@@ -13,6 +13,19 @@ if not check_password():
 show_branding()
 st.title("⭐ Watch List")
 
+st.markdown(
+    """
+    <style>
+    textarea {
+        min-height: 60px !important;
+        height: auto !important;
+        overflow-y: hidden !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ========= External Links =========
 st.markdown(
     """
@@ -147,18 +160,20 @@ else:
                 )
 
             with c2:
-                initial_comment = st.text_input(
-                    "Initial Watch",
-                    value=row.get("initial_watch_comment") or "",
-                    key=f"initial_{player}",
-                    placeholder="Initials + first comment…",
-                )
-                second_comment = st.text_input(
-                    "Second Watch",
-                    value=row.get("second_watch_comment") or "",
-                    key=f"second_{player}",
-                    placeholder="Initials + second comment…",
-                )
+                initial_comment = st.text_area(
+                "Initial Watch",
+                value=row.get("initial_watch_comment") or "",
+                key=f"initial_{player}",
+                placeholder="Initials + first comment…",
+                height=80,  # you can adjust this (e.g. 60, 100, 120)
+            )
+            second_comment = st.text_area(
+                "Second Watch",
+                value=row.get("second_watch_comment") or "",
+                key=f"second_{player}",
+                placeholder="Initials + second comment…",
+                height=60,
+            )
 
             # --- Visibility + Actions ---
             c3, c4, c5 = st.columns([0.5, 0.25, 0.25])
