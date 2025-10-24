@@ -161,19 +161,23 @@ else:
 
             with c2:
                 initial_comment = st.text_area(
-                "Initial Watch",
-                value=row.get("initial_watch_comment") or "",
-                key=f"initial_{player}",
-                placeholder="Initials + first comment…",
-                height=80,  # you can adjust this (e.g. 60, 100, 120)
-            )
-            second_comment = st.text_area(
-                "Second Watch",
-                value=row.get("second_watch_comment") or "",
-                key=f"second_{player}",
-                placeholder="Initials + second comment…",
-                height=60,
-            )
+                    "Initial Watch",
+                    value=row.get("initial_watch_comment") or "",
+                    key=f"initial_{player}",
+                    placeholder="Initials + first comment…",
+                    height=80,
+                )
+            
+            # Make the second box smaller width
+            c2a, c2b = st.columns([0.6, 0.4])
+            with c2a:
+                second_comment = st.text_area(
+                    "Second Watch",
+                    value=row.get("second_watch_comment") or "",
+                    key=f"second_{player}",
+                    placeholder="Initials + second comment…",
+                    height=60,
+                )
 
             # --- Visibility + Actions ---
             c3, c4, c5 = st.columns([0.5, 0.25, 0.25])
