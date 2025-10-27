@@ -1479,6 +1479,19 @@ metric_definitions = {
     "OP Passes Into Box": "Successful open play passes into the penalty area.",
     "Touches In Box": "Touches by the player inside the opponent's penalty area.",
     "Goal Conversion%": "Percentage of non-penalty shots converted to goals.",
+    "Pr. Pass% Dif.": "Passing accuracy % change when under pressure.",
+    "PAdj Tack&Int.": "Number of tackles and interceptions adjusted proportionally to the possession volume of a team.",
+    "PAdj Pressures.": "Possession adjusted pressures.",
+    "Successful Box Cross%.": "What percentage of a player's completed passes into the box are crosses.",
+    "Crossing%": "Percentage of attempted crosses that are successful and received by a teammate.",
+    "Shots": "Number of shots.",
+    "Player Season Fhalf Ball Recoveries 90": "Ball recoveries made in the opposition half of the pitch.",
+    "Deep Completions": "Successful passes within 20 metres of the opposition goal.",
+    "xG/Shot": "Non-penalty expected goals per shot.",
+    "OP xG Assisted": "xG assisted from open play.",
+    "Fouls Won": "Fouls won by player.",
+    "D&C OBV": "OBV	On Ball Value Added from Dribbles and Carries.",
+    "OP Key Passes": "Passes that create shots for teammates, just from open play.",
 }
 
 with st.expander("📘 Metric Glossary"):
