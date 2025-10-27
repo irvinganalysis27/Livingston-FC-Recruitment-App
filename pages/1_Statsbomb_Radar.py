@@ -1451,6 +1451,47 @@ if st.session_state.selected_player:
         metric_groups,
         group_colors
     )
+# ================== Glossary Section ==================
+metric_definitions = {
+    "NP Goals": "Non-penalty goals scored by the player.",
+    "Passing%": "Percentage of attempted passes that were completed.",
+    "Pass OBV": "On-Ball Value added from passes — contribution to team’s expected goals from passing.",
+    "Pr. Long Balls": "Number of pressured long balls played.",
+    "UPr. Long Balls": "Number of unpressured long balls played.",
+    "OBV": "On-Ball Value added from all actions — total offensive contribution.",
+    "PAdj Interceptions": "Interceptions adjusted for possession share.",
+    "PAdj Tackles": "Tackles adjusted for possession share.",
+    "Dribbles Stopped%": "Percentage of dribbles faced that were stopped.",
+    "Aggressive Actions": "Tackles, pressures or fouls within 2 seconds of opposition ball receipt.",
+    "Aerial Win%": "Percentage of aerial duels won.",
+    "Aerial Wins": "Number of aerial duels won.",
+    "Defensive Actions": "Tackles, pressures, or fouls made while defending.",
+    "Turnovers": "Times a player loses the ball through a miscontrol or failed dribble.",
+    "Successful Dribbles": "Times a player successfully beats an opponent while dribbling.",
+    "Deep Progressions": "Passes or carries into the final third.",
+    "xG": "Expected goals from non-penalty shots.",
+    "xG Assisted": "Expected assists — value of key passes leading to shots.",
+    "xGBuildup": "xG contribution from buildup play before the shot.",
+    "OBV": "Overall On-Ball Value added from all actions.",
+    "Fouls": "Fouls committed by the player.",
+    "Player Season Ball Recoveries 90": "Average ball recoveries per 90 minutes.",
+    "Pressure Regains": "Times a team regains the ball within 5 seconds of player’s pressure.",
+    "OP Passes Into Box": "Successful open play passes into the penalty area.",
+    "Touches In Box": "Touches by the player inside the opponent's penalty area.",
+    "Goal Conversion%": "Percentage of non-penalty shots converted to goals.",
+}
+
+with st.expander("📘 Metric Glossary"):
+    st.markdown(f"**Template:** {current_template_name}")
+
+    groups = position_metrics[current_template_name]["groups"]
+    for group_name in sorted(set(groups.values())):
+        color = group_colors.get(group_name, "black")
+        with st.expander(f"{group_name} metrics"):
+            for metric, grp in groups.items():
+                if grp == group_name:
+                    definition = metric_definitions.get(metric, "_Definition not added yet._")
+                    st.markdown(f"**{metric}** — {definition}")
 
 # ---------- AI Scouting Summary ----------
 st.markdown("### 🧠 AI Scouting Summary")
