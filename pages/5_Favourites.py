@@ -97,7 +97,33 @@ selected_statuses = st.multiselect(
 # ========= Fetch and filter data =========
 rows_all = list_favourites(only_visible=not show_hidden)
 
+# ========= Page controls / filters =========
+top_c1, top_c2 = st.columns([1, 1])
+with top_c1:
+    show_hidden = st.toggle("Show hidden players", value=False)
+with top_c2:
+    st.caption("Filter by colour/status or hide players below.")
+
+# --- NEW: Status filter (default = Needs Checked only) ---
+if "status_filter" not in st.session_state:
+    st.session_state.status_filter = ["🟣 Needs Checked"]
+
+selected_statuses = st.multiselect(
+    "Filter by Status",
+    options=COLOUR_CHOICES,
+    default=st.session_state.status_filter,
+    key="status_filter",
+    label_visibility="collapsed"
+)
+
+# ========= Fetch and filter data =========
+rows_all = list_favourites(only_visible=not show_hidden)
+
 # --- NEW: Position Group filter (like radar page) ---
+SIX_GROUPS = [
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
+]
+
 available_groups = sorted({
     r.get("position", "") for r in rows_all if r.get("position")
 })
@@ -106,13 +132,28 @@ available_groups = [g for g in SIX_GROUPS if g in available_groups]
 if "fav_pos_groups" not in st.session_state:
     st.session_state.fav_pos_groups = available_groups.copy()
 
-b1, b2, _ = st.columns([1, 1, 6])
+# Wider buttons
+b1, b2 = st.columns([1.2, 1.2])
 with b1:
-    if st.button("Select all positions"):
-        st.session_state.fav_pos_groups = available_groups.copy()
+    st.markdown(
+        "<div style='text-align:center;'>"
+        + st.button("Select all positions", use_container_width=True, key='select_all_pos').__str__()
+        + "</div>",
+        unsafe_allow_html=True
+    )
 with b2:
-    if st.button("Clear all positions"):
-        st.session_state.fav_pos_groups = []
+    st.markdown(
+        "<div style='text-align:center;'>"
+        + st.button("Clear all positions", use_container_width=True, key='clear_all_pos').__str__()
+        + "</div>",
+        unsafe_allow_html=True
+    )
+
+# Handle button logic cleanly
+if st.session_state.get("select_all_pos"):
+    st.session_state.fav_pos_groups = available_groups.copy()
+if st.session_state.get("clear_all_pos"):
+    st.session_state.fav_pos_groups = []
 
 selected_groups = st.multiselect(
     "Filter by Position Group",
