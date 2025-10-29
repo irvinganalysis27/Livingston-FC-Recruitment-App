@@ -109,15 +109,6 @@ available_groups = [g for g in SIX_GROUPS if g in available_groups]
 if "fav_pos_groups" not in st.session_state:
     st.session_state.fav_pos_groups = available_groups.copy()
 
-# Wider buttons side-by-side
-b1, b2, _ = st.columns([1.5, 1.5, 3])
-with b1:
-    if st.button("Select all positions", use_container_width=True, key="select_all_positions"):
-        st.session_state.fav_pos_groups = available_groups.copy()
-with b2:
-    if st.button("Clear all positions", use_container_width=True, key="clear_all_positions"):
-        st.session_state.fav_pos_groups = []
-
 selected_groups = st.multiselect(
     "Filter by Position Group",
     options=available_groups,
