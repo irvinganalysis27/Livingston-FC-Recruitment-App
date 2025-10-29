@@ -14,7 +14,7 @@ if not check_password():
 
 # ---------- Branding ----------
 show_branding()
-st.title("⚽ Shadow Team (4-3-3)")
+st.title("Shadow Team")
 
 # ---------- Fetch data ----------
 rows = list_shadow_team()
