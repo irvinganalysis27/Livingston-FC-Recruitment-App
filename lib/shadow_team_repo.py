@@ -62,6 +62,7 @@ def upsert_shadow_team(record: dict) -> bool:
         "player": player,
         "position_slot": record.get("position_slot") or "ST",
         "rank": int(record.get("rank") or 0),
+        "notes": record.get("notes") or "",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
