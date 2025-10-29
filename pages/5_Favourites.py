@@ -2,6 +2,9 @@ import streamlit as st
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+import re
+import pandas as pd
+import numpy as np
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -13,20 +16,7 @@ if not check_password():
 show_branding()
 st.title("⭐ Watch List")
 
-st.markdown(
-    """
-    <style>
-    textarea {
-        min-height: 60px !important;
-        height: auto !important;
-        overflow-y: hidden !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# --- Make text areas show visible scrollbars ---
+# --- Style (scrollable text areas) ---
 st.markdown("""
 <style>
 textarea {
@@ -73,10 +63,43 @@ COLOUR_CHOICES = [
 ]
 COLOUR_EMOJI = {c.split(" ", 1)[0]: c for c in COLOUR_CHOICES}
 
-# ========= Position groups (6-group system) =========
 SIX_GROUPS = [
     "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
 ]
+
+# ========= Position Mapping (identical to radar page) =========
+def _clean_pos_token(tok: str) -> str:
+    if pd.isna(tok):
+        return ""
+    t = str(tok).upper().strip()
+    t = re.sub(r"[.\-_/]", " ", t)
+    t = re.sub(r"\s+", "", t)
+    return t
+
+RAW_TO_SIX = {
+    # Full backs & wing backs
+    "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
+    "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+    # Centre backs
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    # Centre mids
+    "CENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
+    # Defensive mids → 6
+    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    # Attacking mids → 8
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    # Wingers
+    "RIGHTWING": "Winger", "LEFTWING": "Winger",
+    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    # Strikers
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+}
+
+def map_first_position_to_group(primary_pos_cell: str) -> str:
+    tok = _clean_pos_token(primary_pos_cell)
+    return RAW_TO_SIX.get(tok, None)
 
 # ========= Page controls / filters =========
 top_c1, top_c2 = st.columns([1, 1])
@@ -100,9 +123,13 @@ selected_statuses = st.multiselect(
 # ========= Fetch and filter data =========
 rows_all = list_favourites(only_visible=not show_hidden)
 
-# --- Position Group filter (like radar page) ---
+# --- Map positions using same logic as radar page ---
+for r in rows_all:
+    raw_pos = r.get("position", "")
+    r["mapped_position"] = map_first_position_to_group(raw_pos) or raw_pos
+
 available_groups = sorted({
-    r.get("position", "") for r in rows_all if r.get("position")
+    r["mapped_position"] for r in rows_all if r.get("mapped_position")
 })
 available_groups = [g for g in SIX_GROUPS if g in available_groups]
 
@@ -120,7 +147,7 @@ selected_groups = st.multiselect(
 # --- Apply both filters ---
 rows = [r for r in rows_all if r.get("colour") in selected_statuses]
 if selected_groups and len(selected_groups) < len(available_groups):
-    rows = [r for r in rows if r.get("position") in selected_groups]
+    rows = [r for r in rows if r.get("mapped_position") in selected_groups]
 
 # ============================================================
 # ➕ ADD NEW PLAYER MANUALLY
@@ -167,7 +194,9 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
                 else:
                     toast_err(f"❌ Failed to add {new_player}.")
 
-# ========= Render current list (cards) =========
+# ============================================================
+# 🧾 Render current list
+# ============================================================
 if not rows:
     st.info("No favourites found for the selected filters.")
 else:
@@ -176,7 +205,7 @@ else:
             player = row.get("player", "")
             team = row.get("team", "") or ""
             league = row.get("league", "") or ""
-            position = row.get("position", "") or ""
+            position = row.get("mapped_position", row.get("position", "") or "")
 
             # Top line
             st.markdown(
@@ -216,6 +245,7 @@ else:
                     height=70,
                 )
 
+            # --- Visibility + Actions ---
             c3, c4, c5 = st.columns([0.5, 0.25, 0.25])
             with c3:
                 visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"vis_{player}")
