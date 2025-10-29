@@ -30,15 +30,15 @@ df = df.drop(columns=[c for c in df.columns if c in ["created_at", "updated_at"]
 # ---------- Define display order ----------
 POSITION_ORDER = ["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"]
 POSITION_LABELS = {
-    "GK": "🧤 Goalkeeper",
-    "RB": "➡️ Right Back",
-    "LB": "⬅️ Left Back",
-    "CB": "🧱 Centre Back",
-    "6": "🛡 Number 6 (Defensive Midfielder)",
-    "8": "⚙️ Number 8 (Box-to-Box Midfielder)",
-    "RW": "⚡ Right Wing",
-    "LW": "⚡ Left Wing",
-    "ST": "🎯 Striker",
+    "GK": "Goalkeeper",
+    "RB": "Right Back",
+    "LB": "Left Back",
+    "CB": "Centre Back",
+    "6": "Number 6",
+    "8": "Number 8",
+    "RW": "Right Wing",
+    "LW": "Left Wing",
+    "ST": "Striker",
 }
 
 # ---------- Display grouped tables ----------
