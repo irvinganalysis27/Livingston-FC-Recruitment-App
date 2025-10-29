@@ -73,6 +73,11 @@ COLOUR_CHOICES = [
 ]
 COLOUR_EMOJI = {c.split(" ", 1)[0]: c for c in COLOUR_CHOICES}
 
+# ========= Position groups (6-group system) =========
+SIX_GROUPS = [
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
+]
+
 # ========= Page controls / filters =========
 top_c1, top_c2 = st.columns([1, 1])
 with top_c1:
@@ -90,11 +95,37 @@ selected_statuses = st.multiselect(
 )
 
 # ========= Fetch and filter data =========
-rows = list_favourites(only_visible=not show_hidden)
+rows_all = list_favourites(only_visible=not show_hidden)
 
-# Apply colour filter if selected
-if selected_statuses and len(selected_statuses) < len(COLOUR_CHOICES):
-    rows = [r for r in rows if r.get("colour") in selected_statuses]
+# --- NEW: Position Group filter (like radar page) ---
+available_groups = sorted({
+    r.get("position", "") for r in rows_all if r.get("position")
+})
+available_groups = [g for g in SIX_GROUPS if g in available_groups]
+
+if "fav_pos_groups" not in st.session_state:
+    st.session_state.fav_pos_groups = available_groups.copy()
+
+b1, b2, _ = st.columns([1, 1, 6])
+with b1:
+    if st.button("Select all positions"):
+        st.session_state.fav_pos_groups = available_groups.copy()
+with b2:
+    if st.button("Clear all positions"):
+        st.session_state.fav_pos_groups = []
+
+selected_groups = st.multiselect(
+    "Filter by Position Group",
+    options=available_groups,
+    default=st.session_state.fav_pos_groups,
+    key="fav_pos_group_multiselect",
+    label_visibility="collapsed"
+)
+
+# --- Apply both filters ---
+rows = [r for r in rows_all if r.get("colour") in selected_statuses]
+if selected_groups and len(selected_groups) < len(available_groups):
+    rows = [r for r in rows if r.get("position") in selected_groups]
 
 # ============================================================
 # ➕ ADD NEW PLAYER MANUALLY
