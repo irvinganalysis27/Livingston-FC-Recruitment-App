@@ -1,11 +1,16 @@
+# ============================================================
+# ⭐ WATCH LIST PAGE (with radar-identical mapping)
+# ============================================================
+
 import streamlit as st
+import pandas as pd
+import numpy as np
+import re
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
-import re
-import pandas as pd
-import numpy as np
 
+# ========= Streamlit Config =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
 # ---------- Authentication ----------
@@ -67,7 +72,7 @@ SIX_GROUPS = [
     "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
 ]
 
-# ========= Position Mapping (identical to radar page) =========
+# ========= Position Mapping (EXACT radar logic) =========
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok):
         return ""
@@ -76,30 +81,44 @@ def _clean_pos_token(tok: str) -> str:
     t = re.sub(r"\s+", "", t)
     return t
 
-RAW_TO_SIX = {
+RAW_TO_GROUP = {
     # Full backs & wing backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+
     # Centre backs
-    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    # Centre mids
-    "CENTREMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    # Defensive mids → 6
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    # Attacking mids → 8
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8", "10": "Number 8",
-    # Wingers
-    "RIGHTWING": "Winger", "LEFTWING": "Winger",
-    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    # Strikers
-    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+    "CENTREBACK": "Centre Back",
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back",
+
+    # Number 6 (Defensive mids)
+    "DEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
+    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+
+    # Number 8 (Central / Attacking mids)
+    "CENTREMIDFIELDER": "Number 8",
+    "LEFTCENTREMIDFIELDER": "Number 8",
+    "RIGHTCENTREMIDFIELDER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTATTACKINGMIDFIELDER": "Number 8",
+    "LEFTATTACKINGMIDFIELDER": "Number 8",
+
+    # Wingers / Wide mids
+    "LEFTWING": "Winger", "RIGHTWING": "Winger",
+    "LEFTMIDFIELDER": "Winger", "RIGHTMIDFIELDER": "Winger",
+
+    # Strikers / Forwards
+    "CENTREFORWARD": "Striker",
+    "LEFTCENTREFORWARD": "Striker",
+    "RIGHTCENTREFORWARD": "Striker",
+    "SECONDSTRIKER": "Striker",
+    "10": "Striker",
 }
 
 def map_first_position_to_group(primary_pos_cell: str) -> str:
     tok = _clean_pos_token(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)
+    return RAW_TO_GROUP.get(tok, None)
 
 # ========= Page controls / filters =========
 top_c1, top_c2 = st.columns([1, 1])
@@ -123,7 +142,7 @@ selected_statuses = st.multiselect(
 # ========= Fetch and filter data =========
 rows_all = list_favourites(only_visible=not show_hidden)
 
-# --- Map positions using same logic as radar page ---
+# --- Map positions using radar logic ---
 for r in rows_all:
     raw_pos = r.get("position", "")
     r["mapped_position"] = map_first_position_to_group(raw_pos) or raw_pos
