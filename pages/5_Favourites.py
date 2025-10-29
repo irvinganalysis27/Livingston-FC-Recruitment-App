@@ -1,5 +1,5 @@
 # ============================================================
-# ⭐ WATCH LIST PAGE (with radar-identical mapping)
+# ⭐ WATCH LIST PAGE (with radar-identical mapping, fixed multi-pos parsing)
 # ============================================================
 
 import streamlit as st
@@ -117,8 +117,18 @@ RAW_TO_GROUP = {
 }
 
 def map_first_position_to_group(primary_pos_cell: str) -> str:
-    tok = _clean_pos_token(primary_pos_cell)
-    return RAW_TO_GROUP.get(tok, None)
+    """Handles multi-position strings like 'Right Centre Back, Right Back'."""
+    if pd.isna(primary_pos_cell) or not str(primary_pos_cell).strip():
+        return None
+
+    # Split on commas or slashes, clean, and test each
+    parts = re.split(r"[,/]", str(primary_pos_cell))
+    for p in parts:
+        tok = _clean_pos_token(p)
+        if tok in RAW_TO_GROUP:
+            return RAW_TO_GROUP[tok]
+
+    return None  # no match found
 
 # ========= Page controls / filters =========
 top_c1, top_c2 = st.columns([1, 1])
@@ -142,7 +152,7 @@ selected_statuses = st.multiselect(
 # ========= Fetch and filter data =========
 rows_all = list_favourites(only_visible=not show_hidden)
 
-# --- Map positions using radar logic ---
+# --- Map positions using radar logic (now robust for multi-position) ---
 for r in rows_all:
     raw_pos = r.get("position", "")
     r["mapped_position"] = map_first_position_to_group(raw_pos) or raw_pos
