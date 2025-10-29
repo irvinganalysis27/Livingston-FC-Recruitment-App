@@ -24,8 +24,8 @@ if not rows:
 
 df = pd.DataFrame(rows).sort_values(["position_slot", "rank"]).reset_index(drop=True)
 
-# ✅ Remove internal timestamp columns if they exist
-df = df.drop(columns=[c for c in df.columns if c in ["created_at", "updated_at"]], errors="ignore")
+# ✅ Remove internal and technical columns (id, timestamps)
+df = df.drop(columns=[c for c in df.columns if c in ["id", "created_at", "updated_at"]], errors="ignore")
 
 # ---------- Define display order ----------
 POSITION_ORDER = ["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"]
