@@ -1,5 +1,5 @@
 # ============================================================
-# ⭐ WATCH LIST PAGE (with radar-identical mapping, fixed multi-pos parsing + shadow team add)
+# ⭐ WATCH LIST PAGE (with radar-identical mapping + Shadow Team add)
 # ============================================================
 
 import streamlit as st
@@ -263,12 +263,12 @@ else:
                 )
 
                 # Main button
-                if st.button("➕ Shadow Team", key=f"shadow_{player}", use_container_width=True):
+                if st.button("➕ Shadow Team", key=f"shadow_{player}", width="stretch"):
                     st.session_state[f"show_popover_{player}"] = True  # open manually
 
                 # Only show popover when clicked
                 if st.session_state.get(f"show_popover_{player}", False):
-                    with st.popover(f"Add {player} to Shadow Team", use_container_width=True):
+                    with st.popover(f"Add {player} to Shadow Team", width="stretch"):
                         # Store position in session_state so it persists through reruns
                         pos_key = f"shadow_pos_{player}"
                         if pos_key not in st.session_state:
@@ -276,8 +276,8 @@ else:
 
                         selected_pos = st.selectbox(
                             "Position slot",
-                            ["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"],
-                            index=["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"].index(
+                            ["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"],
+                            index=["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"].index(
                                 st.session_state.get(pos_key, "ST")
                             ),
                             key=pos_key,
