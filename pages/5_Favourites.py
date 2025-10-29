@@ -250,7 +250,18 @@ else:
 
             # ✅ NEW: Add to Shadow Team
             with c6:
-                if st.button("➕ Shadow Team", key=f"shadow_{player}"):
+                st.markdown(
+                    """
+                    <style>
+                    div[data-testid="stButton"] button[kind="secondary"] {
+                        width: 100% !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            
+                if st.button("➕ Shadow Team", key=f"shadow_{player}", use_container_width=True):
                     with st.popover(f"Add {player} to Shadow Team"):
                         pos_slot = st.selectbox(
                             "Position slot",
