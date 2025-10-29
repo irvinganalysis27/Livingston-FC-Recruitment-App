@@ -204,14 +204,13 @@ RAW_TO_SIX = {
     "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
     # Defensive mids → 6
     "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    # Attacking mids / 10 → 8
+    # Attacking mids → 8
     "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8", "10": "Number 8",
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
     # Strikers
-    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
 }
 
 def parse_first_position(cell) -> str:
