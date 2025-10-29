@@ -274,11 +274,11 @@ else:
                         if pos_key not in st.session_state:
                             st.session_state[pos_key] = "ST"
 
-                        st.session_state[pos_key] = st.selectbox(
+                        selected_pos = st.selectbox(
                             "Position slot",
                             ["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"],
                             index=["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"].index(
-                                st.session_state[pos_key]
+                                st.session_state.get(pos_key, "ST")
                             ),
                             key=pos_key,
                         )
