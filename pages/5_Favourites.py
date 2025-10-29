@@ -308,7 +308,7 @@ else:
                 "Latest Action",
                 value=row.get("latest_action") or "",
                 key=f"latest_{player}",
-                placeholder="e.g. Watched live vs Dundee — decision made to progress / follow up etc.",
+                placeholder="e.g. spoke to agent etc",
                 height=60,
             )
 
