@@ -290,7 +290,7 @@ else:
                     value=row.get("initial_watch_comment") or "",
                     key=f"initial_{player}",
                     placeholder="Initials + first comment…",
-                    height=100,
+                    height=200,
                 )
 
             _, c2b = st.columns([1, 2])
@@ -300,7 +300,7 @@ else:
                     value=row.get("second_watch_comment") or "",
                     key=f"second_{player}",
                     placeholder="Initials + second comment…",
-                    height=70,
+                    height=140,
                 )
 
             # --- New full-width 'Latest Action' field ---
