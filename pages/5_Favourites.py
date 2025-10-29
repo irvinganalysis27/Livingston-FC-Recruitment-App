@@ -248,41 +248,42 @@ else:
                     else:
                         toast_err(f"Failed to remove {player}")
 
-            # ✅ NEW: Add to Shadow Team
-            with c6:
-                st.markdown(
-                    """
-                    <style>
-                    div[data-testid="stButton"] button[kind="secondary"] {
-                        width: 100% !important;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            
-                with c6:
-    # Wider button
+# ✅ NEW: Add to Shadow Team
+with c6:
+    # Make button fill width
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stButton"] button[kind="secondary"] {
+            width: 100% !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Main button
     if st.button("➕ Shadow Team", key=f"shadow_{player}", use_container_width=True):
         st.session_state[f"show_popover_{player}"] = True  # open manually
-        
-# Only show popover when user clicked the button
+
+    # Only show popover when clicked
     if st.session_state.get(f"show_popover_{player}", False):
         with st.popover(f"Add {player} to Shadow Team", use_container_width=True):
-            # Save position choice in session_state so it survives reruns
+            # Store position in session_state so it persists through reruns
             pos_key = f"shadow_pos_{player}"
             if pos_key not in st.session_state:
-                st.session_state[pos_key] = "ST"  # default
+                st.session_state[pos_key] = "ST"
 
             st.session_state[pos_key] = st.selectbox(
                 "Position slot",
-                ["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"],
-                index=["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"].index(
+                ["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"],
+                index=["GK", "RB", "RCB", "LCB", "LB", "CDM", "RCM", "LCM", "RW", "ST", "LW"].index(
                     st.session_state[pos_key]
                 ),
                 key=pos_key,
             )
 
+            # Confirm button inside popover
             if st.button("✅ Confirm", key=f"shadow_add_{player}"):
                 pos_slot = st.session_state[pos_key]
                 payload = {"player": player, "position_slot": pos_slot, "rank": 0}
@@ -291,4 +292,4 @@ else:
                     toast_ok(f"✅ Added {player} to Shadow Team as {pos_slot}")
                 else:
                     toast_err("❌ Failed to add player to Shadow Team")
-                st.session_state[f"show_popover_{player}"] = False  # close after add
+                st.session_state[f"show_popover_{player}"] = False  # close after adding
