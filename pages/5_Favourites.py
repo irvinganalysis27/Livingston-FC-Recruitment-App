@@ -239,6 +239,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
                     "colour": "🟣 Needs Checked",
                     "initial_watch_comment": "",
                     "second_watch_comment": "",
+                    "latest_action": "",
                     "visible": True,
                     "updated_by": st.session_state.get("user_initials", ""),
                     "source": "manual-add",
@@ -302,6 +303,15 @@ else:
                     height=70,
                 )
 
+            # --- New full-width 'Latest Action' field ---
+            latest_action = st.text_area(
+                "Latest Action",
+                value=row.get("latest_action") or "",
+                key=f"latest_{player}",
+                placeholder="e.g. Watched live vs Dundee — decision made to progress / follow up etc.",
+                height=60,
+            )
+
             # --- Visibility + Actions ---
             c3, c4, c5 = st.columns([0.5, 0.25, 0.25])
             with c3:
@@ -317,6 +327,7 @@ else:
                         "colour": colour_choice,
                         "initial_watch_comment": initial_comment,
                         "second_watch_comment": second_comment,
+                        "latest_action": latest_action,
                         "visible": visible_val,
                         "updated_by": st.session_state.get("user_initials", ""),
                         "source": "watchlist-page",
