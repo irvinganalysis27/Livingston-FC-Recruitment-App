@@ -171,6 +171,33 @@ if selected_groups and len(selected_groups) < len(available_groups):
 # ============================================================
 # ➕ ADD NEW PLAYER MANUALLY
 # ============================================================
+
+# --- Manual dropdown positions (human readable) ---
+POSITION_CHOICES = [
+    "Centre Back",
+    "Left Back",
+    "Right Back",
+    "Defensive Midfielder",
+    "Centre Midfielder",
+    "Attacking Midfielder",
+    "Left Wing",
+    "Right Wing",
+    "Striker",
+]
+
+# --- Map manual dropdown -> radar 6-group name ---
+ADD_POSITION_MAP = {
+    "Centre Back": "Centre Back",
+    "Left Back": "Full Back",
+    "Right Back": "Full Back",
+    "Defensive Midfielder": "Number 6",
+    "Centre Midfielder": "Number 8",
+    "Attacking Midfielder": "Number 8",
+    "Left Wing": "Winger",
+    "Right Wing": "Winger",
+    "Striker": "Striker",
+}
+
 with st.expander("➕ Add New Player to Favourites", expanded=False):
     st.markdown("Use this form to manually add a new player record.")
 
@@ -181,11 +208,12 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
         new_league = st.text_input("League", key="new_player_league")
 
     with c2:
-        new_position = st.selectbox(
-            "Position Group",
-            SIX_GROUPS,
-            key="new_player_pos"
+        new_position_human = st.selectbox(
+            "Position",
+            POSITION_CHOICES,
+            key="new_player_human_pos"
         )
+        new_position = ADD_POSITION_MAP.get(new_position_human, new_position_human)
 
     c3, _ = st.columns([1, 4])
     with c3:
@@ -197,7 +225,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
                     "player": new_player.strip(),
                     "team": new_team.strip(),
                     "league": new_league.strip(),
-                    "position": new_position.strip(),
+                    "position": new_position.strip(),   # ✅ stored as 6-group version
                     "colour": "🟣 Needs Checked",
                     "initial_watch_comment": "",
                     "second_watch_comment": "",
@@ -208,7 +236,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
 
                 ok = upsert_favourite(payload, log_to_sheet=True)
                 if ok:
-                    toast_ok(f"✅ Added {new_player} to favourites.")
+                    toast_ok(f"✅ Added {new_player} ({new_position_human}) to favourites.")
                     st.rerun()
                 else:
                     toast_err(f"❌ Failed to add {new_player}.")
