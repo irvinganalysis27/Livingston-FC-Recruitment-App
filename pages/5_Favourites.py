@@ -85,26 +85,7 @@ with top_c1:
 with top_c2:
     st.caption("Filter by colour/status or hide players below.")
 
-# --- NEW: Status filter ---
-selected_statuses = st.multiselect(
-    "Filter by Status",
-    options=COLOUR_CHOICES,
-    default=COLOUR_CHOICES,
-    key="status_filter",
-    label_visibility="collapsed"
-)
-
-# ========= Fetch and filter data =========
-rows_all = list_favourites(only_visible=not show_hidden)
-
-# ========= Page controls / filters =========
-top_c1, top_c2 = st.columns([1, 1])
-with top_c1:
-    show_hidden = st.toggle("Show hidden players", value=False)
-with top_c2:
-    st.caption("Filter by colour/status or hide players below.")
-
-# --- NEW: Status filter (default = Needs Checked only) ---
+# --- Status filter (default = Needs Checked only) ---
 if "status_filter" not in st.session_state:
     st.session_state.status_filter = ["🟣 Needs Checked"]
 
@@ -119,11 +100,7 @@ selected_statuses = st.multiselect(
 # ========= Fetch and filter data =========
 rows_all = list_favourites(only_visible=not show_hidden)
 
-# --- NEW: Position Group filter (like radar page) ---
-SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
-]
-
+# --- Position Group filter (like radar page) ---
 available_groups = sorted({
     r.get("position", "") for r in rows_all if r.get("position")
 })
@@ -132,28 +109,14 @@ available_groups = [g for g in SIX_GROUPS if g in available_groups]
 if "fav_pos_groups" not in st.session_state:
     st.session_state.fav_pos_groups = available_groups.copy()
 
-# Wider buttons
-b1, b2 = st.columns([1.2, 1.2])
+# Wider buttons side-by-side
+b1, b2, _ = st.columns([1.5, 1.5, 3])
 with b1:
-    st.markdown(
-        "<div style='text-align:center;'>"
-        + st.button("Select all positions", use_container_width=True, key='select_all_pos').__str__()
-        + "</div>",
-        unsafe_allow_html=True
-    )
+    if st.button("Select all positions", use_container_width=True, key="select_all_positions"):
+        st.session_state.fav_pos_groups = available_groups.copy()
 with b2:
-    st.markdown(
-        "<div style='text-align:center;'>"
-        + st.button("Clear all positions", use_container_width=True, key='clear_all_pos').__str__()
-        + "</div>",
-        unsafe_allow_html=True
-    )
-
-# Handle button logic cleanly
-if st.session_state.get("select_all_pos"):
-    st.session_state.fav_pos_groups = available_groups.copy()
-if st.session_state.get("clear_all_pos"):
-    st.session_state.fav_pos_groups = []
+    if st.button("Clear all positions", use_container_width=True, key="clear_all_positions"):
+        st.session_state.fav_pos_groups = []
 
 selected_groups = st.multiselect(
     "Filter by Position Group",
@@ -183,7 +146,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
     with c2:
         new_position = st.selectbox(
             "Position Group",
-            ["Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"],
+            SIX_GROUPS,
             key="new_player_pos"
         )
 
@@ -232,7 +195,6 @@ else:
             )
 
             # --- Colour + Comments ---
-            # Row 1: Status (left), Initial Watch (right)
             c1, c2 = st.columns([1, 2])
             with c1:
                 current_colour = row.get("colour") or ""
@@ -244,17 +206,15 @@ else:
                     index=COLOUR_CHOICES.index(current_colour) if current_colour in COLOUR_CHOICES else 0,
                     key=f"colour_{player}",
                 )
-            
             with c2:
                 initial_comment = st.text_area(
                     "Initial Watch",
                     value=row.get("initial_watch_comment") or "",
                     key=f"initial_{player}",
                     placeholder="Initials + first comment…",
-                    height=100,                # fixed height (forces scrollbar when text overflows)
+                    height=100,
                 )
-            
-            # Row 2: Second Watch sits below Initial Watch on the right
+
             _, c2b = st.columns([1, 2])
             with c2b:
                 second_comment = st.text_area(
@@ -262,10 +222,9 @@ else:
                     value=row.get("second_watch_comment") or "",
                     key=f"second_{player}",
                     placeholder="Initials + second comment…",
-                    height=70,                 # fixed height
+                    height=70,
                 )
 
-            # --- Visibility + Actions ---
             c3, c4, c5 = st.columns([0.5, 0.25, 0.25])
             with c3:
                 visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"vis_{player}")
