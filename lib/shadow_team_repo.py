@@ -7,7 +7,7 @@ from supabase import create_client
 
 # --- Create Supabase client (reads from your app secrets) ---
 url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
+key = st.secrets["supabase"]["service_key"]
 client = create_client(url, key)
 
 # ---------- List players ----------
