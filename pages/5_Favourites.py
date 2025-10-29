@@ -265,30 +265,30 @@ else:
     # Wider button
     if st.button("➕ Shadow Team", key=f"shadow_{player}", use_container_width=True):
         st.session_state[f"show_popover_{player}"] = True  # open manually
-
-            # Only show popover when user clicked the button
-            if st.session_state.get(f"show_popover_{player}", False):
-                with st.popover(f"Add {player} to Shadow Team", use_container_width=True):
-                    # Save position choice in session_state so it survives reruns
-                    pos_key = f"shadow_pos_{player}"
-                    if pos_key not in st.session_state:
-                        st.session_state[pos_key] = "ST"  # default
         
-                    st.session_state[pos_key] = st.selectbox(
-                        "Position slot",
-                        ["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"],
-                        index=["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"].index(
-                            st.session_state[pos_key]
-                        ),
-                        key=pos_key,
-                    )
-        
-                    if st.button("✅ Confirm", key=f"shadow_add_{player}"):
-                        pos_slot = st.session_state[pos_key]
-                        payload = {"player": player, "position_slot": pos_slot, "rank": 0}
-                        ok = upsert_shadow_team(payload)
-                        if ok:
-                            toast_ok(f"✅ Added {player} to Shadow Team as {pos_slot}")
-                        else:
-                            toast_err("❌ Failed to add player to Shadow Team")
-                        st.session_state[f"show_popover_{player}"] = False  # close after add
+    # Only show popover when user clicked the button
+        if st.session_state.get(f"show_popover_{player}", False):
+            with st.popover(f"Add {player} to Shadow Team", use_container_width=True):
+                # Save position choice in session_state so it survives reruns
+                pos_key = f"shadow_pos_{player}"
+                if pos_key not in st.session_state:
+                    st.session_state[pos_key] = "ST"  # default
+    
+                st.session_state[pos_key] = st.selectbox(
+                    "Position slot",
+                    ["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"],
+                    index=["GK","RB","RCB","LCB","LB","CDM","RCM","LCM","RW","ST","LW"].index(
+                        st.session_state[pos_key]
+                    ),
+                    key=pos_key,
+                )
+    
+                if st.button("✅ Confirm", key=f"shadow_add_{player}"):
+                    pos_slot = st.session_state[pos_key]
+                    payload = {"player": player, "position_slot": pos_slot, "rank": 0}
+                    ok = upsert_shadow_team(payload)
+                    if ok:
+                        toast_ok(f"✅ Added {player} to Shadow Team as {pos_slot}")
+                    else:
+                        toast_err("❌ Failed to add player to Shadow Team")
+                    st.session_state[f"show_popover_{player}"] = False  # close after add
