@@ -42,7 +42,7 @@ POSITION_LABELS = {
 }
 
 # ---------- Display grouped tables ----------
-st.markdown("### 🧾 Current Shadow Team")
+st.markdown("### Current Shadow Team")
 
 for pos in POSITION_ORDER:
     pos_df = df[df["position_slot"] == pos]
