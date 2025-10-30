@@ -133,19 +133,30 @@ RAW_TO_SIX = {
     # Full backs & wing backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+
     # Centre backs
     "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+
     # Centre mid (generic) → duplicated into 6 & 8 later
     "CENTREMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    # Defensive mids → 6
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+
+    # ✅ Defensive mids → 6 (includes CENTREDEFENSIVEMIDFIELDER)
+    "DEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
+    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+
     # Attacking mids / 10 → 8
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8", "10": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "ATTACKINGMIDFIELDER": "Number 8",
+    "SECONDSTRIKER": "Number 8",
+    "10": "Number 8",
+
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+
     # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker",
 }
