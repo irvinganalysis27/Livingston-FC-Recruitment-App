@@ -780,6 +780,15 @@ with c2:
     pB = None if pB == "(none)" else pB
     st.session_state.cmpB = pB
 
+# ---------- Metrics where lower values are better ----------
+LOWER_IS_BETTER = {
+    "Turnovers",
+    "Lost Balls",
+    "Fouls",
+    "Pr. Long Balls",
+    "UPr. Long Balls",
+}
+
 # ---------- Percentiles ----------
 def compute_percentiles(metrics_list, group_df):
     bench = group_df.copy()
@@ -787,10 +796,19 @@ def compute_percentiles(metrics_list, group_df):
         if m not in bench.columns:
             bench[m] = np.nan
         bench[m] = pd.to_numeric(bench[m], errors="coerce")
-    raw = bench[metrics_list].copy()
-    pct = (raw.rank(pct=True) * 100.0).round(1)
-    return raw, pct
 
+    raw = bench[metrics_list].copy()
+    pct = pd.DataFrame(index=raw.index)
+
+    for m in metrics_list:
+        s = raw[m]
+        # invert ranking for "lower is better" metrics
+        ascending = not (m in LOWER_IS_BETTER)
+        pct[m] = s.rank(pct=True, ascending=ascending) * 100.0
+
+    return raw, pct.round(1)
+
+# ---------- Extract player percentiles ----------
 raw_df, pct_df = compute_percentiles(metrics, df)
 rowA_pct = pct_df.loc[df["Player"] == pA, metrics].iloc[0] if pA in df["Player"].values else None
 rowB_pct = pct_df.loc[df["Player"] == pB, metrics].iloc[0] if pB and pB in df["Player"].values else None
