@@ -1,41 +1,53 @@
-# lib/session_manager.py
+# ============================================================
+# 🧠 SESSION MANAGER (persistent auth + page state)
+# ============================================================
 import streamlit as st
 from datetime import datetime, timedelta
 
-SESSION_TIMEOUT_HOURS = 24
+SESSION_TIMEOUT_HOURS = 24  # keep login active for 24h
 
 def init_session():
     """Ensure all core session keys exist."""
-    for key, default in {
-        "authenticated": False,
-        "login_time": None,
-        "auth_timestamp": None,
-    }.items():
-        if key not in st.session_state:
-            st.session_state[key] = default
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    if "login_time" not in st.session_state:
+        st.session_state["login_time"] = None
 
 def is_session_valid():
     """Return True if user is logged in and session not expired."""
     init_session()
-    if not st.session_state.get("authenticated", False):
+
+    if not st.session_state["authenticated"]:
         return False
 
-    ts = st.session_state.get("login_time") or st.session_state.get("auth_timestamp")
-    if not ts:
+    login_time = st.session_state.get("login_time")
+    if not login_time:
         return False
 
-    if isinstance(ts, datetime) and (datetime.now() - ts > timedelta(hours=SESSION_TIMEOUT_HOURS)):
-        st.session_state["authenticated"] = False
-        st.session_state["auth_timestamp"] = None
-        st.session_state["login_time"] = None
+    elapsed = datetime.now() - login_time
+    if elapsed > timedelta(hours=SESSION_TIMEOUT_HOURS):
+        # expired
+        reset_session()
         return False
 
     return True
 
 def start_session():
     """Start a new authenticated session."""
-    init_session()
     st.session_state["authenticated"] = True
-    now = datetime.now()
-    st.session_state["login_time"] = now
-    st.session_state["auth_timestamp"] = now
+    st.session_state["login_time"] = datetime.now()
+
+def reset_session():
+    """Force logout and clear stored state."""
+    st.session_state.clear()
+    st.session_state["authenticated"] = False
+    st.session_state["login_time"] = None
+
+def save_ui_state(**kwargs):
+    """Save UI elements (filters, toggles, etc.) persistently across pages."""
+    for k, v in kwargs.items():
+        st.session_state[k] = v
+
+def get_ui_state(key, default=None):
+    """Retrieve saved UI element state."""
+    return st.session_state.get(key, default)
