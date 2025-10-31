@@ -9,43 +9,50 @@ SESSION_HOURS = 24
 
 def check_password():
     """
-    Password authentication with 24-hour persistence per tab.
-    Safe on reload and across pages — no crashes.
+    Password authentication that:
+    - Persists across pages and reloads for 24 hours.
+    - Never crashes or triggers double reruns.
     """
 
-    # Initialise keys safely
+    # --- Safe initialisation ---
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
     if "auth_timestamp" not in st.session_state:
         st.session_state["auth_timestamp"] = None
+    if "auth_prompt_shown" not in st.session_state:
+        st.session_state["auth_prompt_shown"] = False
 
-    # ✅ If already authenticated and still valid
+    # --- Valid existing session ---
     ts = st.session_state["auth_timestamp"]
-    if st.session_state.get("authenticated", False) and isinstance(ts, datetime):
+    if st.session_state["authenticated"] and ts and isinstance(ts, datetime):
         if datetime.now() - ts < timedelta(hours=SESSION_HOURS):
             return True
         else:
-            # session expired – mark invalid (don’t clear everything)
             st.session_state["authenticated"] = False
             st.session_state["auth_timestamp"] = None
 
-    # ✅ If session_manager already says valid
+    # --- Valid session via session_manager ---
     if is_session_valid():
         return True
 
-    # 🔒 Password prompt
-    st.markdown("## Welcome to the Livingston FC Recruitment App")
-    password = st.text_input("Enter password:", type="password")
+    # --- Only show the password input once ---
+    if not st.session_state["auth_prompt_shown"]:
+        st.markdown("## Welcome to the Livingston FC Recruitment App")
+        password = st.text_input("Enter password:", type="password")
+        st.session_state["auth_prompt_shown"] = True
+    else:
+        # Retrieve previous value so Streamlit doesn't rerun endlessly
+        password = st.session_state.get("last_password_entry", "")
 
-    # Only process input after user types something
     if password:
+        st.session_state["last_password_entry"] = password
         if password == PASSWORD:
             start_session()
             st.session_state["auth_timestamp"] = datetime.now()
             st.session_state["authenticated"] = True
-            st.success("✅ Access granted — valid for 24 hours or until you close the tab.")
-            st.experimental_set_query_params(auth="1")  # prevent reload loop
-            st.rerun()
+            st.success("✅ Access granted — valid for 24 hours.")
+            st.session_state["auth_prompt_shown"] = False
+            st.experimental_rerun()
             return True
         else:
             st.warning("❌ Incorrect password")
@@ -54,10 +61,8 @@ def check_password():
 
 
 def logout_button(label: str = "Logout"):
-    """Manual logout that doesn't break session."""
+    """Manual logout."""
     if st.button(label, type="secondary"):
-        st.session_state["authenticated"] = False
-        st.session_state["auth_timestamp"] = None
-        st.experimental_set_query_params(clear="1")
+        st.session_state.clear()
         st.success("Logged out.")
-        st.rerun()
+        st.experimental_rerun()
