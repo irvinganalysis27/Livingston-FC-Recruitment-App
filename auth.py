@@ -14,20 +14,30 @@ LOCAL_KEY = "livi_auth"
 def check_password() -> bool:
     """
     Persistent password authentication across reloads and pages (24-hour expiry).
-    Safe for Streamlit Cloud and avoids race conditions.
+    Fully safe for Streamlit Cloud – avoids JS/rerun race conditions.
     """
 
-    # Handle post-JS rerun cycle
-    if st.session_state.get("pending_rerun"):
-        st.session_state["pending_rerun"] = False
-        st.rerun()
+    # 1️⃣ Handle post-login localStorage write (delayed)
+    if st.session_state.get("pending_login", False):
+        try:
+            now_iso = datetime.now().isoformat()
+            streamlit_js_eval(
+                js_expressions=f"localStorage.setItem('{LOCAL_KEY}', '{PASSWORD}|{now_iso}')",
+                key=f"auth_save_{int(time.time())}"
+            )
+            st.session_state["pending_login"] = False
+            st.session_state["authenticated"] = True
+            st.success("✅ Access granted — you’ll stay logged in for 24 hours.")
+        except Exception:
+            st.warning("Login succeeded, but token couldn’t be stored.")
+        return True
 
-    # 1️⃣ Try restore from localStorage
+    # 2️⃣ Restore from localStorage if available
     try:
         stored = streamlit_js_eval(
             js_expressions=f"localStorage.getItem('{LOCAL_KEY}')",
             key="auth_load_local",
-            want_output=True
+            want_output=True,
         )
     except Exception:
         stored = None
@@ -44,34 +54,24 @@ def check_password() -> bool:
                 else:
                     streamlit_js_eval(
                         js_expressions=f"localStorage.removeItem('{LOCAL_KEY}')",
-                        key="auth_clear_expired"
+                        key="auth_clear_expired",
                     )
         except Exception:
             pass
 
-    # 2️⃣ Already authenticated in this Streamlit run
+    # 3️⃣ Already authenticated in this Streamlit session
     if is_session_valid():
         return True
 
-    # 3️⃣ Prompt user
+    # 4️⃣ Ask for password
     st.markdown("## Welcome to the Livingston FC Recruitment App")
     pwd = st.text_input("Enter password:", type="password")
 
     if pwd == PASSWORD:
         start_session()
-
-        try:
-            now_iso = datetime.now().isoformat()
-            streamlit_js_eval(
-                js_expressions=f"localStorage.setItem('{LOCAL_KEY}', '{PASSWORD}|{now_iso}')",
-                key=f"auth_save_{int(time.time())}"
-            )
-            st.session_state["pending_rerun"] = True  # trigger rerun next cycle
-            st.success("✅ Access granted — you'll stay logged in for 24 hours.")
-            return True
-        except Exception as e:
-            st.warning(f"Login succeeded, but token save failed: {e}")
-            return True
+        st.session_state["pending_login"] = True  # trigger write next render
+        st.experimental_rerun()  # safe rerun (no JS yet)
+        return True
 
     elif pwd:
         st.warning("❌ Incorrect password")
@@ -85,7 +85,7 @@ def logout_button(label: str = "Logout"):
         try:
             streamlit_js_eval(
                 js_expressions=f"localStorage.removeItem('{LOCAL_KEY}')",
-                key=f"auth_logout_{int(time.time())}"
+                key=f"auth_logout_{int(time.time())}",
             )
         except Exception:
             pass
