@@ -14,27 +14,35 @@ def check_password():
     Works across all pages and survives reloads as long as tab stays open.
     """
 
-    # 1️⃣ If already authenticated and still valid
-    if "auth_timestamp" in st.session_state:
-        if datetime.now() - st.session_state["auth_timestamp"] < timedelta(hours=SESSION_HOURS):
+    # ✅ Safe initialise keys
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    if "auth_timestamp" not in st.session_state:
+        st.session_state["auth_timestamp"] = None
+
+    # 1️⃣ Check if still valid
+    ts = st.session_state["auth_timestamp"]
+    if ts and isinstance(ts, datetime):
+        if datetime.now() - ts < timedelta(hours=SESSION_HOURS):
             st.session_state["authenticated"] = True
             return True
         else:
-            reset_session()
-            st.session_state.clear()
+            # expired session — don’t clear everything mid-run, just flag it
+            st.session_state["authenticated"] = False
+            st.session_state["auth_timestamp"] = None
 
-    # 2️⃣ If user is already authenticated in this session
+    # 2️⃣ If session still valid
     if is_session_valid():
         return True
 
-    # 3️⃣ Prompt for password
+    # 3️⃣ Show login box
     st.markdown("## Welcome to the Livingston FC Recruitment App")
     password = st.text_input("Enter password:", type="password")
 
     if password == PASSWORD:
         start_session()
         st.session_state["auth_timestamp"] = datetime.now()
-        st.success("✅ Access granted — you’ll stay logged in for 24 hours (or until you close the tab).")
+        st.success("✅ Access granted — you’ll stay logged in for 24 hours (or until tab closes).")
         st.rerun()
         return True
     elif password:
@@ -44,9 +52,10 @@ def check_password():
 
 
 def logout_button(label: str = "Logout"):
-    """Manual logout (clears session immediately)."""
+    """Manual logout (clears session safely)."""
     if st.button(label, type="secondary"):
         reset_session()
-        st.session_state.clear()
+        st.session_state["authenticated"] = False
+        st.session_state["auth_timestamp"] = None
         st.success("Logged out.")
         st.rerun()
