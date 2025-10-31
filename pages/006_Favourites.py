@@ -10,8 +10,6 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 
-st.warning("🚧 DEBUG: Page imported")
-
 # ========= Streamlit Config =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
