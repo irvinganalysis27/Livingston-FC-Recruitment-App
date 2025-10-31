@@ -10,11 +10,25 @@ from datetime import datetime
 from auth import check_password
 from branding import show_branding
 
+st.warning("🚧 DEBUG: Page imported")
+
 # ========= Streamlit Config =========
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-# ---------- Authentication ----------
-if not check_password():
+try:
+    from auth import check_password
+    st.warning("✅ Imported check_password OK")
+except Exception as e:
+    st.error(f"❌ Failed importing check_password: {e}")
+    st.stop()
+
+try:
+    if not check_password():
+        st.warning("⏸ check_password() returned False (not logged in yet)")
+        st.stop()
+    st.success("🟢 check_password() returned True (authenticated)")
+except Exception as e:
+    st.error(f"💥 Crash inside check_password(): {e}")
     st.stop()
 
 # ---------- Branding ----------
