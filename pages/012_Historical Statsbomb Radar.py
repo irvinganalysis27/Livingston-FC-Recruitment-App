@@ -479,6 +479,28 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
     parts = [str(p) for p in parts if p]  # ensure all strings, remove empties
     bottom = " | ".join(parts)
 
+        # metric labels around outside ring
+    for ang, m in zip(angles, valid_metrics):
+        label = m.replace(" per 90", "").replace(", %", " (%)")
+        rotation = np.degrees(ang)
+        if rotation > 90 and rotation < 270:
+            alignment = "right"
+            rotation += 180
+        else:
+            alignment = "left"
+        ax.text(
+            ang,
+            110,  # radius slightly beyond bars
+            label,
+            rotation=rotation,
+            ha=alignment,
+            va="center",
+            fontsize=9,
+            color="black",
+            fontweight="bold",
+            rotation_mode="anchor",
+        )
+
     ax.set_title(f"{top}\n{bottom}", color="black", size=22, pad=20, y=1.10)
     st.pyplot(fig, use_container_width=True)
 
