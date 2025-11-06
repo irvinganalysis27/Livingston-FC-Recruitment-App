@@ -160,35 +160,65 @@ def open_image(path: Path):
         return None
 
 # ========== Upload area ==========
-st.markdown("Upload a StatsBomb export (CSV/XLSX). If empty, I’ll try `statsbomb_player_stats_clean.csv` in the project root.")
-uploaded = st.file_uploader("Upload file", type=["csv", "xlsx", "xls"])
-
-def load_df():
-    if uploaded is not None:
-        if uploaded.name.lower().endswith((".xlsx", ".xls")):
-            return pd.read_excel(uploaded)
-        return pd.read_csv(uploaded)
-    fallback = ROOT_DIR / "statsbomb_player_stats_clean.csv"
-    if fallback.exists():
-        try:
-            return pd.read_csv(fallback)
-        except Exception:
-            return pd.read_excel(fallback)
-    st.error("No data found. Upload a file or add statsbomb_player_stats_clean.csv to the repo root.")
+st.markdown("### 📂 Upload a StatsBomb or Wyscout export file")
+uploaded = st.file_uploader("Upload Excel or CSV file", type=["csv", "xlsx", "xls"])
+if uploaded is None:
+    st.info("Please upload your player data file to continue.")
     st.stop()
 
-df = load_df()
+# Read file (no fallback)
+try:
+    if uploaded.name.lower().endswith((".xlsx", ".xls")):
+        df = pd.read_excel(uploaded)
+    else:
+        df = pd.read_csv(uploaded)
+except Exception as e:
+    st.error(f"Error reading file: {e}")
+    st.stop()
+
 if df.empty:
     st.error("Uploaded file is empty.")
     st.stop()
 
-# ========== Light preprocessing (names, leagues, positions) ==========
+# ========== Light preprocessing (names, positions, etc.) ==========
 df.columns = (
     df.columns.astype(str)
       .str.strip()
       .str.replace(u"\xa0", " ", regex=False)
       .str.replace(r"\s+", " ", regex=True)
 )
+
+# Standard ID columns
+rename_map = {}
+if "Name" in df.columns:
+    rename_map["Name"] = "Player"
+if "Primary Position" in df.columns:
+    rename_map["Primary Position"] = "Position"
+if "Minutes" in df.columns:
+    rename_map["Minutes"] = "Minutes played"
+df.rename(columns=rename_map, inplace=True)
+
+# Position mapping (no league logic)
+df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
+
+# Duplicate true central midfielders into 6 and 8
+cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+if cm_mask.any():
+    cm_as_6 = df.loc[cm_mask].copy()
+    cm_as_6["Six-Group Position"] = "Number 6"
+    cm_as_8 = df.loc[cm_mask].copy()
+    cm_as_8["Six-Group Position"] = "Number 8"
+    df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
+
+# Age derivation if Birth Date exists
+if "Birth Date" in df.columns and "Age" not in df.columns:
+    today = datetime.today()
+    dob = pd.to_datetime(df["Birth Date"], errors="coerce")
+    df["Age"] = dob.apply(
+        lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+        if pd.notnull(d)
+        else np.nan
+    )
 
 # Standard id columns
 rename_map = {}
