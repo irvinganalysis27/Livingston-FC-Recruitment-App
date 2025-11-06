@@ -318,8 +318,30 @@ if selected_groups:
 # Template chooser - snap to single group if only one selected
 if "template_select" not in st.session_state:
     st.session_state.template_select = list(position_metrics.keys())[0]
-if len(selected_groups) == 1 and selected_groups[0] in position_metrics:
-    st.session_state.template_select = selected_groups[0]
+# Template chooser - auto-sync only until user manually changes it
+if "template_select" not in st.session_state:
+    st.session_state.template_select = list(position_metrics.keys())[0]
+if "manual_override" not in st.session_state:
+    st.session_state.manual_override = False
+
+# Detect manual change (user selected a new template)
+template_names = list(position_metrics.keys())
+selected_position_template = st.selectbox(
+    "Radar Template",
+    template_names,
+    index=template_names.index(st.session_state.template_select),
+    key="template_select",
+    label_visibility="collapsed"
+)
+if selected_position_template != st.session_state.template_select:
+    st.session_state.manual_override = True
+st.session_state.template_select = selected_position_template
+
+# Auto-sync only if user hasn’t manually changed it
+if not st.session_state.manual_override and len(selected_groups) == 1:
+    pos = selected_groups[0]
+    if pos in position_metrics:
+        st.session_state.template_select = pos
 
 template_names = list(position_metrics.keys())
 if st.session_state.template_select not in template_names:
