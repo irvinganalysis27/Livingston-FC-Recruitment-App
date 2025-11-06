@@ -920,11 +920,30 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         txt = f"{raw_val:.2f}" if np.isfinite(raw_val) else "-"
         ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
-    # --- Metric labels around edge ---
+    # --- Metric labels around outside ring (Wyscout style) ---
     for ang, m in zip(angles, valid_metrics):
         label = m.replace(" per 90", "").replace(", %", " (%)")
         color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
-        ax.text(ang, 108, label, ha="center", va="center", color=color, fontsize=10, fontweight="bold")
+    
+        rotation = np.degrees(ang)
+        if 90 < rotation < 270:
+            rotation += 180
+            ha = "right"
+        else:
+            ha = "left"
+    
+        ax.text(
+            ang,
+            110,  # slightly outside the bars
+            label,
+            color=color,
+            fontsize=10,
+            fontweight="bold",
+            rotation=rotation,
+            rotation_mode="anchor",
+            ha=ha,
+            va="center",
+        )
 
     # --- Legend ---
     present_groups = list(dict.fromkeys(groups))
