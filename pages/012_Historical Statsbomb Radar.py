@@ -456,39 +456,74 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
     for ang, raw in zip(angles, raw_vals):
         ax.text(ang, 50, f"{raw:.2f}", ha="center", va="center", fontsize=10, color="black", fontweight="bold")
 
-    # labels
-    for ang, m in zip(angles, valid_metrics):
-        label = m.replace(" per 90","").replace(", %"," (%)")
-        ax.text(ang, 108, label, ha="center", va="center", fontsize=10, color="black", fontweight="bold")
+    # title
+    role = row.get("Six-Group Position") or ""
+    age = row.get("Age")
+    team = row.get("Team within selected timeframe") or row.get("Team") or ""
+    mins = row.get("Minutes played")
+    comp = row.get("Competition_norm") if "Competition_norm" in row.index else ""
+    rank_v = int(row.get("Rank")) if pd.notnull(row.get("Rank")) else None
+    z = float(row.get("Avg Z Score") or 0)
 
-    top = " | ".join([x for x in [player_name, role, f"{int(age)} years old" if pd.notnull(age) else None] if x])
-        parts = [
-            team if team else "",
-            comp if comp else "",
-            f"{int(mins)} mins" if pd.notnull(mins) else "",
-            f"Rank #{int(rank_v)}" if pd.notnull(rank_v) else "",
-            f"Avg Z {z:.2f}" if pd.notnull(z) else "",
-        ]
-        parts = [str(p) for p in parts if p]  # ensure all strings, remove empties
-        bottom = " | ".join(parts)
+    top = " | ".join(
+        [x for x in [player_name, role, f"{int(age)} years old" if pd.notnull(age) else None] if x]
+    )
+
+    parts = [
+        team if team else "",
+        comp if comp else "",
+        f"{int(mins)} mins" if pd.notnull(mins) else "",
+        f"Rank #{int(rank_v)}" if pd.notnull(rank_v) else "",
+        f"Avg Z {z:.2f}" if pd.notnull(z) else "",
+    ]
+    parts = [str(p) for p in parts if p]  # ensure all strings, remove empties
+    bottom = " | ".join(parts)
 
     ax.set_title(f"{top}\n{bottom}", color="black", size=22, pad=20, y=1.10)
     st.pyplot(fig, use_container_width=True)
 
+
 # draw chart
 plot_radial_bar_grouped(selected_player, plot_data, metric_groups)
 
-# Ranking table (Avg Z only)
+# ===============================
+# 📊 Ranking Table (Avg Z only)
+# ===============================
 st.markdown("### Players Ranked by Z-Score")
-cols_for_table = ["Player", "Positions played", "Age", "Team", "Team within selected timeframe",
-                  "Minutes played", "Avg Z Score", "Rank"]
+
+cols_for_table = [
+    "Player",
+    "Positions played",
+    "Age",
+    "Team",
+    "Team within selected timeframe",
+    "Minutes played",
+    "Avg Z Score",
+    "Rank",
+]
+
 for c in cols_for_table:
-    if c not in plot_data.columns: plot_data[c] = np.nan
-table = (plot_data[cols_for_table]
-         .sort_values(by="Avg Z Score", ascending=False)
-         .reset_index(drop=True))
-table[["Team","Team within selected timeframe"]] = table[["Team","Team within selected timeframe"]].fillna("N/A")
+    if c not in plot_data.columns:
+        plot_data[c] = np.nan
+
+table = (
+    plot_data[cols_for_table]
+    .sort_values(by="Avg Z Score", ascending=False)
+    .reset_index(drop=True)
+)
+
+# Fill blanks nicely
+table[["Team", "Team within selected timeframe"]] = table[
+    ["Team", "Team within selected timeframe"]
+].fillna("N/A")
+
+# Convert age to integer safely
 if "Age" in table.columns:
     table["Age"] = table["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
-table.index = np.arange(1, len(table)+1); table.index.name = "Row"
+
+# Add row numbers
+table.index = np.arange(1, len(table) + 1)
+table.index.name = "Row"
+
+# Display final table
 st.dataframe(table, use_container_width=True)
