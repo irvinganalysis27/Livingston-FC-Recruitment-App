@@ -322,10 +322,12 @@ if "manual_override" not in st.session_state:
     st.session_state.manual_override = False
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
+if "auto_template" not in st.session_state:
+    st.session_state.auto_template = st.session_state.template_select
 
 template_names = list(position_metrics.keys())
 
-# --- Selectbox (widget manages st.session_state.template_select automatically) ---
+# --- Template selector ---
 selected_position_template = st.selectbox(
     "Radar Template",
     template_names,
@@ -334,19 +336,17 @@ selected_position_template = st.selectbox(
     label_visibility="collapsed"
 )
 
-# --- Detect manual change ---
-if selected_position_template != st.session_state.template_select:
-    # This check won’t actually fire because Streamlit updates the state before returning,
-    # so we compare against a stored previous value
-    pass
+# --- If user manually changes template, lock override mode ---
+if selected_position_template != st.session_state.auto_template:
+    st.session_state.manual_override = True
 
-# --- Auto-sync only if user hasn't manually changed template ---
+# --- Auto-sync only if user hasn’t manually changed template ---
 if not st.session_state.manual_override and len(selected_groups) == 1:
     pos = selected_groups[0]
-    if pos in position_metrics and st.session_state.template_select != pos:
+    if pos in position_metrics and st.session_state.auto_template != pos:
+        st.session_state.auto_template = pos
+        # ✅ Update visual selection safely (no direct write conflict)
         st.session_state.template_select = pos
-else:
-    st.session_state.manual_override = True
 
 st.session_state.last_groups_tuple = tuple(selected_groups)
 
