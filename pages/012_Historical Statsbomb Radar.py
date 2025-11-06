@@ -470,13 +470,15 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
     z = float(row.get("Avg Z Score") or 0)
 
     top = " | ".join([x for x in [player_name, role, f"{int(age)} years old" if pd.notnull(age) else None] if x])
-    bottom = " | ".join([x for x in [
-        team if team else None,
-        comp if comp else None,
-        f"{int(mins)} mins" if pd.notnull(mins) else None,
-        f"Rank #{rank_v}" if rank_v else None,
-        f"Avg Z {z:.2f}",
-    ] if x])
+        parts = [
+        team if team else "",
+        comp if comp else "",
+        f"{int(mins)} mins" if pd.notnull(mins) else "",
+        f"Rank #{int(rank_v)}" if pd.notnull(rank_v) else "",
+        f"Avg Z {z:.2f}" if pd.notnull(z) else "",
+    ]
+    parts = [str(p) for p in parts if p]  # ensure all strings, remove empties
+    bottom = " | ".join(parts)
 
     ax.set_title(f"{top}\n{bottom}", color="black", size=22, pad=20, y=1.10)
     st.pyplot(fig, use_container_width=True)
