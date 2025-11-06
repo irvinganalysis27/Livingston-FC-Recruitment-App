@@ -485,35 +485,33 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         txt = f"{raw:.2f}" if np.isfinite(raw) else "-"
         ax.text(ang, 50, txt, ha="center", va="center", fontsize=10, color="black", fontweight="bold")
 
-    # Metric labels (fixed rotation/orientation)
+    # --- Metric labels (StatsBomb-style outward horizontal) ---
+    label_radius = 108
     for ang, m in zip(angles, valid_metrics):
         label = DISPLAY_NAMES.get(m, m)
         label = label.replace(" per 90", "").replace(", %", " (%)")
         color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
 
-        # Convert radians to degrees for rotation
-        rotation = np.degrees(ang)
-        alignment = "center"
-        rotation_mode = "anchor"
+        # Determine X,Y coordinates for label position
+        x = label_radius * np.cos(ang - np.pi/2)
+        y = label_radius * np.sin(ang - np.pi/2)
 
-        # Flip label orientation on the left half for readability
-        if 90 < rotation < 270:
-            rotation += 180
-            alignment = "right"
-        else:
-            alignment = "left"
+        # Center text horizontally
+        ha = "center"
+        va = "center"
 
         ax.text(
-            ang,
-            108,
+            np.deg2rad(np.degrees(ang)),  # same polar coordinate
+            label_radius,
             label,
             color=color,
             fontsize=10,
             fontweight="bold",
-            ha=alignment,
-            va="center",
-            rotation=rotation,
-            rotation_mode=rotation_mode
+            ha=ha,
+            va=va,
+            rotation=0,
+            rotation_mode="anchor",
+            transform=ax.transData
         )
 
     # --- Legend ---
