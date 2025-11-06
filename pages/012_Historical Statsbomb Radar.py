@@ -523,7 +523,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
                   ncol=min(len(patches), 4), frameon=False)
 
     # --- Title (player info identical style) ---
-    weighted_z = float(row.get("Weighted Z Score", 0) or 0)
     avg_z = float(row.get("Avg Z Score", 0) or 0)
     age = row.get("Age", np.nan)
     height = row.get("Height", np.nan)
@@ -544,7 +543,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     if comp: bottom_parts.append(comp)
     if pd.notnull(mins): bottom_parts.append(f"{int(mins)} mins")
     if rank_v: bottom_parts.append(f"Rank #{rank_v}")
-    bottom_parts.append(f"Z {weighted_z:.2f}")
+    bottom_parts.append(f"Z {avg_z:.2f}")
 
     # ensure all string-safe and filter empties
     bottom_parts = [str(p) for p in bottom_parts if p and str(p).strip() != ""]
@@ -570,7 +569,7 @@ st.markdown("### Players Ranked by Z-Score")
 cols_for_table = [
     "Player", "Positions played", "Age", "Team",
     "Team within selected timeframe", "Minutes played",
-    "Avg Z Score", "Weighted Z Score", "Rank"
+    "Avg Z Score", "Rank"
 ]
 
 for c in cols_for_table:
