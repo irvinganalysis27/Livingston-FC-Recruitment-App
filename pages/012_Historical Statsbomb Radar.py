@@ -386,7 +386,7 @@ with st.expander("Essential Criteria", expanded=False):
         st.caption(f"Applied criteria - kept {kept}, removed {dropped}.")
 
 # Build plot_data and Wyscout-style Z
-keep_cols = ["Player", "Team", "Team within selected timeframe", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position", league_col]
+keep_cols = ["Player", "Team", "Team within selected timeframe", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position"]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
 
@@ -464,7 +464,8 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
     # title
     role = row.get("Six-Group Position") or ""
     age = row.get("Age"); team = row.get("Team within selected timeframe") or row.get("Team") or ""
-    mins = row.get("Minutes played"); comp = row.get(league_col) or ""
+    mins = row.get("Minutes played")
+    comp = row.get("Competition_norm") if "Competition_norm" in row.index else ""
     rank_v = int(row.get("Rank")) if pd.notnull(row.get("Rank")) else None
     z = float(row.get("Avg Z Score") or 0)
 
@@ -482,35 +483,6 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
 
 # draw chart
 plot_radial_bar_grouped(selected_player, plot_data, metric_groups)
-
-# AI summary (kept same interface, using your OpenAI secret if present)
-st.markdown("### AI Scouting Summary")
-try:
-    from openai import OpenAI
-    client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
-    def generate_summary(name: str):
-        row = plot_data.loc[plot_data["Player"] == name].iloc[0]
-        role = str(row.get("Six-Group Position","player"))
-        league = str(row.get(league_col,""))
-        age = row.get("Age",""); team = str(row.get("Team","")); mins = row.get("Minutes played",0)
-        metric_percentiles = {m: row.get(f"{m} (percentile)", np.nan) for m in metrics if f"{m} (percentile)" in row.index}
-        metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
-        prompt = f"""
-Write a concise 5-6 sentence scouting note about {name}, a {role.lower()} aged {age}, in {league} for {team}.
-Use these percentiles (0-100): {metric_text}
-Be honest and specific about strengths and limitations. End with one clear line about his fit.
-"""
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role":"user","content":prompt}],
-            max_tokens=300, temperature=0.85,
-        )
-        return resp.choices[0].message.content.strip()
-    if st.button("Generate AI Summary"):
-        with st.spinner("Writing summary..."):
-            st.markdown(generate_summary(selected_player))
-except Exception as e:
-    st.caption(f"AI disabled - {e}")
 
 # Ranking table (Avg Z only)
 st.markdown("### Players Ranked by Z-Score")
