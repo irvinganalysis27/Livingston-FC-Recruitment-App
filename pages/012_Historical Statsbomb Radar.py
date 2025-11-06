@@ -153,6 +153,20 @@ position_metrics = {
 
 LOWER_IS_BETTER = {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"}
 
+# --- Percentile calculation (handles inverted metrics) ---
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    """
+    Convert a numeric series into 0–100 percentiles.
+    If lower_is_better=True, lower raw values get higher percentile ranks.
+    """
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
+    ranks = series.rank(pct=True, ascending=True)
+    if lower_is_better:
+        percentiles = 1.0 - ranks  # invert if smaller = better
+    else:
+        percentiles = ranks
+    return (percentiles * 100).round(1)
+
 def open_image(path: Path):
     try:
         return Image.open(path)
@@ -433,7 +447,11 @@ for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
 
 metrics_df = df[metrics].copy()
-percentiles = (metrics_df.rank(pct=True) * 100).round(1)
+
+# --- Calculate percentiles (respecting LOWER_IS_BETTER metrics) ---
+percentiles = pd.DataFrame(index=metrics_df.index, columns=metrics_df.columns, dtype=float)
+for m in metrics_df.columns:
+    percentiles[m] = pct_rank(metrics_df[m], lower_is_better=(m in LOWER_IS_BETTER))
 
 plot_data = pd.concat([df[keep_cols], metrics_df, percentiles.add_suffix(" (percentile)")], axis=1)
 
