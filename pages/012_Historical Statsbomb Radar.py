@@ -589,7 +589,7 @@ for c in cols_for_table:
         plot_data[c] = np.nan
 
 ranking_df = (plot_data[cols_for_table]
-              .sort_values(by="Weighted Z Score", ascending=False)
+              .sort_values(by="Avg Z Score", ascending=False)
               .reset_index(drop=True))
 ranking_df.index = np.arange(1, len(ranking_df) + 1)
 ranking_df.index.name = "Row"
