@@ -525,6 +525,13 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     st.pyplot(fig, width="stretch")
 
 # --- Draw chart ---
+group_colors = {
+    "Attacking": "crimson",
+    "Possession": "seagreen",
+    "Defensive": "royalblue",
+    "Off The Ball": "dimgray",
+    "Goalkeeping": "dimgray",
+}
 if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
 
