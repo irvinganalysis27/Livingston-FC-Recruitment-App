@@ -260,36 +260,6 @@ df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 if "min_minutes" not in st.session_state:
     st.session_state.min_minutes = 600
 
-st.session_state.min_minutes = st.number_input(
-    "Minimum minutes to include",
-    min_value=0,
-    value=st.session_state.min_minutes,
-    step=50,
-    key="min_minutes_input"
-)
-df = df[df["_minutes_numeric"] >= st.session_state.min_minutes].copy()
-if df.empty:
-    st.warning("No players meet the minutes threshold.")
-    st.stop()
-
-# Age filter
-if "Age" in df.columns:
-    df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
-    if df["_age_numeric"].notna().any():
-        a_min, a_max = int(np.nanmin(df["_age_numeric"])), int(np.nanmax(df["_age_numeric"]))
-        if "age_range" not in st.session_state:
-            st.session_state.age_range = (a_min, a_max)
-        st.session_state.age_range = st.slider(
-            "Age range to include",
-            min_value=a_min, max_value=a_max,
-            value=st.session_state.age_range,
-            step=1, key="age_range_slider"
-        )
-        lo, hi = st.session_state.age_range
-        df = df[df["_age_numeric"].between(lo, hi)].copy()
-
-st.caption(f"Players after filters: {len(df)}")
-
 # Minutes filter
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
