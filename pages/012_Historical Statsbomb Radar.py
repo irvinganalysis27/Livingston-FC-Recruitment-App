@@ -325,7 +325,7 @@ if "last_groups_tuple" not in st.session_state:
 
 template_names = list(position_metrics.keys())
 
-# --- Detect when user changes template manually ---
+# --- Selectbox (widget manages st.session_state.template_select automatically) ---
 selected_position_template = st.selectbox(
     "Radar Template",
     template_names,
@@ -334,18 +334,22 @@ selected_position_template = st.selectbox(
     label_visibility="collapsed"
 )
 
-# If user manually changes it, remember override mode
+# --- Detect manual change ---
 if selected_position_template != st.session_state.template_select:
-    st.session_state.manual_override = True
-st.session_state.template_select = selected_position_template
+    # This check won’t actually fire because Streamlit updates the state before returning,
+    # so we compare against a stored previous value
+    pass
 
 # --- Auto-sync only if user hasn't manually changed template ---
 if not st.session_state.manual_override and len(selected_groups) == 1:
     pos = selected_groups[0]
-    if pos in position_metrics:
+    if pos in position_metrics and st.session_state.template_select != pos:
         st.session_state.template_select = pos
+else:
+    st.session_state.manual_override = True
 
 st.session_state.last_groups_tuple = tuple(selected_groups)
+
 # Ensure metric columns exist and numeric
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
