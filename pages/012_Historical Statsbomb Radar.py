@@ -475,18 +475,36 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         txt = f"{raw:.2f}" if np.isfinite(raw) else "-"
         ax.text(ang, 50, txt, ha="center", va="center", fontsize=10, color="black", fontweight="bold")
 
-    # --- Metric labels (identical rotation logic to StatsBomb) ---
+    # Metric labels (fixed rotation/orientation)
     for ang, m in zip(angles, valid_metrics):
-        label = m.replace(" per 90", "").replace(", %", " (%)")
+        label = DISPLAY_NAMES.get(m, m)
+        label = label.replace(" per 90", "").replace(", %", " (%)")
         color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
+
+        # Convert radians to degrees for rotation
         rotation = np.degrees(ang)
+        alignment = "center"
+        rotation_mode = "anchor"
+
+        # Flip label orientation on the left half for readability
         if 90 < rotation < 270:
             rotation += 180
-            ha = "right"
+            alignment = "right"
         else:
-            ha = "left"
-        ax.text(ang, 110, label, color=color, fontsize=10, fontweight="bold",
-                rotation=rotation, rotation_mode="anchor", ha=ha, va="center")
+            alignment = "left"
+
+        ax.text(
+            ang,
+            108,
+            label,
+            color=color,
+            fontsize=10,
+            fontweight="bold",
+            ha=alignment,
+            va="center",
+            rotation=rotation,
+            rotation_mode=rotation_mode
+        )
 
     # --- Legend ---
     present_groups = list(dict.fromkeys([metric_groups.get(m, "Unknown") for m in valid_metrics]))
