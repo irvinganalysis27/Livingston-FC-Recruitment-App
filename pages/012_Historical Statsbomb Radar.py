@@ -315,19 +315,34 @@ if selected_groups:
         st.warning("No players after group filter.")
         st.stop()
 
-# ---------- Template chooser - allow manual override ----------
+# ---------- Template chooser ----------
+st.markdown("#### 📊 Choose Radar Template")
+
+# Set up persistent state
 if "template_select" not in st.session_state:
     st.session_state.template_select = list(position_metrics.keys())[0]
+if "last_template_choice" not in st.session_state:
+    st.session_state.last_template_choice = st.session_state.template_select
 if "manual_override" not in st.session_state:
     st.session_state.manual_override = False
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
-if "auto_template" not in st.session_state:
-    st.session_state.auto_template = st.session_state.template_select
 
+# Auto-sync when group selection changes — but only if user hasn't manually changed template
+if tuple(selected_groups) != st.session_state.last_groups_tuple:
+    if len(selected_groups) == 1:
+        pos = selected_groups[0]
+        if pos in position_metrics:
+            st.session_state.template_select = pos
+            st.session_state.manual_override = False
+    st.session_state.last_groups_tuple = tuple(selected_groups)
+
+# Build list of template names
 template_names = list(position_metrics.keys())
+if st.session_state.template_select not in template_names:
+    st.session_state.template_select = template_names[0]
 
-# --- Template selector ---
+# Template selector widget (lets user override manually)
 selected_position_template = st.selectbox(
     "Radar Template",
     template_names,
@@ -336,19 +351,10 @@ selected_position_template = st.selectbox(
     label_visibility="collapsed"
 )
 
-# --- If user manually changes template, lock override mode ---
-if selected_position_template != st.session_state.auto_template:
+# Detect manual override (user changed the dropdown)
+if st.session_state.template_select != st.session_state.last_template_choice:
     st.session_state.manual_override = True
-
-# --- Auto-sync only if user hasn’t manually changed template ---
-if not st.session_state.manual_override and len(selected_groups) == 1:
-    pos = selected_groups[0]
-    if pos in position_metrics and st.session_state.auto_template != pos:
-        st.session_state.auto_template = pos
-        # ✅ Update visual selection safely (no direct write conflict)
-        st.session_state.template_select = pos
-
-st.session_state.last_groups_tuple = tuple(selected_groups)
+    st.session_state.last_template_choice = st.session_state.template_select
 
 # Ensure metric columns exist and numeric
 metrics = position_metrics[selected_position_template]["metrics"]
