@@ -414,6 +414,16 @@ if "selected_player" not in st.session_state or st.session_state.selected_player
 selected_player = st.selectbox("Choose a player", players, index=players.index(st.session_state.selected_player), key="player_select")
 st.session_state.selected_player = selected_player
 
+# --- Display name overrides (match main radar) ---
+DISPLAY_NAMES = {
+    "Player Season Fhalf Pressures 90": "Pressures in Opposition Half",
+    "Deep Completions": "Completed Passes Final 1/3",
+    "Turnovers": "Lost Balls",
+    "Deep Progressions": "Progressions to Final 1/3",
+    "Player Season Fhalf Ball Recoveries 90": "Ball Recovery Opp. Half",
+    "Player Season Ball Recoveries 90": "Ball Recoveries",
+}
+
 # ================== Radar Chart Display ==================
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
