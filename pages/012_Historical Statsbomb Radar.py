@@ -315,17 +315,37 @@ if selected_groups:
         st.warning("No players after group filter.")
         st.stop()
 
-# Template chooser - snap to single group if only one selected
+# ---------- Template chooser - allow manual override ----------
 if "template_select" not in st.session_state:
     st.session_state.template_select = list(position_metrics.keys())[0]
-if len(selected_groups) == 1 and selected_groups[0] in position_metrics:
-    st.session_state.template_select = selected_groups[0]
+if "manual_override" not in st.session_state:
+    st.session_state.manual_override = False
+if "last_groups_tuple" not in st.session_state:
+    st.session_state.last_groups_tuple = tuple()
 
 template_names = list(position_metrics.keys())
-if st.session_state.template_select not in template_names:
-    st.session_state.template_select = template_names[0]
-selected_position_template = st.selectbox("Radar Template", template_names, index=template_names.index(st.session_state.template_select), key="template_select", label_visibility="collapsed")
 
+# --- Detect when user changes template manually ---
+selected_position_template = st.selectbox(
+    "Radar Template",
+    template_names,
+    index=template_names.index(st.session_state.template_select),
+    key="template_select",
+    label_visibility="collapsed"
+)
+
+# If user manually changes it, remember override mode
+if selected_position_template != st.session_state.template_select:
+    st.session_state.manual_override = True
+st.session_state.template_select = selected_position_template
+
+# --- Auto-sync only if user hasn't manually changed template ---
+if not st.session_state.manual_override and len(selected_groups) == 1:
+    pos = selected_groups[0]
+    if pos in position_metrics:
+        st.session_state.template_select = pos
+
+st.session_state.last_groups_tuple = tuple(selected_groups)
 # Ensure metric columns exist and numeric
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
