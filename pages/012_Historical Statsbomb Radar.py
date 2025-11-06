@@ -461,14 +461,6 @@ def plot_radial_bar_grouped(player_name, plot_df, metric_groups):
         label = m.replace(" per 90","").replace(", %"," (%)")
         ax.text(ang, 108, label, ha="center", va="center", fontsize=10, color="black", fontweight="bold")
 
-    # title
-    role = row.get("Six-Group Position") or ""
-    age = row.get("Age"); team = row.get("Team within selected timeframe") or row.get("Team") or ""
-    mins = row.get("Minutes played")
-    comp = row.get("Competition_norm") if "Competition_norm" in row.index else ""
-    rank_v = int(row.get("Rank")) if pd.notnull(row.get("Rank")) else None
-    z = float(row.get("Avg Z Score") or 0)
-
     top = " | ".join([x for x in [player_name, role, f"{int(age)} years old" if pd.notnull(age) else None] if x])
         parts = [
             team if team else "",
