@@ -198,6 +198,18 @@ if "Minutes" in df.columns:
     rename_map["Minutes"] = "Minutes played"
 df.rename(columns=rename_map, inplace=True)
 
+# --- Derived / calculated metrics ---
+if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
+    df["Successful Dribbles"] = (
+        pd.to_numeric(df["Player Season Total Dribbles 90"], errors="coerce").fillna(0)
+        - pd.to_numeric(df["Player Season Failed Dribbles 90"], errors="coerce").fillna(0)
+    )
+
+if "Successful Box Cross %" in df.columns:
+    df.rename(columns={"Successful Box Cross %": "Successful Box Cross%"}, inplace=True)
+if "Player Season Box Cross Ratio" in df.columns:
+    df.rename(columns={"Player Season Box Cross Ratio": "Successful Box Cross%"}, inplace=True)
+
 # Position mapping (no league logic)
 df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
 
