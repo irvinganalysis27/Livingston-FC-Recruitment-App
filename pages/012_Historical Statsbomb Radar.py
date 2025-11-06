@@ -249,34 +249,46 @@ if "Birth Date" in df.columns and "Age" not in df.columns:
     dob = pd.to_datetime(df["Birth Date"], errors="coerce")
     df["Age"] = dob.apply(lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day)) if pd.notnull(d) else np.nan)
 
-# ========== Filters (like Wyscout radar) ==========
-league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
-if league_col not in df.columns:
-    st.error("No Competition/Competition_norm column found.")
+# ========== Basic filters (same logic as Wyscout radar) ==========
+
+# Minutes filter
+minutes_col = "Minutes played"
+if minutes_col not in df.columns:
+    df[minutes_col] = np.nan
+df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+
+if "min_minutes" not in st.session_state:
+    st.session_state.min_minutes = 600
+
+st.session_state.min_minutes = st.number_input(
+    "Minimum minutes to include",
+    min_value=0,
+    value=st.session_state.min_minutes,
+    step=50,
+    key="min_minutes_input"
+)
+df = df[df["_minutes_numeric"] >= st.session_state.min_minutes].copy()
+if df.empty:
+    st.warning("No players meet the minutes threshold.")
     st.stop()
 
-leagues = sorted([x for x in df[league_col].dropna().astype(str).unique() if x and x.lower() != "nan"])
-st.markdown("#### Choose league(s)")
-if "league_selection" not in st.session_state:
-    st.session_state.league_selection = leagues.copy()
+# Age filter
+if "Age" in df.columns:
+    df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
+    if df["_age_numeric"].notna().any():
+        a_min, a_max = int(np.nanmin(df["_age_numeric"])), int(np.nanmax(df["_age_numeric"]))
+        if "age_range" not in st.session_state:
+            st.session_state.age_range = (a_min, a_max)
+        st.session_state.age_range = st.slider(
+            "Age range to include",
+            min_value=a_min, max_value=a_max,
+            value=st.session_state.age_range,
+            step=1, key="age_range_slider"
+        )
+        lo, hi = st.session_state.age_range
+        df = df[df["_age_numeric"].between(lo, hi)].copy()
 
-c1, c2, c3 = st.columns([1,1,6])
-with c1:
-    if st.button("Select all"):
-        st.session_state.league_selection = leagues.copy()
-with c2:
-    if st.button("Clear all"):
-        st.session_state.league_selection = []
-
-selected_leagues = st.multiselect("Leagues", options=leagues, default=st.session_state.league_selection, label_visibility="collapsed", key="league_selection")
-if selected_leagues:
-    df = df[df[league_col].isin(selected_leagues)].copy()
-    if df.empty:
-        st.warning("No players match the selected leagues.")
-        st.stop()
-else:
-    st.info("Pick at least one league.")
-    st.stop()
+st.caption(f"Players after filters: {len(df)}")
 
 # Minutes filter
 minutes_col = "Minutes played"
