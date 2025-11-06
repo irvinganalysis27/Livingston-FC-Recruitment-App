@@ -529,7 +529,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     team = row.get("Team within selected timeframe", "") or row.get("Team", "") or ""
     mins = row.get("Minutes played", np.nan)
     role = row.get("Six-Group Position", "") or ""
-    comp = row.get("Competition_norm") or row.get("Competition") or ""
     rank_v = int(row.get("Rank", 0)) if pd.notnull(row.get("Rank", 0)) else None
 
     top_parts = [player_name]
