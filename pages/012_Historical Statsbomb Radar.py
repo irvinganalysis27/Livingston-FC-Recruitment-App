@@ -197,9 +197,9 @@ if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
 if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
 df.rename(columns=rename_map, inplace=True)
 
-# League normalisation
+# League column normalisation (no mapping needed)
 if "Competition" in df.columns:
-    df["Competition_norm"] = df["Competition"].astype(str).str.strip().map(lambda x: LEAGUE_SYNONYMS.get(x, x))
+    df["Competition_norm"] = df["Competition"].astype(str).str.strip()
 else:
     df["Competition_norm"] = np.nan
 
