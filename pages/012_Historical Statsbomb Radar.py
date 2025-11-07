@@ -645,7 +645,7 @@ st.markdown("### Players Ranked by Z-Score")
 
 cols_for_table = [
     "Player", "Positions played", "Age", "Team",
-    "Team within selected timeframe", "Minutes played",
+    "Minutes played",
     "Avg Z Score", "Rank"
 ]
 
