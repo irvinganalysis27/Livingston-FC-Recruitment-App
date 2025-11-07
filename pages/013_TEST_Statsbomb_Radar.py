@@ -789,17 +789,29 @@ else:
 
 st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
 
-# --- Safe Season check ---
-season_cols = [c for c in df_all_raw.columns if c.lower() in {"season", "season_name", "seasonid", "season_name"}]
-if season_cols:
-    chosen_season_col = season_cols[0]
-    st.write(f"🔍 Using '{chosen_season_col}' as Season column")
-    df_all_raw.rename(columns={chosen_season_col: "Season"}, inplace=True)
-    st.write("🔍 Seasons found:", sorted(df_all_raw["Season"].dropna().astype(str).unique().tolist())[:10])
+# --- Season column detection ---
+season_col_candidates = [c for c in df_all_raw.columns if "season" in c.lower()]
+if not season_col_candidates:
+    st.error("❌ No column containing 'season' found at all.")
 else:
-    st.warning("⚠️ No Season-like column found. Add or rename one (expected e.g. 'season_name').")
+    # Prefer 'season_name', fallback to first
+    chosen = next((c for c in season_col_candidates if "name" in c.lower()), season_col_candidates[0])
+    st.write(f"✅ Using '{chosen}' as Season column")
+    if chosen != "Season":
+        df_all_raw.rename(columns={chosen: "Season"}, inplace=True)
 
-st.write("🔍 Weighted Z exists?", "Weighted Z Score" in df_all_raw.columns)
+    try:
+        seasons_list = (
+            df_all_raw["Season"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        st.write("🔍 Seasons found:", sorted(seasons_list)[:10])
+    except Exception as e:
+        st.warning(f"⚠️ Couldn't list seasons: {e}")
+
 st.write("🔍 Weighted Z exists?", "Weighted Z Score" in df_all_raw.columns)
 
 if df_all_raw is None or df_all_raw.empty:
