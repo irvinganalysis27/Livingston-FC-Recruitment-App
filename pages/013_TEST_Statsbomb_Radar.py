@@ -693,7 +693,9 @@ def load_data_once():
 # ============================================================
 df_all_raw = load_data_once()
 
-print("[DEBUG] Seasons found:", sorted(df_all_raw["Season"].dropna().unique().tolist()))
+st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
+st.write("🔍 Seasons found:", sorted(df_all_raw["Season"].dropna().unique().tolist())[:10])
+st.write("🔍 Weighted Z exists?", "Weighted Z Score" in df_all_raw.columns)
 
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
