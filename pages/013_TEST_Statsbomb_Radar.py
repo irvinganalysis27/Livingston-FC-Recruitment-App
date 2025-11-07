@@ -693,6 +693,16 @@ def load_data_once():
 # ============================================================
 df_all_raw = load_data_once()
 
+# --- Normalise season column names ---
+season_cols = [c for c in df_all_raw.columns if "season" in c.lower()]
+if season_cols:
+    # Prefer "season_name" if it exists
+    preferred = "season_name" if "season_name" in season_cols else season_cols[0]
+    df_all_raw.rename(columns={preferred: "Season"}, inplace=True)
+    print(f"[DEBUG] Renamed '{preferred}' → 'Season'")
+else:
+    print("[DEBUG] No season column found!")
+
 st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
 st.write("🔍 Seasons found:", sorted(df_all_raw["Season"].dropna().unique().tolist())[:10])
 st.write("🔍 Weighted Z exists?", "Weighted Z Score" in df_all_raw.columns)
