@@ -1647,6 +1647,11 @@ for c in cols_for_table:
 # Build ranking table from the current plot_data
 z_ranking = plot_data[cols_for_table].copy()
 
+# 🧹 Remove duplicate players — keep best Weighted Z
+if "Weighted Z Score" in z_ranking.columns:
+    z_ranking.sort_values("Weighted Z Score", ascending=False, inplace=True)
+    z_ranking = z_ranking.drop_duplicates(subset=["Player"], keep="first").reset_index(drop=True)
+
 # Sort automatically by Weighted Z (descending)
 z_ranking.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_index=True)
 z_ranking["Rank"] = np.arange(1, len(z_ranking) + 1)
