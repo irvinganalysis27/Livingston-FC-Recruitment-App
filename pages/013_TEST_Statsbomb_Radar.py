@@ -764,20 +764,20 @@ else:
     st.stop()
 
 # ============================================================
-# 4️⃣ SEASON FILTER
+# 4️⃣ SEASON FILTER (fixed)
 # ============================================================
 if "Season" in df.columns:
     season_options = sorted(df["Season"].dropna().unique().tolist())
     selected_season = st.selectbox("Select Season", ["All (3-Season Avg)"] + season_options)
     
+    # Save to session state for historical summary
+    st.session_state["selected_season"] = selected_season
+
     if selected_season == "All (3-Season Avg)":
         st.caption("Showing 3-season weighted averages and improvement trends (see below).")
-    elif selected_season == "Current Season":
-        st.caption("Showing data for all 2025 and 2025/2026 competitions (Current Season).")
-        df = df[df["Season Group"] == "Current Season"].copy()
     else:
         st.caption(f"Showing data for **{selected_season}** only.")
-        df = df[df["Season Group"] == selected_season].copy()
+        df = df[df["Season"] == selected_season].copy()
 
     if df.empty:
         st.warning("No players found for this season selection.")
