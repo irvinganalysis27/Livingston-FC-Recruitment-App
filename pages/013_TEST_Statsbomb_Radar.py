@@ -412,7 +412,7 @@ position_metrics = {
 }
 
 # ---------- Data source: local repo ----------
-DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
+DATA_PATH = ROOT_DIR / "statsbomb_player_stats_all_seasons.csv"
 
 # ---------- Helper functions for flexible loading ----------
 def load_one_file(p: Path) -> pd.DataFrame:
