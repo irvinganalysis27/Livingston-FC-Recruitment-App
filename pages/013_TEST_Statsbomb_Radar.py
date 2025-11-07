@@ -693,6 +693,90 @@ def load_data_once():
 # ============================================================
 df_all_raw = load_data_once()
 
+# --- Column normaliser to match app expectations ---
+def _rename_first(df, candidates, target):
+    for c in candidates:
+        if c in df.columns:
+            if c != target:
+                df.rename(columns={c: target}, inplace=True)
+                print(f"[DEBUG] Renamed '{c}' -> '{target}'")
+            return True
+    return False
+
+cols_lower = {c.lower(): c for c in df_all_raw.columns}  # map to actual case
+
+def has(col):
+    return col in df_all_raw.columns or col in cols_lower
+
+def real(col):
+    return col if col in df_all_raw.columns else cols_lower.get(col, col)
+
+# Season
+_rename_first(
+    df_all_raw,
+    [real("Season"), real("season_name"), real("season")],
+    "Season",
+)
+
+# Competition
+_rename_first(
+    df_all_raw,
+    [real("Competition"), real("competition_name"), real("competition")],
+    "Competition",
+)
+
+# Team
+_rename_first(
+    df_all_raw,
+    [real("Team"), real("team_name")],
+    "Team",
+)
+
+# Player
+_rename_first(
+    df_all_raw,
+    [real("Player"), real("player_name"), real("Name")],
+    "Player",
+)
+
+# Positions
+_rename_first(
+    df_all_raw,
+    [real("Primary Position"), real("primary_position")],
+    "Position",
+)
+_rename_first(
+    df_all_raw,
+    [real("Secondary Position"), real("secondary_position")],
+    "Secondary Position",
+)
+
+# Minutes
+_rename_first(
+    df_all_raw,
+    [real("Minutes played"), real("Minutes"), real("player_season_minutes")],
+    "Minutes played",
+)
+
+# Competition_ID (helps league multipliers)
+_rename_first(
+    df_all_raw,
+    [real("Competition_ID"), real("competition_id"), real("Competition Id"), real("Competition id")],
+    "competition_id",
+)
+
+# Clean col names a touch (keeps your later .str.replace calls safe)
+df_all_raw.columns = (
+    df_all_raw.columns.astype(str)
+    .str.replace("\xa0", " ", regex=False)
+    .str.replace(r"\s+", " ", regex=True)
+    .str.strip()
+)
+
+print("[DEBUG] Columns now include:", [c for c in ["Season", "Competition", "Team", "Player",
+                                                  "Position", "Secondary Position", "Minutes played",
+                                                  "competition_id"] if c in df_all_raw.columns])
+
 # --- Normalise season column names ---
 season_cols = [c for c in df_all_raw.columns if "season" in c.lower()]
 if season_cols:
