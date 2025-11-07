@@ -763,7 +763,13 @@ else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
 
-    # --- Apply season filter logic ---
+# ============================================================
+# 4️⃣ SEASON FILTER
+# ============================================================
+if "Season" in df.columns:
+    season_options = sorted(df["Season"].dropna().unique().tolist())
+    selected_season = st.selectbox("Select Season", ["All (3-Season Avg)"] + season_options)
+    
     if selected_season == "All (3-Season Avg)":
         st.caption("Showing 3-season weighted averages and improvement trends (see below).")
     elif selected_season == "Current Season":
