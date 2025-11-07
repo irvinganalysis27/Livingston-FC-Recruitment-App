@@ -693,6 +693,8 @@ def load_data_once():
 # ============================================================
 df_all_raw = load_data_once()
 
+print("[DEBUG] Seasons found:", sorted(df_all_raw["Season"].dropna().unique().tolist()))
+
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
     st.stop()
@@ -1830,7 +1832,12 @@ for c in cols_for_table:
         plot_data[c] = np.nan
 
 # Build ranking table from the current plot_data
-z_ranking = plot_data[cols_for_table].copy()
+extra_cols = ["Season", "Season_norm"]
+for c in extra_cols:
+    if c in df_all.columns and c not in plot_data.columns:
+        plot_data[c] = df_all.loc[df.index, c].values
+
+z_ranking = plot_data[cols_for_table + [c for c in extra_cols if c in plot_data.columns]].copy()
 
 # Remove duplicates — keep the one matching the selected season
 if "Season" in z_ranking.columns and "selected_season" in st.session_state:
