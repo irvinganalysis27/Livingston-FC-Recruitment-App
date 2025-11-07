@@ -763,39 +763,6 @@ else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
 
-# ============================================================
-# 🟢 SEASON FILTER + HISTORICAL MODEL (adds multi-season logic)
-# ============================================================
-
-# 1️⃣ Detect and normalise season column
-if "Season" in df.columns:
-    df["Season"] = df["Season"].astype(str).str.strip()
-
-    # Build clean list of unique seasons
-    all_seasons = sorted([s for s in df["Season"].dropna().unique().tolist() if s and s.lower() != "nan"])
-
-    # Define "Current Season" group (any row with '2025' or '2025/2026' etc)
-    current_season_aliases = {"2025", "2025/2026", "25/26", "2025-26"}
-    df["Season Group"] = df["Season"].apply(lambda s: "Current Season" if s in current_season_aliases else s)
-
-    grouped_seasons = sorted(df["Season Group"].dropna().unique().tolist())
-
-    # Add special option for 3-season aggregate
-    grouped_seasons += ["All (3-Season Avg)"]
-
-    # Session state for persistence
-    if "selected_season" not in st.session_state:
-        st.session_state.selected_season = "Current Season" if "Current Season" in grouped_seasons else grouped_seasons[-1]
-
-    selected_season = st.selectbox(
-        "📅 Select Season",
-        options=grouped_seasons,
-        index=grouped_seasons.index(st.session_state.selected_season)
-        if st.session_state.selected_season in grouped_seasons else 0,
-        key="season_select_box"
-    )
-    st.session_state.selected_season = selected_season
-
     # --- Apply season filter logic ---
     if selected_season == "All (3-Season Avg)":
         st.caption("Showing 3-season weighted averages and improvement trends (see below).")
@@ -1357,6 +1324,85 @@ plot_data["LFC Score (0–100)"] = df_all.loc[df.index, "LFC Score (0–100)"].f
 # ---------- Rank ----------
 plot_data.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_index=True)
 plot_data["Rank"] = np.arange(1, len(plot_data) + 1)
+
+# ============================================================
+# 🧮 HISTORICAL WEIGHTED RANKINGS (for 'All (3-Season Avg)') — fixed placement
+# ============================================================
+if (
+    "Weighted Z Score" in df_all.columns
+    and "Season" in df_all.columns
+    and st.session_state.get("selected_season") == "All (3-Season Avg)"
+):
+    try:
+        st.markdown("### 🧾 Historical Weighted Rankings (3-Season Summary)")
+
+        # --- Aggregate per-player per-season weighted Z ---
+        season_groups = (
+            df_all.groupby(["Player", "Season", "Six-Group Position", "Competition_norm"], as_index=False)
+            .agg({
+                "Weighted Z Score": "mean",
+                "Minutes played": "sum",
+                "Multiplier": "mean",
+                "Age": "mean",
+                "Team": lambda x: ", ".join(sorted(set(x.dropna())))
+            })
+        )
+
+        # --- Compute 3-season averages per player-position ---
+        rolling = (
+            season_groups.groupby(["Player", "Six-Group Position"], as_index=False)
+            .agg({
+                "Weighted Z Score": "mean",
+                "Minutes played": "sum",
+                "Multiplier": "mean",
+                "Age": "mean",
+                "Team": lambda x: ", ".join(sorted(set(x.dropna()))),
+                "Competition_norm": lambda x: ", ".join(sorted(set(x.dropna())))
+            })
+            .rename(columns={"Weighted Z Score": "3-Season Weighted Z"})
+        )
+
+        # --- Improvement logic (first vs last available season) ---
+        trend_calc = (
+            season_groups.sort_values(["Player", "Season"])
+            .groupby("Player")
+            .agg(first_z=("Weighted Z Score", "first"), last_z=("Weighted Z Score", "last"))
+        )
+        trend_calc["Z Δ"] = trend_calc["last_z"] - trend_calc["first_z"]
+        trend_calc["Trend"] = np.select(
+            [trend_calc["Z Δ"] > 0.25, trend_calc["Z Δ"] < -0.25],
+            ["⬆️ Improving", "⬇️ Declining"],
+            default="➖ Stable"
+        )
+
+        # Merge improvement into summary
+        rolling = rolling.merge(trend_calc, on="Player", how="left")
+
+        # --- Display compact summary table ---
+        st.dataframe(
+            rolling[["Player", "Six-Group Position", "3-Season Weighted Z", "Z Δ", "Trend"]]
+            .sort_values("3-Season Weighted Z", ascending=False)
+            .reset_index(drop=True),
+            use_container_width=True
+        )
+
+        # --- Optional trend visualisation ---
+        if st.checkbox("📈 Show Player Trend Over Seasons"):
+            player_opts = sorted(season_groups["Player"].unique().tolist())
+            player_sel = st.selectbox("Select player for trend chart", player_opts)
+            p_df = season_groups[season_groups["Player"] == player_sel].sort_values("Season")
+
+            if not p_df.empty:
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.plot(p_df["Season"], p_df["Weighted Z Score"], marker="o", color="royalblue", linewidth=2)
+                ax.axhline(0, color="gray", lw=1)
+                ax.set_ylabel("Weighted Z Score")
+                ax.set_title(f"{player_sel} — League-Weighted Z Trend")
+                st.pyplot(fig)
+
+    except Exception as e:
+        st.warning(f"⚠️ Could not compute 3-season rankings: {e}")
+
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
