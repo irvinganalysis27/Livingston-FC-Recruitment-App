@@ -716,6 +716,28 @@ df_all = df_all_raw.copy()
 df = df_all.copy()
 
 # ============================================================
+# 🗓️ NORMALISE SEASON LABELS
+# ============================================================
+if "Season" in df_all.columns:
+    # Convert all to string for consistency
+    df_all["Season"] = df_all["Season"].astype(str)
+
+    # Normalise standalone years (e.g. 2025 -> 2025/2026)
+    def normalise_season_label(s):
+        s = s.strip()
+        # If already looks like "2024/2025" leave it
+        if "/" in s:
+            return s
+        # Convert single year to "YYYY/YYYY+1"
+        if re.match(r"^\d{4}$", s):
+            return f"{s}/{int(s)+1}"
+        return s
+
+    df_all["Season_norm"] = df_all["Season"].apply(normalise_season_label)
+else:
+    df_all["Season_norm"] = np.nan
+
+# ============================================================
 # 3️⃣ LEAGUE FILTER
 # ============================================================
 league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
@@ -764,102 +786,26 @@ else:
     st.stop()
 
 # ============================================================
-# 4️⃣ SEASON FILTER (fixed)
+# 4️⃣ SEASON FILTER (merged single + double year)
 # ============================================================
-if "Season" in df.columns:
-    season_options = sorted(df["Season"].dropna().unique().tolist())
-    selected_season = st.selectbox("Select Season", ["All (3-Season Avg)"] + season_options)
-    
-    # Save to session state for historical summary
+if "Season_norm" in df_all.columns:
+    season_options = sorted(df_all["Season_norm"].dropna().unique().tolist(), reverse=True)
+    selected_season = st.selectbox("Select Season", season_options)
     st.session_state["selected_season"] = selected_season
 
-    if selected_season == "All (3-Season Avg)":
-        st.caption("Showing 3-season weighted averages and improvement trends (see below).")
-    else:
-        st.caption(f"Showing data for **{selected_season}** only.")
-        df = df[df["Season"] == selected_season].copy()
+    st.caption(f"Showing data for **{selected_season}** season (merged single + double-year entries).")
+
+    # Filter both Season and Season_norm to catch merged years
+    df = df_all[
+        (df_all["Season_norm"] == selected_season)
+        | (df_all["Season"] == selected_season)
+    ].copy()
 
     if df.empty:
         st.warning("No players found for this season selection.")
         st.stop()
 else:
-    st.info("No 'Season' column found in dataset — skipping season filter.")
-
-# ============================================================
-# 🧮 HISTORICAL WEIGHTED RANKINGS (for 'All (3-Season Avg)')
-# ============================================================
-
-if "Season" in df_all.columns and st.session_state.get("selected_season") == "All (3-Season Avg)":
-    try:
-        st.markdown("### 🧾 Historical Weighted Rankings (3-Season Summary)")
-
-        # --- Aggregate per-player per-season weighted Z ---
-        season_groups = (
-            df_all.groupby(["Player", "Season", "Six-Group Position", "Competition_norm"], as_index=False)
-                  .agg({
-                      "Weighted Z Score": "mean",
-                      "Minutes played": "sum",
-                      "Multiplier": "mean",
-                      "Age": "mean",
-                      "Team": lambda x: ", ".join(sorted(set(x.dropna())))
-                  })
-        )
-
-        # --- Compute 3-season averages per player-position ---
-        rolling = (
-            season_groups.groupby(["Player", "Six-Group Position"], as_index=False)
-            .agg({
-                "Weighted Z Score": "mean",
-                "Minutes played": "sum",
-                "Multiplier": "mean",
-                "Age": "mean",
-                "Team": lambda x: ", ".join(sorted(set(x.dropna()))),
-                "Competition_norm": lambda x: ", ".join(sorted(set(x.dropna())))
-            })
-            .rename(columns={"Weighted Z Score": "3-Season Weighted Z"})
-        )
-
-        # --- Improvement logic (first vs last available season) ---
-        trend_calc = (
-            season_groups.sort_values(["Player", "Season"])
-            .groupby("Player")
-            .agg(first_z=("Weighted Z Score", "first"), last_z=("Weighted Z Score", "last"))
-        )
-        trend_calc["Z Δ"] = trend_calc["last_z"] - trend_calc["first_z"]
-        trend_calc["Trend"] = np.select(
-            [trend_calc["Z Δ"] > 0.25, trend_calc["Z Δ"] < -0.25],
-            ["⬆️ Improving", "⬇️ Declining"],
-            default="➖ Stable"
-        )
-
-        # Merge improvement into summary
-        rolling = rolling.merge(trend_calc, on="Player", how="left")
-
-        # --- Display compact summary table ---
-        st.dataframe(
-            rolling[["Player", "Six-Group Position", "3-Season Weighted Z", "Z Δ", "Trend"]]
-            .sort_values("3-Season Weighted Z", ascending=False)
-            .reset_index(drop=True),
-            use_container_width=True
-        )
-
-        # --- Optional trend visualisation toggle ---
-        if st.checkbox("📈 Show Player Trend Over Seasons"):
-            player_opts = sorted(season_groups["Player"].unique().tolist())
-            player_sel = st.selectbox("Select player for trend chart", player_opts)
-            p_df = season_groups[season_groups["Player"] == player_sel].sort_values("Season")
-
-            if not p_df.empty:
-                import matplotlib.pyplot as plt
-                fig, ax = plt.subplots(figsize=(6, 4))
-                ax.plot(p_df["Season"], p_df["Weighted Z Score"], marker="o", color="royalblue", linewidth=2)
-                ax.axhline(0, color="gray", lw=1)
-                ax.set_ylabel("Weighted Z Score")
-                ax.set_title(f"{player_sel} — League-Weighted Z Trend")
-                st.pyplot(fig)
-
-    except Exception as e:
-        st.warning(f"⚠️ Could not compute 3-season rankings: {e}")
+    st.info("No 'Season' column found — skipping season filter.")
 
 # ---------- Minutes + Age filters (side by side) ----------
 minutes_col = "Minutes played"
@@ -1552,6 +1498,27 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     st.pyplot(fig, width="stretch")
 
+# ============================================================
+# 📈 PLAYER TREND LINE BELOW RADAR
+# ============================================================
+if st.session_state.selected_player and "Season" in df_all.columns:
+    p_df = (
+        df_all[df_all["Player"] == st.session_state.selected_player]
+        .groupby("Season", as_index=False)
+        .agg({"Weighted Z Score": "mean"})
+        .sort_values("Season")
+    )
+
+    if not p_df.empty and len(p_df) > 1:
+        st.markdown("#### 📈 Weighted Z Score Trend by Season")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(p_df["Season"], p_df["Weighted Z Score"], marker="o", color="royalblue", linewidth=2)
+        ax.axhline(0, color="gray", lw=1)
+        ax.set_ylabel("Weighted Z Score")
+        ax.set_xlabel("Season")
+        ax.set_title(f"{st.session_state.selected_player} — Weighted Z Score by Season")
+        st.pyplot(fig)
+
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
     """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
     try:
@@ -1811,13 +1778,51 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
         similar_df = similar_df[["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]]
 
         st.dataframe(similar_df, use_container_width=True)
+
+# ============================================================
+# 🧮 PLAYER TREND ANALYSIS & IMPROVEMENT TAGS
+# ============================================================
+
+# Compute per-player-per-season weighted averages
+if "Season" in df_all.columns and "Weighted Z Score" in df_all.columns:
+    season_groups = (
+        df_all.groupby(["Player", "Season"], as_index=False)
+        .agg({"Weighted Z Score": "mean", "Minutes played": "sum"})
+    )
+
+    # Calculate change between first and last available season
+    trend_calc = (
+        season_groups.sort_values(["Player", "Season"])
+        .groupby("Player")
+        .agg(first_z=("Weighted Z Score", "first"), last_z=("Weighted Z Score", "last"))
+    )
+    trend_calc["ΔZ"] = trend_calc["last_z"] - trend_calc["first_z"]
+
+    # Classify into five levels
+    trend_calc["Trend"] = np.select(
+        [
+            trend_calc["ΔZ"] >= 0.5,
+            (trend_calc["ΔZ"] >= 0.2) & (trend_calc["ΔZ"] < 0.5),
+            (trend_calc["ΔZ"] <= -0.2) & (trend_calc["ΔZ"] > -0.5),
+            trend_calc["ΔZ"] <= -0.5,
+        ],
+        ["⬆️ Improving a lot", "↗️ Improving", "↘️ Declining", "⬇️ Declining a lot"],
+        default="➖ Stable",
+    )
+
+    # Merge into main table (by player)
+    df_all = df_all.merge(trend_calc[["Trend"]], on="Player", how="left")
+
+else:
+    df_all["Trend"] = "Unknown"
+
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
     "Avg Z Score", "Weighted Z Score", "Score (0–100)", "LFC Score (0–100)",
-    "Age", "Minutes played", "Rank"
+    "Trend", "Age", "Minutes played", "Rank"
 ]
 
 for c in cols_for_table:
@@ -1827,8 +1832,26 @@ for c in cols_for_table:
 # Build ranking table from the current plot_data
 z_ranking = plot_data[cols_for_table].copy()
 
-# Sort automatically by Weighted Z (descending)
-z_ranking.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_index=True)
+# Remove duplicates — keep the one matching the selected season
+if "Season" in z_ranking.columns and "selected_season" in st.session_state:
+    sel_season = st.session_state["selected_season"]
+
+    # Drop duplicates but prioritise the chosen season first
+    z_ranking = (
+        z_ranking.assign(
+            _is_selected=z_ranking["Season"].astype(str).eq(sel_season)
+        )
+        .sort_values(["_is_selected", "Weighted Z Score"], ascending=[False, False])
+        .drop_duplicates(subset=["Player"], keep="first")
+        .drop(columns="_is_selected")
+    )
+else:
+    # Fallback if no season filtering
+    z_ranking = z_ranking.sort_values("Weighted Z Score", ascending=False)
+    z_ranking = z_ranking.drop_duplicates(subset=["Player"], keep="first")
+
+# Re-rank after filtering
+z_ranking = z_ranking.sort_values("Weighted Z Score", ascending=False, ignore_index=True)
 z_ranking["Rank"] = np.arange(1, len(z_ranking) + 1)
 
 # Rename Competition_norm → League for display consistency
