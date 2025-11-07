@@ -645,6 +645,15 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
                 df = pd.concat([df, new_rows], ignore_index=True)
 
+    # ============================================================
+    # 🧹 FINAL DEDUPLICATION SAFEGUARD
+    # ============================================================
+    subset_cols = [c for c in ["Player", "Team", "Competition_norm", "Six-Group Position"] if c in df.columns]
+    before = len(df)
+    df = df.drop_duplicates(subset=subset_cols, keep="first").reset_index(drop=True)
+    after = len(df)
+    print(f"[DEBUG] Deduplicated dataset: {before} → {after} rows after cleanup.")
+
     return df
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
@@ -656,29 +665,18 @@ def load_data_once():
     # ============================================================
     # 1️⃣ LOAD FILE(S)
     # ============================================================
-    if path.is_file():
-        df_raw = load_one_file(path)
+    # --- Force single-source loading to prevent duplicates ---
+    main_csv = ROOT_DIR / "statsbomb_player_stats_clean.csv"
+    
+    if main_csv.exists():
+        df_raw = load_one_file(main_csv)
     else:
-        files = sorted(
-            f for f in path.iterdir()
-            if f.is_file() and (f.suffix.lower() in {".csv", ".xlsx", ".xls"} or f.suffix == "")
-        )
-        if not files:
-            st.error(f"No data files found in {path.name}. Please add a CSV or XLSX file.")
+        # Fallback only if the above file doesn’t exist
+        if path.is_file():
+            df_raw = load_one_file(path)
+        else:
+            st.error("❌ No valid StatsBomb data file found in project root.")
             st.stop()
-
-        frames = []
-        for f in files:
-            try:
-                frames.append(load_one_file(f))
-            except Exception:
-                continue
-
-        if not frames:
-            st.error("No readable player data files found.")
-            st.stop()
-
-        df_raw = pd.concat(frames, ignore_index=True, sort=False)
 
     # ============================================================
     # 2️⃣ AGE + PREPROCESSING
