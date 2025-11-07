@@ -787,6 +787,14 @@ if season_cols:
 else:
     print("[DEBUG] No season column found!")
 
+# --- Fix Season column mixup ---
+if "season_name" in df_all_raw.columns:
+    df_all_raw["Season"] = df_all_raw["season_name"].astype(str).str.strip()
+    print("[DEBUG] Season column corrected from 'season_name'")
+elif "season" in df_all_raw.columns:
+    df_all_raw["Season"] = df_all_raw["season"].astype(str).str.strip()
+    print("[DEBUG] Season column corrected from 'season'")
+
 st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
 
 # --- Ensure Season is a single text column, not a DataFrame ---
