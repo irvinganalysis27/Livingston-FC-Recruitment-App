@@ -789,6 +789,22 @@ else:
 
 st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
 
+# --- Ensure Season is a single text column, not a DataFrame ---
+if "Season" in df_all_raw.columns:
+    # If multiple columns share the same name, combine the first non-null values
+    if isinstance(df_all_raw["Season"], pd.DataFrame):
+        df_all_raw["Season"] = df_all_raw["Season"].bfill(axis=1).iloc[:, 0]
+
+    # If somehow multiple columns named Season exist in the DataFrame
+    while df_all_raw.columns.duplicated().any():
+        df_all_raw = df_all_raw.loc[:, ~df_all_raw.columns.duplicated()]
+
+    # Force to string for consistency
+    df_all_raw["Season"] = df_all_raw["Season"].astype(str).str.strip()
+
+st.write("Sample Season values:", df_all_raw["Season"].head(10).tolist())
+st.write("Unique count:", df_all_raw["Season"].nunique())
+
 # --- Season column detection ---
 season_col_candidates = [c for c in df_all_raw.columns if "season" in c.lower()]
 if not season_col_candidates:
