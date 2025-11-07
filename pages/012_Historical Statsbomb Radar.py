@@ -660,9 +660,6 @@ ranking_df.index = np.arange(1, len(ranking_df) + 1)
 ranking_df.index.name = "Row"
 
 # Clean + formatting
-ranking_df[["Team", "Team within selected timeframe"]] = ranking_df[
-    ["Team", "Team within selected timeframe"]
-].fillna("N/A")
 if "Age" in ranking_df:
     ranking_df["Age"] = ranking_df["Age"].apply(lambda x: int(x) if pd.notnull(x) else x)
 
