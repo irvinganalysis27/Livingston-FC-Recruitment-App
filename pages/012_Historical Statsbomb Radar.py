@@ -212,6 +212,20 @@ if "Minutes" in df.columns:
     rename_map["Minutes"] = "Minutes played"
 df.rename(columns=rename_map, inplace=True)
 
+if "Primary Position" in df.columns:
+    if "Secondary Position" in df.columns:
+        df["Positions played"] = df["Primary Position"].fillna("") + np.where(
+            df["Secondary Position"].notna() & (df["Secondary Position"] != ""),
+            ", " + df["Secondary Position"].astype(str),
+            ""
+        )
+    else:
+        df["Positions played"] = df["Primary Position"]
+elif "Position" in df.columns:
+    df["Positions played"] = df["Position"]
+else:
+    df["Positions played"] = np.nan
+
 # --- Derived / calculated metrics ---
 if "Player Season Total Dribbles 90" in df.columns and "Player Season Failed Dribbles 90" in df.columns:
     df["Successful Dribbles"] = (
@@ -254,10 +268,13 @@ if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
 df.rename(columns=rename_map, inplace=True)
 
 # League column normalisation (no mapping needed)
-if "Competition" in df.columns:
-    df["Competition_norm"] = df["Competition"].astype(str).str.strip()
-else:
-    df["Competition_norm"] = np.nan
+if "Competition" not in df.columns:
+    for alt in ["competition", "competition_name", "league", "league_name"]:
+        if alt in df.columns:
+            df.rename(columns={alt: "Competition"}, inplace=True)
+            break
+
+df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competition" in df.columns else np.nan
 
 # Position mapping
 df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
@@ -442,7 +459,7 @@ with st.expander("Essential Criteria", expanded=False):
         st.caption(f"Applied criteria - kept {kept}, removed {dropped}.")
 
 # Build plot_data and Wyscout-style Z
-keep_cols = ["Player", "Team", "Team within selected timeframe", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position"]
+keep_cols = ["Player", "Team", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position"]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
 
