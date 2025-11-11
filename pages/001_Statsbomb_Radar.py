@@ -663,69 +663,69 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-# ✅ Duplicate key position types into tactical roles (6, 8, 10)
-if "Six-Group Position" in df.columns:
+    # ✅ Duplicate key position types into tactical roles (6, 8, 10)
+    if "Six-Group Position" in df.columns:
 
-    # --- 1️⃣ Centre Midfielders → both Number 6 and Number 8
-    cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-    if cm_mask.any():
-        cm_rows = (
-            df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
-            .drop_duplicates(subset=["Player", "Team"])
-        )
-        if not cm_rows.empty:
-            cm_as_6 = df.loc[
-                df["Player"].isin(cm_rows["Player"])
-                & df["Team"].isin(cm_rows["Team"])
-                & cm_mask
-            ].copy()
-            cm_as_8 = cm_as_6.copy()
+        # --- 1️⃣ Centre Midfielders → both Number 6 and Number 8
+        cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+        if cm_mask.any():
+            cm_rows = (
+                df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
+                .drop_duplicates(subset=["Player", "Team"])
+            )
+            if not cm_rows.empty:
+                cm_as_6 = df.loc[
+                    df["Player"].isin(cm_rows["Player"])
+                    & df["Team"].isin(cm_rows["Team"])
+                    & cm_mask
+                ].copy()
+                cm_as_8 = cm_as_6.copy()
 
-            cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8["Six-Group Position"] = "Number 8"
+                cm_as_6["Six-Group Position"] = "Number 6"
+                cm_as_8["Six-Group Position"] = "Number 8"
 
-            already_6_8 = df[
-                (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
-                & df["Player"].isin(cm_rows["Player"])
-            ]
+                already_6_8 = df[
+                    (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
+                    & df["Player"].isin(cm_rows["Player"])
+                ]
 
-            new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
-            new_rows = new_rows[
-                ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                    already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                )
-            ]
+                new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
+                new_rows = new_rows[
+                    ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                        already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                    )
+                ]
 
-            df = pd.concat([df, new_rows], ignore_index=True)
+                df = pd.concat([df, new_rows], ignore_index=True)
 
-    # --- 2️⃣ Number 10s → also counted as Number 8 (hybrid attacking mids)
-    ten_mask = df["Six-Group Position"].eq("Number 10")
-    if ten_mask.any():
-        ten_rows = (
-            df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
-            .drop_duplicates(subset=["Player", "Team"])
-        )
-        if not ten_rows.empty:
-            ten_as_8 = df.loc[
-                df["Player"].isin(ten_rows["Player"])
-                & df["Team"].isin(ten_rows["Team"])
-                & ten_mask
-            ].copy()
+        # --- 2️⃣ Number 10s → also counted as Number 8 (hybrid attacking mids)
+        ten_mask = df["Six-Group Position"].eq("Number 10")
+        if ten_mask.any():
+            ten_rows = (
+                df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
+                .drop_duplicates(subset=["Player", "Team"])
+            )
+            if not ten_rows.empty:
+                ten_as_8 = df.loc[
+                    df["Player"].isin(ten_rows["Player"])
+                    & df["Team"].isin(ten_rows["Team"])
+                    & ten_mask
+                ].copy()
 
-            ten_as_8["Six-Group Position"] = "Number 8"
+                ten_as_8["Six-Group Position"] = "Number 8"
 
-            already_8 = df[
-                (df["Six-Group Position"] == "Number 8")
-                & df["Player"].isin(ten_rows["Player"])
-            ]
+                already_8 = df[
+                    (df["Six-Group Position"] == "Number 8")
+                    & df["Player"].isin(ten_rows["Player"])
+                ]
 
-            new_rows = ten_as_8[
-                ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                    already_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                )
-            ]
+                new_rows = ten_as_8[
+                    ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                        already_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                    )
+                ]
 
-            df = pd.concat([df, new_rows], ignore_index=True)
+                df = pd.concat([df, new_rows], ignore_index=True)
 
     # ============================================================
     # 🧹 FINAL DEDUPLICATION SAFEGUARD
