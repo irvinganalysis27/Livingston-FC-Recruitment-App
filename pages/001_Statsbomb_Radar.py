@@ -181,7 +181,7 @@ LEAGUE_SYNONYMS = {
 
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
 ]
 
 # ========== Position → group mapping ==========
@@ -194,50 +194,23 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
-    # Full backs
+    # Full backs & wing backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-
     # Centre backs
-    "CENTREBACK": "Centre Back", "CENTERBACK": "Centre Back",
-
-    # Central midfielders
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    # Centre mid (generic) → duplicated into 6 & 8 later
     "CENTREMIDFIELDER": "Centre Midfield",
-    "CENTRALMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTREMIDFIELDER": "Centre Midfield",
-    "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTRALMIDFIELDER": "Centre Midfield",
-    "LEFTCENTRALMIDFIELDER": "Centre Midfield",
-
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
     # Defensive mids → 6
-    "DEFENSIVEMIDFIELDER": "Number 6",
-    "CENTRALDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
-    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-
-    # Attacking mids → 8s by default (NOT 10s)
-    "ATTACKINGMIDFIELDER": "Number 8",
-    "CENTREATTACKINGMIDFIELDER": "Number 8",
-    "CENTRALATTACKINGMIDFIELDER": "Number 8",
-    "RIGHTATTACKINGMIDFIELDER": "Number 8",
-    "LEFTATTACKINGMIDFIELDER": "Number 8",
-
-    # True 10s and second strikers
-    "SECONDSTRIKER": "Number 10",
-    "10": "Number 10",
-    "NUMBER10": "Number 10",
-
-    # Wingers
+    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    # Attacking mids → 8
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
-    "RIGHTWINGER": "Winger", "LEFTWINGER": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-
     # Strikers
-    "CENTREFORWARD": "Striker",
-    "CENTERFORWARD": "Striker",
-    "RIGHTCENTREFORWARD": "Striker",
-    "LEFTCENTREFORWARD": "Striker",
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
 }
 
 def parse_first_position(cell) -> str:
@@ -247,19 +220,7 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    mapped = RAW_TO_SIX.get(tok)
-    if not mapped:
-        # fallback for “MIDFIELDER”, “FORWARD”, etc.
-        if "BACK" in tok:
-            return "Full Back" if "WING" in tok else "Centre Back"
-        if "MID" in tok:
-            return "Number 8"
-        if "FORWARD" in tok or "STRIKER" in tok:
-            return "Striker"
-        if "WING" in tok:
-            return "Winger"
-        return None
-    return mapped
+    return RAW_TO_SIX.get(tok, None)  # don’t force into Winger
 
 # ========== Default template mapping ==========
 DEFAULT_TEMPLATE = {
@@ -267,7 +228,6 @@ DEFAULT_TEMPLATE = {
     "Centre Back": "Centre Back",
     "Number 6": "Number 6",
     "Number 8": "Number 8",
-    "Number 10": "Number 10",
     "Winger": "Winger",
     "Striker": "Striker"
 }
@@ -683,12 +643,12 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-    # ✅ Duplicate key position types into tactical roles (6, 8, 10)
+    # ✅ Only duplicate true Centre Midfielders once (for each unique player-team combo)
     if "Six-Group Position" in df.columns:
-
-        # --- 1️⃣ Centre Midfielders → both Number 6 and Number 8
         cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+
         if cm_mask.any():
+            # Deduplicate by player + team (avoids multiple club rows repeating)
             cm_rows = (
                 df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
                 .drop_duplicates(subset=["Player", "Team"])
@@ -704,44 +664,15 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 cm_as_6["Six-Group Position"] = "Number 6"
                 cm_as_8["Six-Group Position"] = "Number 8"
 
+                # Only add if they don't already exist
                 already_6_8 = df[
                     (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
                     & df["Player"].isin(cm_rows["Player"])
                 ]
-
                 new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
                 new_rows = new_rows[
                     ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
                         already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                    )
-                ]
-
-                df = pd.concat([df, new_rows], ignore_index=True)
-
-        # --- 2️⃣ Number 10s → also counted as Number 8 (hybrid attacking mids)
-        ten_mask = df["Six-Group Position"].eq("Number 10")
-        if ten_mask.any():
-            ten_rows = (
-                df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
-                .drop_duplicates(subset=["Player", "Team"])
-            )
-            if not ten_rows.empty:
-                ten_as_8 = df.loc[
-                    df["Player"].isin(ten_rows["Player"])
-                    & df["Team"].isin(ten_rows["Team"])
-                    & ten_mask
-                ].copy()
-
-                ten_as_8["Six-Group Position"] = "Number 8"
-
-                already_8 = df[
-                    (df["Six-Group Position"] == "Number 8")
-                    & df["Player"].isin(ten_rows["Player"])
-                ]
-
-                new_rows = ten_as_8[
-                    ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                        already_8.set_index(["Player", "Team", "Six-Group Position"]).index
                     )
                 ]
 
@@ -772,8 +703,6 @@ def load_data_once():
     
     if main_csv.exists():
         df_raw = load_one_file(main_csv)
-        print("[DEBUG] Columns in loaded data:", list(df_raw.columns))
-        print("[DEBUG] Sample Position column values:", df_raw.iloc[0:10].to_dict().keys())
     else:
         # Fallback only if the above file doesn’t exist
         if path.is_file():
