@@ -201,7 +201,7 @@ RAW_TO_SIX = {
     # Centre backs
     "CENTREBACK": "Centre Back", "CENTERBACK": "Centre Back",
 
-    # Central midfielders (cover CENTRAL/CENTRE synonyms)
+    # Central midfielders
     "CENTREMIDFIELDER": "Centre Midfield",
     "CENTRALMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield",
@@ -216,16 +216,17 @@ RAW_TO_SIX = {
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
     "LEFTDEFENSIVEMIDFIELDER": "Number 6",
 
-    # Attacking mids → 8s by default (duplicated to 10s later)
+    # Attacking mids → 8s by default (NOT 10s)
     "ATTACKINGMIDFIELDER": "Number 8",
     "CENTREATTACKINGMIDFIELDER": "Number 8",
     "CENTRALATTACKINGMIDFIELDER": "Number 8",
     "RIGHTATTACKINGMIDFIELDER": "Number 8",
     "LEFTATTACKINGMIDFIELDER": "Number 8",
 
-    # True 10s & second strikers
+    # True 10s and second strikers
     "SECONDSTRIKER": "Number 10",
     "10": "Number 10",
+    "NUMBER10": "Number 10",
 
     # Wingers
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
