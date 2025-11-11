@@ -216,7 +216,6 @@ RAW_TO_SIX = {
     "LEFTATTACKINGMIDFIELDER": "Number 10",
     "SECONDSTRIKER": "Number 10",
     "10": "Number 10",
-}
     # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
 }
