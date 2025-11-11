@@ -199,35 +199,42 @@ RAW_TO_SIX = {
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
 
     # Centre backs
-    "CENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back",
+    "CENTREBACK": "Centre Back", "CENTERBACK": "Centre Back",
 
-    # Central midfielders — these get duplicated into Number 6 & Number 8 later in preprocess_df()
+    # Central midfielders (cover CENTRAL/CENTRE synonyms)
     "CENTREMIDFIELDER": "Centre Midfield",
+    "CENTRALMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield",
     "LEFTCENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTRALMIDFIELDER": "Centre Midfield",
+    "LEFTCENTRALMIDFIELDER": "Centre Midfield",
 
-    # Defensive midfielders → 6
+    # Defensive mids → 6
     "DEFENSIVEMIDFIELDER": "Number 6",
+    "CENTRALDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
     "LEFTDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
 
-    # Attacking midfielders → stay as attacking mids (become 8s via duplication)
+    # Attacking mids → 8s by default (duplicated to 10s later)
     "ATTACKINGMIDFIELDER": "Number 8",
     "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "CENTRALATTACKINGMIDFIELDER": "Number 8",
     "RIGHTATTACKINGMIDFIELDER": "Number 8",
     "LEFTATTACKINGMIDFIELDER": "Number 8",
 
-    # True 10s and second strikers → Number 10
+    # True 10s & second strikers
     "SECONDSTRIKER": "Number 10",
     "10": "Number 10",
 
-    # Wingers / wide mids
+    # Wingers
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
+    "RIGHTWINGER": "Winger", "LEFTWINGER": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
 
     # Strikers
     "CENTREFORWARD": "Striker",
+    "CENTERFORWARD": "Striker",
     "RIGHTCENTREFORWARD": "Striker",
     "LEFTCENTREFORWARD": "Striker",
 }
@@ -239,7 +246,19 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)  # don’t force into Winger
+    mapped = RAW_TO_SIX.get(tok)
+    if not mapped:
+        # fallback for “MIDFIELDER”, “FORWARD”, etc.
+        if "BACK" in tok:
+            return "Full Back" if "WING" in tok else "Centre Back"
+        if "MID" in tok:
+            return "Number 8"
+        if "FORWARD" in tok or "STRIKER" in tok:
+            return "Striker"
+        if "WING" in tok:
+            return "Winger"
+        return None
+    return mapped
 
 # ========== Default template mapping ==========
 DEFAULT_TEMPLATE = {
