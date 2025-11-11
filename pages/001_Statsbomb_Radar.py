@@ -194,30 +194,42 @@ def _clean_pos_token(tok: str) -> str:
     return t
 
 RAW_TO_SIX = {
-    # Full backs & wing backs
+    # Full backs
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
+
     # Centre backs
-    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
-    # Centre mid (generic) → duplicated into 6 & 8 later
+    "CENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back",
+
+    # Central midfielders — these get duplicated into Number 6 & Number 8 later in preprocess_df()
     "CENTREMIDFIELDER": "Centre Midfield",
-    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    # Defensive mids → 6
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    # Attacking mids → 8
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield",
+    "LEFTCENTREMIDFIELDER": "Centre Midfield",
+
+    # Defensive midfielders → 6
+    "DEFENSIVEMIDFIELDER": "Number 6",
+    "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
+    "LEFTDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+
+    # Attacking midfielders → stay as attacking mids (become 8s via duplication)
+    "ATTACKINGMIDFIELDER": "Number 8",
+    "CENTREATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTATTACKINGMIDFIELDER": "Number 8",
+    "LEFTATTACKINGMIDFIELDER": "Number 8",
+
+    # True 10s and second strikers → Number 10
+    "SECONDSTRIKER": "Number 10",
+    "10": "Number 10",
+
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
-    # Number 10 / 10's
-    "ATTACKINGMIDFIELDER": "Number 10",
-    "CENTREATTACKINGMIDFIELDER": "Number 10",
-    "RIGHTATTACKINGMIDFIELDER": "Number 10",
-    "LEFTATTACKINGMIDFIELDER": "Number 10",
-    "SECONDSTRIKER": "Number 10",
-    "10": "Number 10",
+
     # Strikers
-    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
+    "CENTREFORWARD": "Striker",
+    "RIGHTCENTREFORWARD": "Striker",
+    "LEFTCENTREFORWARD": "Striker",
 }
 
 def parse_first_position(cell) -> str:
@@ -651,68 +663,69 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-    # ✅ Only duplicate true Centre Midfielders once (for each unique player-team combo)
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+# ✅ Duplicate key position types into tactical roles (6, 8, 10)
+if "Six-Group Position" in df.columns:
 
-        if cm_mask.any():
-            # Deduplicate by player + team (avoids multiple club rows repeating)
-            cm_rows = (
-                df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
-                .drop_duplicates(subset=["Player", "Team"])
-            )
-            if not cm_rows.empty:
-                cm_as_6 = df.loc[
-                    df["Player"].isin(cm_rows["Player"])
-                    & df["Team"].isin(cm_rows["Team"])
-                    & cm_mask
-                ].copy()
-                cm_as_8 = cm_as_6.copy()
+    # --- 1️⃣ Centre Midfielders → both Number 6 and Number 8
+    cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+    if cm_mask.any():
+        cm_rows = (
+            df.loc[cm_mask, ["Player", "Team", "Six-Group Position"]]
+            .drop_duplicates(subset=["Player", "Team"])
+        )
+        if not cm_rows.empty:
+            cm_as_6 = df.loc[
+                df["Player"].isin(cm_rows["Player"])
+                & df["Team"].isin(cm_rows["Team"])
+                & cm_mask
+            ].copy()
+            cm_as_8 = cm_as_6.copy()
 
-                cm_as_6["Six-Group Position"] = "Number 6"
-                cm_as_8["Six-Group Position"] = "Number 8"
+            cm_as_6["Six-Group Position"] = "Number 6"
+            cm_as_8["Six-Group Position"] = "Number 8"
 
-                # Only add if they don't already exist
-                already_6_8 = df[
-                    (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
-                    & df["Player"].isin(cm_rows["Player"])
-                ]
-                new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
-                new_rows = new_rows[
-                    ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                        already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                    )
-                ]
+            already_6_8 = df[
+                (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
+                & df["Player"].isin(cm_rows["Player"])
+            ]
 
-                df = pd.concat([df, new_rows], ignore_index=True)
-
-        # ✅ Duplicate hybrid attacking mids → both Number 8 and Number 10
-        if "Six-Group Position" in df.columns:
-            ten_mask = df["Six-Group Position"].eq("Number 10")
-            if ten_mask.any():
-                ten_rows = (
-                    df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
-                    .drop_duplicates(subset=["Player", "Team"])
+            new_rows = pd.concat([cm_as_6, cm_as_8], ignore_index=True)
+            new_rows = new_rows[
+                ~new_rows.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                    already_6_8.set_index(["Player", "Team", "Six-Group Position"]).index
                 )
-                if not ten_rows.empty:
-                    ten_as_8 = df.loc[
-                        df["Player"].isin(ten_rows["Player"])
-                        & df["Team"].isin(ten_rows["Team"])
-                        & ten_mask
-                    ].copy()
-                    ten_as_8["Six-Group Position"] = "Number 8"
-    
-                    # Only add if they don't already exist
-                    already_8 = df[
-                        (df["Six-Group Position"] == "Number 8")
-                        & df["Player"].isin(ten_rows["Player"])
-                    ]
-                    new_rows = ten_as_8[
-                        ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
-                            already_8.set_index(["Player", "Team", "Six-Group Position"]).index
-                        )
-                    ]
-                    df = pd.concat([df, new_rows], ignore_index=True)
+            ]
+
+            df = pd.concat([df, new_rows], ignore_index=True)
+
+    # --- 2️⃣ Number 10s → also counted as Number 8 (hybrid attacking mids)
+    ten_mask = df["Six-Group Position"].eq("Number 10")
+    if ten_mask.any():
+        ten_rows = (
+            df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
+            .drop_duplicates(subset=["Player", "Team"])
+        )
+        if not ten_rows.empty:
+            ten_as_8 = df.loc[
+                df["Player"].isin(ten_rows["Player"])
+                & df["Team"].isin(ten_rows["Team"])
+                & ten_mask
+            ].copy()
+
+            ten_as_8["Six-Group Position"] = "Number 8"
+
+            already_8 = df[
+                (df["Six-Group Position"] == "Number 8")
+                & df["Player"].isin(ten_rows["Player"])
+            ]
+
+            new_rows = ten_as_8[
+                ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                    already_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                )
+            ]
+
+            df = pd.concat([df, new_rows], ignore_index=True)
 
     # ============================================================
     # 🧹 FINAL DEDUPLICATION SAFEGUARD
