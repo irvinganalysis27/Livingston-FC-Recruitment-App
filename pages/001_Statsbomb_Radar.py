@@ -772,6 +772,7 @@ def load_data_once():
     if main_csv.exists():
         df_raw = load_one_file(main_csv)
         print("[DEBUG] Columns in loaded data:", list(df_raw.columns))
+        print("[DEBUG] Sample Position column values:", df_raw.iloc[0:10].to_dict().keys())
     else:
         # Fallback only if the above file doesn’t exist
         if path.is_file():
