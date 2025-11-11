@@ -181,7 +181,7 @@ LEAGUE_SYNONYMS = {
 
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"
 ]
 
 # ========== Position → group mapping ==========
@@ -209,6 +209,14 @@ RAW_TO_SIX = {
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
     "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    # Number 10 / 10's
+    "ATTACKINGMIDFIELDER": "Number 10",
+    "CENTREATTACKINGMIDFIELDER": "Number 10",
+    "RIGHTATTACKINGMIDFIELDER": "Number 10",
+    "LEFTATTACKINGMIDFIELDER": "Number 10",
+    "SECONDSTRIKER": "Number 10",
+    "10": "Number 10",
+})
     # Strikers
     "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
 }
@@ -228,6 +236,7 @@ DEFAULT_TEMPLATE = {
     "Centre Back": "Centre Back",
     "Number 6": "Number 6",
     "Number 8": "Number 8",
+    "Number 10": "Number 10",
     "Winger": "Winger",
     "Striker": "Striker"
 }
@@ -350,6 +359,39 @@ position_metrics = {
             "Player Season Fhalf Ball Recoveries 90": "Defensive",
             "Aggressive Actions": "Defensive",
             "OBV": "Possession",
+        }
+    },
+
+        # ---------- Number 10 ----------
+    "Number 10": {
+        "metrics": [
+            # Possession
+            "Deep Progressions", "Deep Completions", "OP Passes Into Box", "OBV", "OP Key Passes",
+            # Attacking
+            "Shots", "xG", "xG Assisted", "Assists", "NP Goals", "xG/Shot",
+            "Touches In Box", "Goal Conversion%",
+            # Defensive
+            "Aggressive Actions", "PAdj Pressures",
+        ],
+        "groups": {
+            # Possession
+            "Deep Progressions": "Possession",
+            "Deep Completions": "Possession",
+            "OBV": "Possession",
+            "OP Passes Into Box": "Possession",
+            "OP Key Passes": "Possession",
+            # Attacking
+            "Shots": "Attacking",
+            "xG": "Attacking",
+            "xG Assisted": "Attacking",
+            "Assists": "Attacking",
+            "NP Goals": "Attacking",
+            "xG/Shot": "Attacking",
+            "Touches In Box": "Attacking",
+            "Goal Conversion%": "Attacking",
+            # Defensive
+            "Aggressive Actions": "Defensive",
+            "PAdj Pressures": "Defensive",
         }
     },
 
@@ -644,6 +686,34 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 ]
 
                 df = pd.concat([df, new_rows], ignore_index=True)
+
+        # ✅ Duplicate hybrid attacking mids → both Number 8 and Number 10
+        if "Six-Group Position" in df.columns:
+            ten_mask = df["Six-Group Position"].eq("Number 10")
+            if ten_mask.any():
+                ten_rows = (
+                    df.loc[ten_mask, ["Player", "Team", "Six-Group Position"]]
+                    .drop_duplicates(subset=["Player", "Team"])
+                )
+                if not ten_rows.empty:
+                    ten_as_8 = df.loc[
+                        df["Player"].isin(ten_rows["Player"])
+                        & df["Team"].isin(ten_rows["Team"])
+                        & ten_mask
+                    ].copy()
+                    ten_as_8["Six-Group Position"] = "Number 8"
+    
+                    # Only add if they don't already exist
+                    already_8 = df[
+                        (df["Six-Group Position"] == "Number 8")
+                        & df["Player"].isin(ten_rows["Player"])
+                    ]
+                    new_rows = ten_as_8[
+                        ~ten_as_8.set_index(["Player", "Team", "Six-Group Position"]).index.isin(
+                            already_8.set_index(["Player", "Team", "Six-Group Position"]).index
+                        )
+                    ]
+                    df = pd.concat([df, new_rows], ignore_index=True)
 
     # ============================================================
     # 🧹 FINAL DEDUPLICATION SAFEGUARD
