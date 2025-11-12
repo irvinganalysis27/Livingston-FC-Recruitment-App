@@ -148,7 +148,7 @@ def upsert_favourite(record, log_to_sheet=False):
                 str(existing_row.get(k, "")).strip() != str(payload.get(k, "")).strip()
                 for k in [
                     "team", "league", "position", "colour",
-                    "initial_watch_comment", "second_watch_comment", "visible"
+                    "initial_watch_comment", "second_watch_comment", "latest_action", "visible"
                 ]
             )
             if not changed:
