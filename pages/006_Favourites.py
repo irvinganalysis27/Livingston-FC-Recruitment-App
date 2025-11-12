@@ -268,6 +268,8 @@ else:
 
             with c4:
                 if st.button("💾 Save", key=f"save_{player}"):
+                    # Determine latest action
+                    latest_action_text = "Updated" if row.get("latest_action") else "Added"
                     payload = {
                         "player": player,
                         "team": team,
@@ -276,7 +278,7 @@ else:
                         "colour": colour_choice,
                         "initial_watch_comment": initial_comment,
                         "second_watch_comment": second_comment,
-                        "latest_action": latest_action,
+                        "latest_action": latest_action_text,
                         "visible": visible_val,
                         "updated_by": st.session_state.get("user_initials", ""),
                         "source": "watchlist-page",
@@ -291,6 +293,7 @@ else:
             with c5:
                 if st.button("🗑 Remove", key=f"del_{player}"):
                     if delete_favourite(player):
+                        upsert_favourite({"player": player, "latest_action": "Removed"}, log_to_sheet=True)
                         toast_ok(f"Removed {player}")
                         st.rerun()
                     else:
