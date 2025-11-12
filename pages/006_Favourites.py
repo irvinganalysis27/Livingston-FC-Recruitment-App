@@ -14,8 +14,6 @@ from branding import show_branding
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
 # ========= Password =========
-
-from auth import check_password
 if not check_password():
     st.stop()
 
@@ -197,6 +195,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
                     "colour": "🟣 Needs Checked",
                     "initial_watch_comment": "",
                     "second_watch_comment": "",
+                    "latest_action": "",
                     "visible": True,
                     "updated_by": st.session_state.get("user_initials", ""),
                     "source": "manual-add",
@@ -266,35 +265,31 @@ else:
             with c3:
                 visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"vis_{player}")
 
+            # ---------- SAVE BUTTON ----------
             with c4:
-                with c4:
-                    if st.button("💾 Save", key=f"save_{player}"):
-                        payload = {
-                            "player": player,
-                            "team": team,
-                            "league": league,
-                            "position": position,
-                            "colour": colour_choice,
-                            "initial_watch_comment": initial_comment.strip(),
-                            "second_watch_comment": second_comment.strip(),
-                            "latest_action": latest_action.strip(),
-                            "visible": visible_val,
-                            "updated_at": datetime.now().isoformat(),
-                            "source": "watch-list-page",
-                        }
+                if st.button("💾 Save", key=f"save_{player}"):
+                    payload = {
+                        "player": player,
+                        "team": team,
+                        "league": league,
+                        "position": position,
+                        "colour": colour_choice,
+                        "initial_watch_comment": initial_comment.strip(),
+                        "second_watch_comment": second_comment.strip(),
+                        "latest_action": latest_action.strip(),
+                        "visible": visible_val,
+                        "updated_at": datetime.now().isoformat(),
+                        "source": "watch-list-page",
+                    }
 
-        ok = upsert_favourite(payload, log_to_sheet=True)
-        if ok:
-            toast_ok(f"Saved changes for {player}")
-            st.rerun()
-        else:
-            toast_err(f"Failed to save {player}")
+                    ok = upsert_favourite(payload, log_to_sheet=True)
                     if ok:
                         toast_ok(f"Saved changes for {player}")
                         st.rerun()
                     else:
                         toast_err(f"Failed to save {player}")
 
+            # ---------- REMOVE BUTTON ----------
             with c5:
                 if st.button("🗑 Remove", key=f"del_{player}"):
                     if delete_favourite(player):
@@ -304,7 +299,7 @@ else:
                     else:
                         toast_err(f"Failed to remove {player}")
 
-            # ✅ NEW: Add to Shadow Team
+            # ---------- SHADOW TEAM BUTTON ----------
             with c6:
                 # Make button fill width
                 st.markdown(
@@ -318,14 +313,11 @@ else:
                     unsafe_allow_html=True,
                 )
 
-                # Main button
-                if st.button("➕ Shadow Team", key=f"shadow_{player}", width="stretch"):
+                if st.button("➕ Shadow Team", key=f"shadow_{player}", use_container_width=True):
                     st.session_state[f"show_popover_{player}"] = True  # open manually
 
-                # Only show popover when clicked
                 if st.session_state.get(f"show_popover_{player}", False):
-                    with st.popover(f"Add {player} to Shadow Team", width="stretch"):
-                        # Store position in session_state so it persists through reruns
+                    with st.popover(f"Add {player} to Shadow Team", use_container_width=True):
                         pos_key = f"shadow_pos_{player}"
                         if pos_key not in st.session_state:
                             st.session_state[pos_key] = "ST"
@@ -339,7 +331,6 @@ else:
                             key=pos_key,
                         )
 
-                        # Confirm button inside popover
                         if st.button("✅ Confirm", key=f"shadow_add_{player}"):
                             pos_slot = st.session_state[pos_key]
                             payload = {"player": player, "position_slot": pos_slot, "rank": 0}
@@ -348,4 +339,4 @@ else:
                                 toast_ok(f"✅ Added {player} to Shadow Team as {pos_slot}")
                             else:
                                 toast_err("❌ Failed to add player to Shadow Team")
-                            st.session_state[f"show_popover_{player}"] = False  # close after adding
+                            st.session_state[f"show_popover_{player}"] = False
