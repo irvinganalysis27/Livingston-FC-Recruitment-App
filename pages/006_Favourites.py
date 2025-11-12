@@ -197,6 +197,7 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
                     "colour": "🟣 Needs Checked",
                     "initial_watch_comment": "",
                     "second_watch_comment": "",
+                    "latest_action": "",
                     "visible": True,
                     "updated_by": st.session_state.get("user_initials", ""),
                     "source": "manual-add",
