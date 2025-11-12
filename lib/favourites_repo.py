@@ -62,7 +62,7 @@ def get_gsheet():
             sheet = sh.add_worksheet(title="favourites_log", rows=1000, cols=11)
             sheet.append_row([
                 "Timestamp", "Player", "Team", "League", "Position",
-                "Colour", "Initial Watch", "Second Watch",
+                "Colour", "Initial Watch", "Second Watch", "Latest Action",
                 "Visible", "Updated_by", "Source"
             ], value_input_option="USER_ENTERED")
             print("[INFO] Created new 'favourites_log' worksheet")
@@ -91,6 +91,7 @@ def append_to_google_sheet(record):
             record.get("colour", ""),
             record.get("initial_watch_comment", ""),
             record.get("second_watch_comment", ""),
+            record.get("latest_action", ""),
             record.get("visible", True),
             record.get("updated_by", "auto"),
             record.get("source", "radar-page"),
@@ -129,6 +130,7 @@ def upsert_favourite(record, log_to_sheet=False):
         "colour": record.get("colour", "🟣 Needs Checked"),
         "initial_watch_comment": record.get("initial_watch_comment", ""),
         "second_watch_comment": record.get("second_watch_comment", ""),
+        "latest_action": record.get("latest_action", ""),
         "visible": bool(record.get("visible", True)),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "updated_by": record.get("updated_by", "auto"),
