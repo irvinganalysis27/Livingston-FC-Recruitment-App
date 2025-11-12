@@ -267,23 +267,28 @@ else:
                 visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"vis_{player}")
 
             with c4:
-                if st.button("💾 Save", key=f"save_{player}"):
-                    # Determine latest action
-                    latest_action_text = "Updated" if row.get("latest_action") else "Added"
-                    payload = {
-                        "player": player,
-                        "team": team,
-                        "league": league,
-                        "position": position,
-                        "colour": colour_choice,
-                        "initial_watch_comment": initial_comment,
-                        "second_watch_comment": second_comment,
-                        "latest_action": latest_action_text,
-                        "visible": visible_val,
-                        "updated_by": st.session_state.get("user_initials", ""),
-                        "source": "watchlist-page",
-                    }
-                    ok = upsert_favourite(payload, log_to_sheet=True)
+                with c4:
+                    if st.button("💾 Save", key=f"save_{player}"):
+                        payload = {
+                            "player": player,
+                            "team": team,
+                            "league": league,
+                            "position": position,
+                            "colour": colour_choice,
+                            "initial_watch_comment": initial_comment.strip(),
+                            "second_watch_comment": second_comment.strip(),
+                            "latest_action": latest_action.strip(),
+                            "visible": visible_val,
+                            "updated_at": datetime.now().isoformat(),
+                            "source": "watch-list-page",
+                        }
+
+        ok = upsert_favourite(payload, log_to_sheet=True)
+        if ok:
+            toast_ok(f"Saved changes for {player}")
+            st.rerun()
+        else:
+            toast_err(f"Failed to save {player}")
                     if ok:
                         toast_ok(f"Saved changes for {player}")
                         st.rerun()
