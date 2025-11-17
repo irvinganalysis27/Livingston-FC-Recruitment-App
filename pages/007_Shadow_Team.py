@@ -28,7 +28,7 @@ df = pd.DataFrame(rows).sort_values(["position_slot", "rank"]).reset_index(drop=
 df = df.drop(columns=[c for c in df.columns if c in ["id", "created_at", "updated_at"]], errors="ignore")
 
 # ---------- Define display order ----------
-POSITION_ORDER = ["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"]
+POSITION_ORDER = ["GK", "RB", "LB", "CB", "6", "8", "10", "RW", "LW", "ST"]
 POSITION_LABELS = {
     "GK": "Goalkeeper",
     "RB": "Right Back",
@@ -36,6 +36,7 @@ POSITION_LABELS = {
     "CB": "Centre Back",
     "6": "Number 6",
     "8": "Number 8",
+    "10": "Number 10",
     "RW": "Right Wing",
     "LW": "Left Wing",
     "ST": "Striker",
