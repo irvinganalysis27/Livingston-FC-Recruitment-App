@@ -325,8 +325,8 @@ else:
 
                         selected_pos = st.selectbox(
                             "Position slot",
-                            ["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"],
-                            index=["GK", "RB", "LB", "CB", "6", "8", "RW", "LW", "ST"].index(
+                            ["GK", "RB", "LB", "CB", "6", "8", "10", "RW", "LW", "ST"],
+                            index=["GK", "RB", "LB", "CB", "6", "8", "10", "RW", "LW", "ST"].index(
                                 st.session_state.get(pos_key, "ST")
                             ),
                             key=pos_key,
