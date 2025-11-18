@@ -17,7 +17,7 @@ def get_supabase_client():
     """Return a new Supabase client using the service key."""
     try:
         url = st.secrets["supabase"]["url"]
-        key = st.secrets["supabase"]["service_key"]  # ✅ use service role key
+        key = st.secrets["supabase"]["service_key"]
         return create_client(url, key)
     except Exception as e:
         st.error(f"❌ Supabase connection failed: {e}")
@@ -47,7 +47,7 @@ def safe_execute(query, retries=3, delay=0.3):
 def upsert_shadow_team(record: dict) -> bool:
     """
     Insert or update a player in the Shadow Team table.
-    record = {"player": str, "position_slot": str, "rank": int}
+    Uses UNIQUE(player, position_slot) correctly.
     """
     sb = get_supabase_client()
     if not sb:
@@ -58,34 +58,45 @@ def upsert_shadow_team(record: dict) -> bool:
         print("[shadow_team_repo] ⚠️ No player provided.")
         return False
 
+    pos = record.get("position_slot") or "ST"
+
     payload = {
         "player": player,
-        "position_slot": record.get("position_slot") or "ST",
+        "position_slot": pos,
         "rank": int(record.get("rank") or 0),
         "notes": record.get("notes") or "",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     try:
-        # Check if record already exists
-        existing = sb.table(TABLE).select("*") \
-            .eq("player", player) \
-            .eq("position_slot", payload["position_slot"]) \
+        # --- 1️⃣ Check if this exact (player, position_slot) row exists ---
+        existing = (
+            sb.table(TABLE)
+            .select("*")
+            .eq("player", player)
+            .eq("position_slot", pos)
             .execute()
-        print(f"[shadow_team_repo] Existing check for {player}: {existing.data}")
+        )
 
+        print(f"[shadow_team_repo] Existing check for {player}, {pos}: {existing.data}")
+
+        # --- 2️⃣ If exists => UPDATE this exact row ---
         if existing.data:
-            # Update
             res = safe_execute(
-                sb.table(TABLE).update(payload).eq("player", player)
+                sb.table(TABLE)
+                .update(payload)
+                .eq("player", player)
+                .eq("position_slot", pos)
             )
-            print(f"[shadow_team_repo] ✅ Updated record for {player}: {res.data}")
+            print(f"[shadow_team_repo] ✅ Updated row for {player} at {pos}: {res.data}")
+
+        # --- 3️⃣ If not exists => INSERT using correct ON CONFLICT keys ---
         else:
-            # Insert (will upsert by player)
             res = safe_execute(
-                sb.table(TABLE).upsert(payload, on_conflict="player,position_slot")
+                sb.table(TABLE)
+                .upsert(payload, on_conflict="player,position_slot")
             )
-            print(f"[shadow_team_repo] ✅ Inserted record for {player}: {res.data}")
+            print(f"[shadow_team_repo] ✅ Inserted new row for {player} at {pos}: {res.data}")
 
         return True
 
@@ -100,26 +111,33 @@ def list_shadow_team():
     sb = get_supabase_client()
     if not sb:
         return []
+
     try:
         res = safe_execute(
-            sb.table(TABLE).select("*").order("position_slot").order("rank")
+            sb.table(TABLE)
+            .select("*")
+            .order("position_slot")
+            .order("rank")
         )
         print(f"[shadow_team_repo] ✅ Retrieved {len(res.data or [])} shadow team rows")
         return res.data or []
+
     except Exception as e:
         print(f"[shadow_team_repo] ❌ list_shadow_team failed: {e}")
         return []
 
 
 def delete_shadow_team(player: str) -> bool:
-    """Delete a player from the Shadow Team."""
+    """Delete ALL entries for a player (across all positions)."""
     sb = get_supabase_client()
     if not sb:
         return False
+
     try:
         safe_execute(sb.table(TABLE).delete().eq("player", player))
-        print(f"[shadow_team_repo] 🗑 Deleted from shadow team: {player}")
+        print(f"[shadow_team_repo] 🗑 Deleted all shadow team rows for: {player}")
         return True
+
     except Exception as e:
         print(f"[shadow_team_repo] ❌ delete_shadow_team failed for {player}: {e}")
         return False
