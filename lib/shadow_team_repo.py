@@ -68,7 +68,10 @@ def upsert_shadow_team(record: dict) -> bool:
 
     try:
         # Check if record already exists
-        existing = sb.table(TABLE).select("*").eq("player", player).execute()
+        existing = sb.table(TABLE).select("*") \
+            .eq("player", player) \
+            .eq("position_slot", payload["position_slot"]) \
+            .execute()
         print(f"[shadow_team_repo] Existing check for {player}: {existing.data}")
 
         if existing.data:
@@ -80,7 +83,7 @@ def upsert_shadow_team(record: dict) -> bool:
         else:
             # Insert (will upsert by player)
             res = safe_execute(
-                sb.table(TABLE).upsert(payload, on_conflict="player")
+                sb.table(TABLE).upsert(payload, on_conflict="player,position_slot")
             )
             print(f"[shadow_team_repo] ✅ Inserted record for {player}: {res.data}")
 
