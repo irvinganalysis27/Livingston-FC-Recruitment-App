@@ -47,56 +47,51 @@ def safe_execute(query, retries=3, delay=0.3):
 def upsert_shadow_team(record: dict) -> bool:
     """
     Insert or update a player in the Shadow Team table.
-    Uses UNIQUE(player, position_slot) correctly.
+    Supports one player appearing in multiple positions.
+    Unique constraint is (player, position_slot).
     """
     sb = get_supabase_client()
     if not sb:
         return False
 
     player = (record.get("player") or "").strip()
-    if not player:
-        print("[shadow_team_repo] ⚠️ No player provided.")
-        return False
+    position_slot = (record.get("position_slot") or "").strip()
 
-    pos = record.get("position_slot") or "ST"
+    if not player or not position_slot:
+        print("[shadow_team_repo] ⚠️ Missing player or position_slot.")
+        return False
 
     payload = {
         "player": player,
-        "position_slot": pos,
+        "position_slot": position_slot,
         "rank": int(record.get("rank") or 0),
         "notes": record.get("notes") or "",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     try:
-        # --- 1️⃣ Check if this exact (player, position_slot) row exists ---
-        existing = (
-            sb.table(TABLE)
-            .select("*")
-            .eq("player", player)
-            .eq("position_slot", pos)
+        # 1️⃣ Check if this exact (player, position_slot) exists
+        existing = sb.table(TABLE).select("*") \
+            .eq("player", player) \
+            .eq("position_slot", position_slot) \
             .execute()
-        )
 
-        print(f"[shadow_team_repo] Existing check for {player}, {pos}: {existing.data}")
-
-        # --- 2️⃣ If exists => UPDATE this exact row ---
+        # 2️⃣ If exists → update *using both keys*
         if existing.data:
-            res = safe_execute(
+            safe_execute(
                 sb.table(TABLE)
                 .update(payload)
                 .eq("player", player)
-                .eq("position_slot", pos)
+                .eq("position_slot", position_slot)
             )
-            print(f"[shadow_team_repo] ✅ Updated row for {player} at {pos}: {res.data}")
-
-        # --- 3️⃣ If not exists => INSERT using correct ON CONFLICT keys ---
+            print(f"[shadow_team_repo] ✅ Updated ({player}, {position_slot})")
         else:
-            res = safe_execute(
+            # 3️⃣ Insert new row (allowed because you removed the old constraint)
+            safe_execute(
                 sb.table(TABLE)
-                .upsert(payload, on_conflict="player,position_slot")
+                .insert(payload)
             )
-            print(f"[shadow_team_repo] ✅ Inserted new row for {player} at {pos}: {res.data}")
+            print(f"[shadow_team_repo] ✅ Inserted ({player}, {position_slot})")
 
         return True
 
