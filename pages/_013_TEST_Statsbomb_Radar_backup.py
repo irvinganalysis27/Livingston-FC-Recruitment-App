@@ -761,36 +761,29 @@ df_all_raw.columns = (
 )
 
 # --- Normalise season column names / values ---
-season_cols = [c for c in df_all_raw.columns if "season" in c.lower()]
 
-if season_cols:
-    # Prefer "season_name" if present
-    preferred = None
+# These are the column names that exist in your file
+season_priority = ["season_name", "season", "season_id"]
 
-    # Step 1: Try exact match before substring
-    for candidate in ["season_name", "Season_name", "Season Name"]:
-        if candidate in df_all_raw.columns:
-            preferred = candidate
-            break
+# Find the first one that exists
+found_season_col = next((c for c in season_priority if c in df_all_raw.columns), None)
 
-    # Step 2: Otherwise use the first detected column
-    if preferred is None:
-        preferred = season_cols[0]
-
-    # Step 3: Rename to "Season" if needed
-    if preferred != "Season":
-        df_all_raw.rename(columns={preferred: "Season"}, inplace=True)
-        print(f"[DEBUG] Renamed '{preferred}' → 'Season'")
-else:
-    st.error("❌ No season column found in your StatsBomb file. Expected something like 'season', 'Season', or 'season_name'.")
+if not found_season_col:
+    st.error("❌ No season column was found. Expected one of: season_name, season, season_id")
     st.stop()
+
+# Rename it to Season if needed
+if found_season_col != "Season":
+    df_all_raw.rename(columns={found_season_col: "Season"}, inplace=True)
+    print(f"[DEBUG] Renamed '{found_season_col}' → 'Season'")
 
 # Final safety check
-if "Season" in df_all_raw.columns:
-    df_all_raw["Season"] = df_all_raw["Season"].astype(str).str.strip()
-else:
-    st.error("❌ Failed to create a unified 'Season' column.")
+if "Season" not in df_all_raw.columns:
+    st.error("❌ Season column still missing after rename. Cannot continue.")
     st.stop()
+
+# Convert to clean strings
+df_all_raw["Season"] = df_all_raw["Season"].astype(str).str.strip()
 
 # ---------- Create Season_norm ----------
 def normalise_season_label(s: str) -> str:
