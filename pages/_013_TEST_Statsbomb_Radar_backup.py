@@ -762,16 +762,35 @@ df_all_raw.columns = (
 
 # --- Normalise season column names / values ---
 season_cols = [c for c in df_all_raw.columns if "season" in c.lower()]
+
 if season_cols:
-    preferred = "season_name" if "season_name" in season_cols else season_cols[0]
-    if preferred != "Season" and preferred in df_all_raw.columns:
+    # Prefer "season_name" if present
+    preferred = None
+
+    # Step 1: Try exact match before substring
+    for candidate in ["season_name", "Season_name", "Season Name"]:
+        if candidate in df_all_raw.columns:
+            preferred = candidate
+            break
+
+    # Step 2: Otherwise use the first detected column
+    if preferred is None:
+        preferred = season_cols[0]
+
+    # Step 3: Rename to "Season" if needed
+    if preferred != "Season":
         df_all_raw.rename(columns={preferred: "Season"}, inplace=True)
         print(f"[DEBUG] Renamed '{preferred}' → 'Season'")
 else:
-    print("[DEBUG] No season column found!")
+    st.error("❌ No season column found in your StatsBomb file. Expected something like 'season', 'Season', or 'season_name'.")
+    st.stop()
 
+# Final safety check
 if "Season" in df_all_raw.columns:
     df_all_raw["Season"] = df_all_raw["Season"].astype(str).str.strip()
+else:
+    st.error("❌ Failed to create a unified 'Season' column.")
+    st.stop()
 
 # ---------- Create Season_norm ----------
 def normalise_season_label(s: str) -> str:
