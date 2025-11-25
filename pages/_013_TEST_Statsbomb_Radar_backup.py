@@ -15,8 +15,6 @@ from branding import show_branding
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
-from openai import OpenAI
-client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -26,7 +24,7 @@ if not check_password():
 
 # ---------- Branding ----------
 show_branding()
-st.title("Statsbomb Radar")
+st.title("Statsbomb Radar (Test / Backup)")
 
 # ========= PATHS =========
 APP_DIR = Path(__file__).parent          # pages/
@@ -220,17 +218,7 @@ def parse_first_position(cell) -> str:
 
 def map_first_position_to_group(primary_pos_cell) -> str:
     tok = parse_first_position(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)  # don’t force into Winger
-
-# ========== Default template mapping ==========
-DEFAULT_TEMPLATE = {
-    "Full Back": "Full Back",
-    "Centre Back": "Centre Back",
-    "Number 6": "Number 6",
-    "Number 8": "Number 8",
-    "Winger": "Winger",
-    "Striker": "Striker"
-}
+    return RAW_TO_SIX.get(tok, None)  # do not force into Winger
 
 # ========== Radar metric sets ==========
 position_metrics = {
@@ -631,7 +619,7 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 cm_as_6["Six-Group Position"] = "Number 6"
                 cm_as_8["Six-Group Position"] = "Number 8"
 
-                # Only add if they don't already exist
+                # Only add if they do not already exist
                 already_6_8 = df[
                     (df["Six-Group Position"].isin(["Number 6", "Number 8"]))
                     & df["Player"].isin(cm_rows["Player"])
@@ -646,6 +634,8 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 df = pd.concat([df, new_rows], ignore_index=True)
 
     return df
+
+
 # ---------- Cached Data Loader ----------
 @st.cache_data(show_spinner=True)
 def load_data_once():
@@ -689,11 +679,11 @@ def load_data_once():
 
 
 # ============================================================
-# ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
+# ✅ Load + prepare the data (TOP-LEVEL DATA PREP)
 # ============================================================
 df_all_raw = load_data_once()
 
-# --- Column normaliser to match app expectations ---
+# --- Column normaliser helper ---
 def _rename_first(df, candidates, target):
     for c in candidates:
         if c in df.columns:
@@ -704,9 +694,6 @@ def _rename_first(df, candidates, target):
     return False
 
 cols_lower = {c.lower(): c for c in df_all_raw.columns}  # map to actual case
-
-def has(col):
-    return col in df_all_raw.columns or col in cols_lower
 
 def real(col):
     return col if col in df_all_raw.columns else cols_lower.get(col, col)
@@ -765,7 +752,7 @@ _rename_first(
     "competition_id",
 )
 
-# Clean col names a touch (keeps your later .str.replace calls safe)
+# Clean column names
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
     .str.replace("\xa0", " ", regex=False)
@@ -773,70 +760,66 @@ df_all_raw.columns = (
     .str.strip()
 )
 
-print("[DEBUG] Columns now include:", [c for c in ["Season", "Competition", "Team", "Player",
-                                                  "Position", "Secondary Position", "Minutes played",
-                                                  "competition_id"] if c in df_all_raw.columns])
-
-# --- Normalise season column names ---
+# --- Normalise season column names / values ---
 season_cols = [c for c in df_all_raw.columns if "season" in c.lower()]
 if season_cols:
-    # Prefer "season_name" if it exists
     preferred = "season_name" if "season_name" in season_cols else season_cols[0]
-    df_all_raw.rename(columns={preferred: "Season"}, inplace=True)
-    print(f"[DEBUG] Renamed '{preferred}' → 'Season'")
+    if preferred != "Season" and preferred in df_all_raw.columns:
+        df_all_raw.rename(columns={preferred: "Season"}, inplace=True)
+        print(f"[DEBUG] Renamed '{preferred}' → 'Season'")
 else:
     print("[DEBUG] No season column found!")
 
-# --- Fix Season column mixup ---
-if "season_name" in df_all_raw.columns:
-    df_all_raw["Season"] = df_all_raw["season_name"].astype(str).str.strip()
-    print("[DEBUG] Season column corrected from 'season_name'")
-elif "season" in df_all_raw.columns:
-    df_all_raw["Season"] = df_all_raw["season"].astype(str).str.strip()
-    print("[DEBUG] Season column corrected from 'season'")
-
-st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
-
-# --- Ensure Season is a single text column, not a DataFrame ---
 if "Season" in df_all_raw.columns:
-    # If multiple columns share the same name, combine the first non-null values
-    if isinstance(df_all_raw["Season"], pd.DataFrame):
-        df_all_raw["Season"] = df_all_raw["Season"].bfill(axis=1).iloc[:, 0]
-
-    # If somehow multiple columns named Season exist in the DataFrame
-    while df_all_raw.columns.duplicated().any():
-        df_all_raw = df_all_raw.loc[:, ~df_all_raw.columns.duplicated()]
-
-    # Force to string for consistency
     df_all_raw["Season"] = df_all_raw["Season"].astype(str).str.strip()
 
-st.write("Sample Season values:", df_all_raw["Season"].head(10).tolist())
-st.write("Unique count:", df_all_raw["Season"].nunique())
+# ---------- Create Season_norm ----------
+def normalise_season_label(s: str) -> str:
+    s = s.strip()
+    if "/" in s:
+        return s
+    if re.match(r"^\d{4}$", s):
+        return f"{s}/{int(s) + 1}"
+    return s
 
-# --- Season column detection ---
-season_col_candidates = [c for c in df_all_raw.columns if "season" in c.lower()]
-if not season_col_candidates:
-    st.error("❌ No column containing 'season' found at all.")
+if "Season" in df_all_raw.columns:
+    df_all_raw["Season_norm"] = df_all_raw["Season"].astype(str).apply(normalise_season_label)
 else:
-    # Prefer 'season_name', fallback to first
-    chosen = next((c for c in season_col_candidates if "name" in c.lower()), season_col_candidates[0])
-    st.write(f"✅ Using '{chosen}' as Season column")
-    if chosen != "Season":
-        df_all_raw.rename(columns={chosen: "Season"}, inplace=True)
+    df_all_raw["Season_norm"] = np.nan
 
-    try:
-        seasons_list = (
-            df_all_raw["Season"]
-            .dropna()
-            .astype(str)
-            .unique()
-            .tolist()
-        )
-        st.write("🔍 Seasons found:", sorted(seasons_list)[:10])
-    except Exception as e:
-        st.warning(f"⚠️ Couldn't list seasons: {e}")
+# ---------- Build PlayerKey (for duplicate names across seasons) ----------
+def add_player_key(df: pd.DataFrame) -> pd.DataFrame:
+    """Create a PlayerKey using player_id if present, else Player + DOB, else Player."""
+    # Try ID
+    id_col = None
+    for c in df.columns:
+        if c.lower() in {"player_id", "playerid", "id_player"}:
+            id_col = c
+            break
 
-st.write("🔍 Weighted Z exists?", "Weighted Z Score" in df_all_raw.columns)
+    birth_col = None
+    for c in df.columns:
+        cl = c.lower()
+        if "birth" in cl and "date" in cl:
+            birth_col = c
+            break
+
+    if id_col:
+        df["PlayerKey"] = df[id_col].astype(str).str.strip()
+    elif "Player" in df.columns and birth_col:
+        dob_series = pd.to_datetime(df[birth_col], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
+        df["PlayerKey"] = df["Player"].astype(str).str.strip() + "|" + dob_series
+    elif "Player" in df.columns:
+        df["PlayerKey"] = df["Player"].astype(str).str.strip()
+    else:
+        df["PlayerKey"] = df.index.astype(str)
+
+    return df
+
+df_all_raw = add_player_key(df_all_raw)
+
+# ---------- Basic inspection ----------
+st.write("🔍 Columns in df_all_raw:", list(df_all_raw.columns))
 
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
@@ -846,44 +829,13 @@ if "Competition" not in df_all_raw.columns:
     st.error("❌ Expected a 'Competition' column in your data.")
     st.stop()
 
-# ---------- Clean and prepare ----------
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()
-    .str.replace(u"\xa0", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-)
-
-# ✅ No extra “Birth Date” handling block needed anymore
-
-# ---------- Preprocess and create the working copy ----------
+# ---------- Preprocess and create working copy ----------
 df_all = df_all_raw.copy()
+df_all = preprocess_df(df_all)  # already handles Competition_norm, positions, multipliers etc
 df = df_all.copy()
 
 # ============================================================
-# 🗓️ NORMALISE SEASON LABELS
-# ============================================================
-if "Season" in df_all.columns:
-    # Convert all to string for consistency
-    df_all["Season"] = df_all["Season"].astype(str)
-
-    # Normalise standalone years (e.g. 2025 -> 2025/2026)
-    def normalise_season_label(s):
-        s = s.strip()
-        # If already looks like "2024/2025" leave it
-        if "/" in s:
-            return s
-        # Convert single year to "YYYY/YYYY+1"
-        if re.match(r"^\d{4}$", s):
-            return f"{s}/{int(s)+1}"
-        return s
-
-    df_all["Season_norm"] = df_all["Season"].apply(normalise_season_label)
-else:
-    df_all["Season_norm"] = np.nan
-
-# ============================================================
-# 3️⃣ LEAGUE FILTER
+# LEAGUE FILTER
 # ============================================================
 league_candidates = ["Competition_norm", "Competition", "competition_norm", "competition"]
 league_col = next((c for c in league_candidates if c in df.columns), None)
@@ -922,7 +874,7 @@ if set(valid_defaults) != set(st.session_state.league_selection):
 
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
-    st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
+    st.caption(f"Leagues selected: {len(selected_leagues)} | Players rows: {len(df)}")
     if df.empty:
         st.warning("No players match the selected leagues. Try a different selection.")
         st.stop()
@@ -931,28 +883,33 @@ else:
     st.stop()
 
 # ============================================================
-# 4️⃣ SEASON FILTER (merged single + double year)
+# SEASON FILTER (+ “All (3-Season Avg)” OPTION)
 # ============================================================
 if "Season_norm" in df_all.columns:
     season_options = sorted(df_all["Season_norm"].dropna().unique().tolist(), reverse=True)
-    selected_season = st.selectbox("Select Season", season_options)
+    # Insert synthetic “All (3-Season Avg)” option
+    season_options_with_all = ["All (3-Season Avg)"] + season_options
+
+    selected_season = st.selectbox("Select Season or 3-Season View", season_options_with_all)
     st.session_state["selected_season"] = selected_season
 
-    st.caption(f"Showing data for **{selected_season}** season (merged single + double-year entries).")
-
-    # Filter both Season and Season_norm to catch merged years
-    df = df_all[
-        (df_all["Season_norm"] == selected_season)
-        | (df_all["Season"] == selected_season)
-    ].copy()
-
-    if df.empty:
-        st.warning("No players found for this season selection.")
-        st.stop()
+    if selected_season == "All (3-Season Avg)":
+        st.caption("Showing **3-season averaged** view (where available) and trend information. Radar still uses per-season data.")
+        # For the main df used to build radar and filters, keep all seasons for now
+        df = df.copy()
+    else:
+        st.caption(f"Showing data for **{selected_season}** season.")
+        df = df_all[
+            (df_all["Season_norm"] == selected_season)
+            | (df_all["Season"] == selected_season)
+        ].copy()
+        if df.empty:
+            st.warning("No players found for this season selection.")
+            st.stop()
 else:
     st.info("No 'Season' column found — skipping season filter.")
 
-# ---------- Minutes + Age filters (side by side) ----------
+# ---------- Minutes + Age filters ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
@@ -960,11 +917,9 @@ if minutes_col not in df.columns:
 c1, c2 = st.columns(2)
 
 with c1:
-    # Initialise in session_state if not already set
     if "min_minutes" not in st.session_state:
         st.session_state.min_minutes = 500
 
-    # Persist value in session_state
     st.session_state.min_minutes = st.number_input(
         "Minimum minutes to include",
         min_value=0,
@@ -975,14 +930,12 @@ with c1:
 
     min_minutes = st.session_state.min_minutes
 
-    # Apply filter
     df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
     df = df[df["_minutes_numeric"] >= min_minutes].copy()
 
     if df.empty:
         st.warning("No players meet the minutes threshold. Lower the minimum.")
         st.stop()
-
 
 with c2:
     if "Age" in df.columns:
@@ -992,7 +945,6 @@ with c2:
             age_min = int(np.nanmin(df["_age_numeric"]))
             age_max = int(np.nanmax(df["_age_numeric"]))
 
-            # Use session_state to persist age range
             if "age_range" not in st.session_state:
                 st.session_state.age_range = (age_min, age_max)
 
@@ -1007,23 +959,20 @@ with c2:
 
             sel_min, sel_max = st.session_state.age_range
             df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
-
         else:
             st.info("Age column has no numeric values, age filter skipped.")
     else:
         st.info("No Age column found, age filter skipped.")
 
-st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Players remaining: {len(df)}")
+st.caption(f"Filtering on '{minutes_col}' ≥ {min_minutes}. Rows remaining: {len(df)}")
 
 # ---------- Position Group Section ----------
 st.markdown("#### 🟡 Select Position Group")
 
-# Build list of available groups from data
 available_groups = []
 if "Six-Group Position" in df.columns:
     available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].unique()]
 
-# Use session_state to persist the last selection
 if "selected_groups" not in st.session_state:
     st.session_state.selected_groups = []
 
@@ -1035,17 +984,15 @@ selected_groups = st.multiselect(
     key="pos_group_multiselect"
 )
 
-# Apply filter if groups selected
 if selected_groups:
     df = df[df["Six-Group Position"].isin(selected_groups)].copy()
     if df.empty:
         st.warning("No players after group filter. Clear filters or choose different groups.")
         st.stop()
 
-# Track currently selected group if only one is chosen
 current_single_group = selected_groups[0] if len(selected_groups) == 1 else None
 
-# ---------- Session state setup ----------
+# ---------- Template selection ----------
 if "template_select" not in st.session_state:
     st.session_state.template_select = list(position_metrics.keys())[0]
 if "last_template_choice" not in st.session_state:
@@ -1055,7 +1002,7 @@ if "manual_override" not in st.session_state:
 if "last_groups_tuple" not in st.session_state:
     st.session_state.last_groups_tuple = tuple()
 
-# ---------- Auto-sync template with group ----------
+# Auto-sync template with selected group when only one
 if tuple(selected_groups) != st.session_state.last_groups_tuple:
     if len(selected_groups) == 1:
         pos = selected_groups[0]
@@ -1064,135 +1011,40 @@ if tuple(selected_groups) != st.session_state.last_groups_tuple:
             st.session_state.manual_override = False
     st.session_state.last_groups_tuple = tuple(selected_groups)
 
-# ---------- Template Section ----------
 st.markdown("#### 📊 Choose Radar Template")
-
 template_names = list(position_metrics.keys())
 if st.session_state.template_select not in template_names:
     st.session_state.template_select = template_names[0]
 
 selected_position_template = st.selectbox(
-    "Radar Template",   # dummy label (required)
+    "Radar Template",
     template_names,
     index=template_names.index(st.session_state.template_select),
     key="template_select",
-    label_visibility="collapsed"   # hides the text
+    label_visibility="collapsed"
 )
 
-# Handle manual override
 if st.session_state.template_select != st.session_state.last_template_choice:
     st.session_state.manual_override = True
     st.session_state.last_template_choice = st.session_state.template_select
 
-# ---------- Build metric pool for Essential Criteria ----------
+# ---------- Build metric pool for the selected template ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
-current_metrics = position_metrics[current_template_name]["metrics"]
+metrics = position_metrics[current_template_name]["metrics"]
+metric_groups = position_metrics[current_template_name]["groups"]
 
-for m in current_metrics:
+# Make sure metric columns exist and are numeric
+for m in metrics:
+    if m not in df_all.columns:
+        df_all[m] = 0
     if m not in df.columns:
         df[m] = 0
-df[current_metrics] = df[current_metrics].fillna(0)
-
-# ---------- Session state setup for Essential Criteria ----------
-if "ec_rows" not in st.session_state:
-    st.session_state.ec_rows = 1
-
-# ---------- Essential Criteria ----------
-with st.expander("Essential Criteria", expanded=False):
-    use_all_cols = st.checkbox("Pick from all numeric columns", value=False)
-    numeric_cols_all = sorted([c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])])
-    metric_pool_base = numeric_cols_all if use_all_cols else current_metrics
-
-    cbtn1, cbtn2, cbtn3 = st.columns(3)
-    with cbtn1:
-        if st.button("Add criterion"):
-            st.session_state.ec_rows += 1
-    with cbtn2:
-        if st.button("Remove last", disabled=st.session_state.ec_rows <= 1):
-            st.session_state.ec_rows = max(1, st.session_state.ec_rows - 1)
-    with cbtn3:
-        apply_nonneg = st.checkbox("Apply all criteria", value=False)
-
-    if len(metric_pool_base) == 0:
-        st.info("No numeric metrics available to filter.")
-        apply_nonneg = False
-        st.session_state.ec_rows = 1
-
-    criteria = []
-    for i in range(st.session_state.ec_rows):
-        st.markdown(f"**Criterion {i+1}**")
-        c1, c2, c3, c4 = st.columns([3, 2, 2, 3])
-
-        prev_key_metric = f"ec_metric_{i}"
-        prev_metric = st.session_state.get(prev_key_metric, None)
-        metric_pool_display = list(metric_pool_base)
-        if prev_metric and prev_metric not in metric_pool_display and prev_metric in numeric_cols_all:
-            metric_pool_display = [prev_metric] + [m for m in metric_pool_display if m != prev_metric]
-
-        with c1:
-            metric_name = st.selectbox("Metric", metric_pool_display, key=prev_key_metric)
-
-        with c2:
-            mode = st.radio("Apply to", ["Raw", "Percentile"], horizontal=True, key=f"ec_mode_{i}")
-
-        with c3:
-            op = st.selectbox("Operator", [">=", ">", "<=", "<"], index=0, key=f"ec_op_{i}")
-
-        with c4:
-            if mode == "Percentile":
-                default_thr = 50.0
-            else:
-                default_thr = float(np.nanmedian(pd.to_numeric(df[metric_name], errors="coerce")))
-                if not np.isfinite(default_thr):
-                    default_thr = 0.0
-            thr_str = st.text_input("Threshold", value=str(int(default_thr)), key=f"ec_thr_{i}")
-            try:
-                thr_val = float(thr_str)
-            except ValueError:
-                thr_val = default_thr
-
-        criteria.append((metric_name, mode, op, thr_val))
-
-    if apply_nonneg and len(criteria) > 0:
-        temp_cols = []
-        mask_all = pd.Series(True, index=df.index)
-
-        for metric_name, mode, op, thr_val in criteria:
-            if mode == "Percentile":
-                df[metric_name] = pd.to_numeric(df[metric_name], errors="coerce")
-                perc_series = (df[metric_name].rank(pct=True) * 100).round(1)
-                tmp_col = f"__tmp_percentile__{metric_name}"
-                df[tmp_col] = perc_series
-                filter_col = tmp_col
-                temp_cols.append(tmp_col)
-            else:
-                filter_col = metric_name
-                df[filter_col] = pd.to_numeric(df[filter_col], errors="coerce")
-
-            if op == ">=":
-                mask = df[filter_col] >= thr_val
-            elif op == ">":
-                mask = df[filter_col] > thr_val
-            elif op == "<=":
-                mask = df[filter_col] <= thr_val
-            else:
-                mask = df[filter_col] < thr_val
-
-            mask_all &= mask
-
-        kept = int(mask_all.sum())
-        dropped = int((~mask_all).sum())
-        df = df[mask_all].copy()
-
-        if temp_cols:
-            df.drop(columns=temp_cols, inplace=True, errors="ignore")
-
-        summary = " AND ".join([f"{m} {o} {t}{'%' if md=='Percentile' else ''}" for m, md, o, t in criteria])
-        st.caption(f"Essential Criteria applied: {summary}. Kept {kept}, removed {dropped} players.")
+    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
+    df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
 # ---------- Player list ----------
 if "Player" not in df.columns:
-    st.error("Expected a 'Name' column in the upload (renamed to 'Player').")
+    st.error("Expected a 'Player' column in the data.")
     st.stop()
 
 players = df["Player"].dropna().unique().tolist()
@@ -1200,9 +1052,8 @@ if not players:
     st.warning("No players available after filters.")
     st.stop()
 
-# --- Initialise session state if missing ---
 if "selected_player" not in st.session_state:
-    st.session_state.selected_player = None
+    st.session_state.selected_player = players[0]
 
 if st.session_state.selected_player not in players:
     st.session_state.selected_player = players[0]
@@ -1215,20 +1066,9 @@ selected_player = st.selectbox(
 )
 st.session_state.selected_player = selected_player
 
-# ---------- Metrics + percentiles ----------
-metrics = position_metrics[selected_position_template]["metrics"]
-metric_groups = position_metrics[selected_position_template]["groups"]
-
-# Ensure columns exist and are numeric in both df_all and df
-for m in metrics:
-    if m not in df_all.columns:
-        df_all[m] = 0
-    if m not in df.columns:
-        df[m] = 0
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
-
-# Metrics where lower values are better (raw values unchanged; only percentiles invert)
+# ============================================================
+# PERCENTILES & SCORE CALCULATIONS
+# ============================================================
 LOWER_IS_BETTER = {
     "Turnovers",
     "Fouls",
@@ -1237,19 +1077,18 @@ LOWER_IS_BETTER = {
 }
 
 def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
-    # Convert series to numeric, handle invalid values
     series = pd.to_numeric(series, errors="coerce").fillna(0)
-    # pandas: rank(pct=True, ascending=True) -> smallest ≈ 0, largest = 1.0
     r = series.rank(pct=True, ascending=True)
     if lower_is_better:
-        p = 1.0 - r  # smaller raw -> larger percentile
+        p = 1.0 - r
     else:
-        p = r  # larger raw -> larger percentile
+        p = r
     return (p * 100.0).round(1)
 
-# --- A) Percentiles for RADAR BARS (within selected leagues vs pooled) ---
+# --- Percentiles for radar (within selected leagues vs pooled) ---
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox("Percentiles within each league", value=True, key="percentiles_within_league")
+
 percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
 if compute_within_league and league_col in df.columns:
     for m in metrics:
@@ -1260,20 +1099,24 @@ if compute_within_league and league_col in df.columns:
             )
         except Exception as e:
             print(f"[DEBUG] Percentile calc failed for {m}: {e}")
-            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
+            percentile_df_chart[m] = 50.0
 else:
     for m in metrics:
         try:
             percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
         except Exception as e:
             print(f"[DEBUG] Percentile calc failed for {m}: {e}")
-            percentile_df_chart[m] = 50.0  # Neutral percentile if calculation fails
-percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)  # Fill any remaining NaN with neutral percentile
+            percentile_df_chart[m] = 50.0
 
-# --- B) Percentiles for 0–100 SCORE (baseline = WHOLE DATASET by position) ---
+percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)
+
+# --- Percentiles for score baseline (whole dataset by position) ---
 pos_col = "Six-Group Position"
-if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns: df[pos_col] = np.nan
+if pos_col not in df_all.columns:
+    df_all[pos_col] = np.nan
+if pos_col not in df.columns:
+    df[pos_col] = np.nan
+
 percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=metrics, dtype=float)
 for m in metrics:
     try:
@@ -1283,90 +1126,75 @@ for m in metrics:
         )
     except Exception as e:
         print(f"[DEBUG] Global percentile calc failed for {m}: {e}")
-        percentile_df_globalpos_all[m] = 50.0  # Neutral percentile
+        percentile_df_globalpos_all[m] = 50.0
 percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].fillna(50.0).round(1)
 
-# --- Assemble plot_data (radar uses the CHART percentiles) ---
+# --- Assemble plot_data (radar uses CHART percentiles) ---
 metrics_df = df[metrics].copy()
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
     "Positions played", "Minutes played", "Six-Group Position",
-    "Competition", "Competition_norm", "Multiplier"
+    "Competition", "Competition_norm", "Multiplier", "Season", "Season_norm", "PlayerKey"
 ]
 for c in keep_cols:
-    if c not in df.columns: df[c] = np.nan
+    if c not in df.columns:
+        df[c] = np.nan
+
 plot_data = pd.concat(
     [df[keep_cols], metrics_df, percentile_df_chart.add_suffix(" (percentile)")],
     axis=1
 )
 
-# ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
-
-# Metrics for scoring (same as chart)
+# ============================================================
+# WEIGHTED Z, SCORES AND ANCHORS
+# ============================================================
 sel_metrics = list(metric_groups.keys())
 
-# --- A) Percentiles for SCORE BASELINE (full dataset by position, for reference) ---
-pos_col = "Six-Group Position"
-if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns: df[pos_col] = np.nan
-
-percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
+# Ensure metrics numeric in df_all
 for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    percentile_df_globalpos_all[m] = (
-        df_all.groupby(pos_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-    )
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
+    df_all[m] = pd.to_numeric(df_all.get(m, 0), errors="coerce").fillna(0)
 
-# --- B) Raw Z-Scores for RANKING (eligible players only for baseline) ---
-pos_col = "Six-Group Position"
-
-# Define eligible baseline (600+ minutes)
+# --- Raw Z per metric, by position baseline (eligible players only) ---
 _mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
 eligible = df_all[_mins_all >= 600].copy()
 if eligible.empty:
     eligible = df_all.copy()
 
-# Compute per-position mean/std using eligible only
 baseline_stats = eligible.groupby(pos_col)[sel_metrics].agg(["mean", "std"]).fillna(0)
 baseline_stats.columns = baseline_stats.columns.map("_".join)
 
-# Compute Z per metric using baseline stats
 raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
 for m in sel_metrics:
     df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
     mean_col = f"{m}_mean"
     std_col = f"{m}_std"
-    
+
     if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
         raw_z_all[m] = 0
         continue
-        
+
     mean_vals = df_all[pos_col].map(baseline_stats[mean_col])
     std_vals = df_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
     z = (df_all[m] - mean_vals) / std_vals
-    
+
     if m in LOWER_IS_BETTER:
         z *= -1
     raw_z_all[m] = z.fillna(0)
 
-# ---------- Average + Weighted Z (sign-aware) ----------
+# --- Average + Weighted Z ---
 avg_z_all = raw_z_all.mean(axis=1).fillna(0)
 df_all["Avg Z Score"] = avg_z_all
 
 mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
 avg_z = df_all["Avg Z Score"]
 
-# ✅ Apply proper weighting logic (strong leagues boost, weak leagues dampen)
 df_all["Weighted Z Score"] = np.select(
     [avg_z > 0, avg_z < 0],
     [avg_z * mult, avg_z / mult],
     default=0.0
 )
 
-# ---------- LFC Weighted Z (Scottish Premiership 1.20) ----------
+# LFC Weighted version
 df_all["LFC Multiplier"] = mult
 df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
 lfc_mult = df_all["LFC Multiplier"]
@@ -1377,8 +1205,7 @@ df_all["LFC Weighted Z"] = np.select(
     default=0.0
 )
 
-# ---------- Anchors + Scaling ----------
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
+# Anchors per position
 eligible = df_all[_mins_all >= 600].copy()
 if eligible.empty:
     eligible = df_all.copy()
@@ -1411,31 +1238,32 @@ df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
     .fillna(0)
 )
 
-# ---------- Copy relevant columns into plot_data ----------
+# Copy back into plot_data for current filtered view
 plot_data["Avg Z Score"] = df_all.loc[df.index, "Avg Z Score"].fillna(0).values
 plot_data["Weighted Z Score"] = df_all.loc[df.index, "Weighted Z Score"].fillna(0).values
 plot_data["LFC Weighted Z"] = df_all.loc[df.index, "LFC Weighted Z"].fillna(0).values
 plot_data["Score (0–100)"] = df_all.loc[df.index, "Score (0–100)"].fillna(0).values
 plot_data["LFC Score (0–100)"] = df_all.loc[df.index, "LFC Score (0–100)"].fillna(0).values
 
-# ---------- Rank ----------
+# Rank
 plot_data.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_index=True)
 plot_data["Rank"] = np.arange(1, len(plot_data) + 1)
 
 # ============================================================
-# 🧮 HISTORICAL WEIGHTED RANKINGS (for 'All (3-Season Avg)') — fixed placement
+# 3-SEASON SUMMARY WHEN “All (3-Season Avg)” IS SELECTED
 # ============================================================
+key_col = "PlayerKey" if "PlayerKey" in df_all.columns else "Player"
+
 if (
     "Weighted Z Score" in df_all.columns
     and "Season" in df_all.columns
     and st.session_state.get("selected_season") == "All (3-Season Avg)"
 ):
     try:
-        st.markdown("### 🧾 Historical Weighted Rankings (3-Season Summary)")
+        st.markdown("### 🧾 3-Season Weighted Z Summary")
 
-        # --- Aggregate per-player per-season weighted Z ---
         season_groups = (
-            df_all.groupby(["Player", "Season", "Six-Group Position", "Competition_norm"], as_index=False)
+            df_all.groupby([key_col, "Player", "Season", "Six-Group Position", "Competition_norm"], as_index=False)
             .agg({
                 "Weighted Z Score": "mean",
                 "Minutes played": "sum",
@@ -1445,9 +1273,9 @@ if (
             })
         )
 
-        # --- Compute 3-season averages per player-position ---
+        # Average across all seasons per player-position
         rolling = (
-            season_groups.groupby(["Player", "Six-Group Position"], as_index=False)
+            season_groups.groupby([key_col, "Player", "Six-Group Position"], as_index=False)
             .agg({
                 "Weighted Z Score": "mean",
                 "Minutes played": "sum",
@@ -1459,10 +1287,10 @@ if (
             .rename(columns={"Weighted Z Score": "3-Season Weighted Z"})
         )
 
-        # --- Improvement logic (first vs last available season) ---
+        # Improvement / trend (first vs last)
         trend_calc = (
-            season_groups.sort_values(["Player", "Season"])
-            .groupby("Player")
+            season_groups.sort_values([key_col, "Season"])
+            .groupby(key_col)
             .agg(first_z=("Weighted Z Score", "first"), last_z=("Weighted Z Score", "last"))
         )
         trend_calc["Z Δ"] = trend_calc["last_z"] - trend_calc["first_z"]
@@ -1472,10 +1300,8 @@ if (
             default="➖ Stable"
         )
 
-        # Merge improvement into summary
-        rolling = rolling.merge(trend_calc, on="Player", how="left")
+        rolling = rolling.merge(trend_calc, left_on=key_col, right_index=True, how="left")
 
-        # --- Display compact summary table ---
         st.dataframe(
             rolling[["Player", "Six-Group Position", "3-Season Weighted Z", "Z Δ", "Trend"]]
             .sort_values("3-Season Weighted Z", ascending=False)
@@ -1483,7 +1309,6 @@ if (
             use_container_width=True
         )
 
-        # --- Optional trend visualisation ---
         if st.checkbox("📈 Show Player Trend Over Seasons"):
             player_opts = sorted(season_groups["Player"].unique().tolist())
             player_sel = st.selectbox("Select player for trend chart", player_opts)
@@ -1498,9 +1323,11 @@ if (
                 st.pyplot(fig)
 
     except Exception as e:
-        st.warning(f"⚠️ Could not compute 3-season rankings: {e}")
+        st.warning(f"⚠️ Could not compute 3-season summary: {e}")
 
-# ---------- Chart ----------
+# ============================================================
+# RADAR PLOT
+# ============================================================
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
     from matplotlib import colormaps as mcm
@@ -1513,7 +1340,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             "Defensive": "royalblue",
         }
 
-    # Get player row safely
     row_df = plot_data.loc[plot_data["Player"] == player_name]
     if row_df.empty:
         st.error(f"No player named '{player_name}' found.")
@@ -1521,7 +1347,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     row = row_df.iloc[0]
 
-    # Get all metric names (with valid percentile cols)
     group_order = ["Possession", "Defensive", "Attacking", "Off The Ball"]
     ordered_metrics = [m for g in group_order for m, gg in metric_groups.items() if gg == g]
 
@@ -1536,25 +1361,21 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         st.warning("No valid metrics available to plot for this player.")
         return
 
-    # Retrieve numeric values safely
     raw_vals = pd.to_numeric(row[valid_metrics], errors="coerce").fillna(0).to_numpy()
-    pct_vals = pd.to_numeric(row[valid_pcts], errors="coerce").fillna(50).to_numpy()  # default neutral 50
+    pct_vals = pd.to_numeric(row[valid_pcts], errors="coerce").fillna(50).to_numpy()
 
     n = len(valid_metrics)
     if n == 0:
         st.warning("No valid numeric metrics found for this player.")
         return
 
-    # Groups and colours
     groups = [metric_groups.get(m, "Unknown") for m in valid_metrics]
     cmap = mcm.get_cmap("RdYlGn")
     norm = mcolors.Normalize(vmin=0, vmax=100)
     bar_colors = [cmap(norm(v)) for v in pct_vals]
 
-    # Angles for radar
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
 
-    # --- Plot setup ---
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
     ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
@@ -1565,7 +1386,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
     ax.set_xticks([])
     ax.spines["polar"].set_visible(False)
 
-    # --- Bars ---
     ax.bar(
         angles, pct_vals,
         width=2 * np.pi / n * 0.85,
@@ -1575,19 +1395,16 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         alpha=0.9
     )
 
-    # Raw values inside the chart
     for ang, raw_val in zip(angles, raw_vals):
         txt = f"{raw_val:.2f}" if np.isfinite(raw_val) else "-"
         ax.text(ang, 50, txt, ha="center", va="center", color="black", fontsize=10, fontweight="bold")
 
-    # Metric labels
     for ang, m in zip(angles, valid_metrics):
         label = DISPLAY_NAMES.get(m, m)
         label = label.replace(" per 90", "").replace(", %", " (%)")
         color = group_colors.get(metric_groups.get(m, "Unknown"), "black")
         ax.text(ang, 108, label, ha="center", va="center", color=color, fontsize=10, fontweight="bold")
 
-    # --- Legend ---
     present_groups = list(dict.fromkeys(groups))
     patches = [mpatches.Patch(color=group_colors.get(g, "grey"), label=g) for g in present_groups]
     if patches:
@@ -1598,7 +1415,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             ncol=min(len(patches), 4), frameon=False
         )
 
-    # --- Player Info ---
     weighted_z = float(row.get("Weighted Z Score", 0) or 0)
     score_100 = row.get("Score (0–100)")
     score_100 = float(score_100) if pd.notnull(score_100) else None
@@ -1612,7 +1428,6 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     comp = row.get("Competition_norm") or row.get("Competition") or ""
 
-    # Title text
     top_parts = [player_name]
     if role: top_parts.append(role)
     if pd.notnull(age): top_parts.append(f"{int(age)} years old")
@@ -1632,19 +1447,19 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
     ax.set_title(f"{line1}\n{line2}", color="black", size=22, pad=20, y=1.10)
 
-    # Logo overlay if available
-    try:
-        if "logo" in globals() and logo is not None:
-            imagebox = OffsetImage(np.array(logo), zoom=0.18)
-            ab = AnnotationBbox(imagebox, (0, 0), frameon=False, box_alignment=(0.5, 0.5))
-            ax.add_artist(ab)
-    except Exception:
-        pass
-
     st.pyplot(fig, width="stretch")
 
+# ---------- Plot radar for selected player ----------
+if st.session_state.selected_player:
+    plot_radial_bar_grouped(
+        st.session_state.selected_player,
+        plot_data,
+        metric_groups,
+        group_colors
+    )
+
 # ============================================================
-# 📈 PLAYER TREND LINE BELOW RADAR
+# PLAYER TREND LINE (PER PLAYER)
 # ============================================================
 if st.session_state.selected_player and "Season" in df_all.columns:
     p_df = (
@@ -1664,160 +1479,13 @@ if st.session_state.selected_player and "Season" in df_all.columns:
         ax.set_title(f"{st.session_state.selected_player} — Weighted Z Score by Season")
         st.pyplot(fig)
 
-def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
-    """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
-    try:
-        row = plot_data.loc[plot_data["Player"] == player_name].iloc[0]
-    except IndexError:
-        return "No data available for this player."
-
-    role = str(row.get("Six-Group Position", "player"))
-    league = str(row.get("Competition_norm", ""))
-    age = row.get("Age", "")
-    team = str(row.get("Team", ""))
-    mins = row.get("Minutes played", 0)
-
-    # Collect numeric metrics
-    metric_percentiles = {
-        m: row.get(f"{m} (percentile)", np.nan)
-        for m in metrics.keys()
-        if f"{m} (percentile)" in row.index
-    }
-    metric_text = ", ".join([f"{k}: {v:.0f}" for k, v in metric_percentiles.items() if pd.notnull(v)])
-
-    # --- Build dynamic prompt ---
-    prompt = f"""
-    You are writing a detailed but concise player scouting report in the style of Tom Irving,
-    a professional football recruitment analyst known for honest, critical, and realistic assessments.
-
-    Write a 5–6 sentence paragraph about {player_name}, a {role.lower()} aged {age}, currently playing in {league} for {team}.
-
-    You have access to percentile data (0–100) for performance metrics:
-    {metric_text}
-
-    Tone and writing style rules:
-    - Do NOT start with cliches like “is an exciting” or “is a talented” player.
-    - Vary the opening line. It can start with what kind of player he looks like, what stands out, or even what’s missing.
-    - If metrics are low (below 40th percentile), acknowledge weaknesses clearly. Use natural phrasing like:
-        • “Struggles to impact games consistently.” 
-        • “Can look limited when the game becomes physical.”
-        • “Output doesn’t yet match his effort.”
-    - If metrics are high (above 70th percentile), highlight them naturally:
-        • “Ranks among the best in his league for dribbles and chance creation.”
-        • “Shows real control under pressure and moves play forward quickly.”
-    - Keep a balanced tone — be fair, but never overly generous. You're not writing marketing material.
-    - Combine data insight with realistic football language (movement, body shape, pressing work, mentality).
-    - Vary phrasing so no two reports feel copy-pasted.
-    - End with one strong, definitive sentence that sums up his player type or potential fit — e.g.:
-        • “A physically strong, low-risk defender who could suit a compact system.”
-        • “A creative wide player with flashes of quality but inconsistent end product.”
-        • “Profiles as a hard-working forward who fits the pressing style but lacks a ruthless edge.”
-
-    Write in Tom’s natural tone, as seen in these examples:
-    - “He’s got a good base technically but sometimes forces play when it’s not on.”
-    - “Not the most dynamic athlete, but his awareness and timing stand out.”
-    - “There’s something raw but promising about him — a player who could develop quickly in the right setup.”
-
-    Be honest, concise, and analytical. Avoid repetition. Write like a human scout.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=350,
-            temperature=0.85,  # slightly higher for more creative, human tone
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"⚠️ AI summary generation failed: {e}"
-
-# ---------- Plot ----------
-if st.session_state.selected_player:
-    plot_radial_bar_grouped(
-        st.session_state.selected_player,
-        plot_data,
-        metric_groups,
-        group_colors
-    )
-# ================== Glossary Section ==================
-metric_definitions = {
-    # Core metrics
-    "NP Goals": "Non-penalty goals scored by the player.",
-    "xG": "Expected goals from non-penalty shots.",
-    "xG Assisted": "Expected assists — value of key passes leading to shots.",
-    "xGBuildup": "xG contribution from buildup play before the shot.",
-    "xG/Shot": "Expected goals per shot (shot quality).",
-    "Shots": "Total shots attempted (excluding penalties).",
-    "Goal Conversion%": "Percentage of non-penalty shots converted to goals.",
-    "Touches In Box": "Touches by the player inside the opposition penalty area.",
-    "Fouls Won": "Times the player is fouled by opponents.",
-    "Aggressive Actions": "Tackles, pressures, or fouls within 2 seconds of the opponent receiving the ball.",
-    "Defensive Actions": "Combined tackles, pressures, and fouls while defending.",
-    "Fouls": "Fouls committed by the player.",
-    "Turnovers": "Times the player loses possession through a miscontrol or failed dribble.",
-    "Successful Dribbles": "Number of times the player successfully beats an opponent while dribbling.",
-    "Dribbles Stopped%": "Percentage of dribbles faced that were successfully stopped by the player.",
-    "Aerial Win%": "Percentage of aerial duels won.",
-    "Aerial Wins": "Total number of aerial duels won.",
-    "Pressure Regains": "Times a team regains possession within 5 seconds of the player's pressure.",
-    "Player Season Ball Recoveries 90": "Average number of ball recoveries per 90 minutes.",
-    "Player Season Fhalf Ball Recoveries 90": "Ball recoveries made in the opposition half per 90 minutes.",
-    "Player Season Fhalf Pressures 90": "Pressures made in the opposition half per 90 minutes.",
-    "OBV": "On-Ball Value — contribution to team xG from all on-ball actions.",
-    "Pass OBV": "On-Ball Value added from passing actions only.",
-    "D&C OBV": "On-Ball Value added from dribbles and carries.",
-    "Deep Progressions": "Passes or carries that move the ball into the final third.",
-    "Deep Completions": "Successful passes received within 20 metres of the opposition goal.",
-    "OP Key Passes": "Passes from open play that directly create a shot.",
-    "OP Passes Into Box": "Successful open play passes into the opposition penalty area.",
-    "OP xG Assisted": "Expected assists (xG Assisted) from open play passes only.",
-    "Crossing%": "Percentage of attempted crosses that successfully reach a teammate.",
-    "Successful Box Cross%": "Percentage of completed passes into the penalty area that are crosses.",
-    "Passing%": "Percentage of passes successfully completed.",
-    "Pr. Pass% Dif.": "Change in passing accuracy when under pressure compared to unpressured passes.",
-    "Pr. Long Balls": "Number of pressured long passes attempted.",
-    "UPr. Long Balls": "Number of unpressured long passes attempted.",
-    "PAdj Interceptions": "Interceptions adjusted for team possession share.",
-    "PAdj Tackles": "Tackles adjusted for team possession share.",
-    "PAdj Tack&Int": "Combined tackles and interceptions adjusted for possession share.",
-    "PAdj Pressures": "Pressures adjusted for team possession share.",
-    "Lost Balls": "Times the player loses the ball (renamed from 'Turnovers').",
-    "Pressures in Opposition Half": "Number of pressures applied in the opposition half per 90 minutes.",
-    "Progressions to Final 1/3": "Passes or carries that move the ball into the final third (renamed from Deep Progressions).",
-    "Completed Passes Final 1/3": "Completed passes received in the final third (renamed from Deep Completions).",
-}
-
-with st.expander("📘 Metric Glossary"):
-    st.markdown(f"**Template:** {current_template_name}")
-
-    groups = position_metrics[current_template_name]["groups"]
-    for group_name in sorted(set(groups.values())):
-        color = group_colors.get(group_name, "black")
-        with st.expander(f"{group_name} metrics"):
-            for metric, grp in groups.items():
-                if grp == group_name:
-                    definition = metric_definitions.get(metric, "_Definition not added yet._")
-                    st.markdown(f"**{metric}** — {definition}")
-
-# ---------- AI Scouting Summary ----------
-st.markdown("### 🧠 AI Scouting Summary")
-
-if st.button("Generate AI Summary", key="ai_summary_button"):
-    with st.spinner("Generating AI scouting report..."):
-        summary_text = generate_player_summary(
-            st.session_state.selected_player,
-            plot_data,
-            metric_groups
-        )
-        st.markdown(summary_text)
-
-# ---------- 🔍 Find 10 Similar Players ----------
+# ============================================================
+# FIND SIMILAR PLAYERS
+# ============================================================
 st.markdown("### 🔍 Find Similar Players")
 
 MINUTES_SIMILAR = 400
 pos_col = "Six-Group Position"
-minutes_col = "Minutes played"
 
 def find_similar_players_same_scale(
     player_name: str,
@@ -1828,17 +1496,14 @@ def find_similar_players_same_scale(
     n_similar: int = 10,
     minutes_floor: int = 400
 ):
-    """Find most similar players using the *existing* Weighted Z Score scale and same 0–100 logic."""
     if player_name not in base_df["Player"].values:
         return pd.DataFrame(), f"{player_name} not found."
 
-    # Selected player's position
     pos = base_df.loc[base_df["Player"] == player_name, position_col].iloc[0]
     if pd.isna(pos) or not pos:
         return pd.DataFrame(), f"No position found for {player_name}."
 
-    # Filter pool: same position & ≥ minutes_floor
-    mins_num = pd.to_numeric(base_df.get(minutes_col, np.nan), errors="coerce")
+    mins_num = pd.to_numeric(base_df.get("Minutes played", np.nan), errors="coerce")
     pool = base_df[
         (base_df[position_col] == pos) &
         (mins_num >= minutes_floor)
@@ -1846,27 +1511,22 @@ def find_similar_players_same_scale(
     if pool.empty:
         return pd.DataFrame(), f"No players (≥{minutes_floor} mins) at {pos}."
 
-    # Ensure numeric metrics exist
     valid_metrics = [m for m in metrics if m in pool.columns]
     if not valid_metrics:
         return pd.DataFrame(), "No valid metrics for similarity."
 
-    # Z-score within the pool (so distances are scale-free)
     X = pool[valid_metrics].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     Z = (X - X.mean()) / X.std(ddof=0).replace(0, np.nan)
     Z = Z.fillna(0)
 
-    # Get player vector
     pZ = Z.loc[pool["Player"] == player_name]
     if pZ.empty:
         return pd.DataFrame(), f"{player_name} has no valid metric data."
 
-    # Compute Euclidean distance
     diff = Z.values - pZ.values[0]
     dists = np.sqrt(np.sum(diff**2, axis=1))
     pool["Similarity Score"] = 100.0 - (dists / dists.max() * 100.0 if dists.max() != 0 else 0)
 
-    # Exclude self
     out = (
         pool[pool["Player"] != player_name]
         .sort_values("Similarity Score", ascending=False)
@@ -1874,34 +1534,29 @@ def find_similar_players_same_scale(
         .copy()
     )
 
-    # Keep same “Score (0–100)” as ranking table (don’t recalc)
     score_map = base_df.set_index("Player")["Score (0–100)"].to_dict()
     out["Score (0–100)"] = out["Player"].map(score_map)
 
-    # Clean columns
     out.rename(columns={"Team within selected timeframe": "Team",
                         "Competition_norm": "League"}, inplace=True)
-    keep_cols = ["Player", "Team", "League", "Age", minutes_col, "Score (0–100)", "Similarity Score"]
+    keep_cols = ["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]
     for c in keep_cols:
         if c not in out.columns:
             out[c] = np.nan
     out = out[keep_cols]
 
-    # Round + tidy
-    out[minutes_col] = pd.to_numeric(out[minutes_col], errors="coerce").fillna(0).astype(int)
+    out["Minutes played"] = pd.to_numeric(out["Minutes played"], errors="coerce").fillna(0).astype(int)
     out["Age"] = pd.to_numeric(out["Age"], errors="coerce").round(0)
     out["Score (0–100)"] = pd.to_numeric(out["Score (0–100)"], errors="coerce").round(1)
     out["Similarity Score"] = pd.to_numeric(out["Similarity Score"], errors="coerce").round(1)
 
     return out, None
 
-
-# ---------- Run Button ----------
 if st.button("Find 10 Similar Players", key="similar_players_button"):
     with st.spinner("Finding most similar players..."):
         similar_df, err = find_similar_players_same_scale(
             st.session_state.selected_player,
-            plot_data,  # ✅ use same scaled dataset that feeds the ranking table
+            plot_data,
             position_metrics[st.session_state.template_select]["metrics"],
             pos_col,
             {"Turnovers", "Fouls", "Pr. Long Balls", "UPr. Long Balls"},
@@ -1915,35 +1570,26 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
         st.info("No similar players found.")
     else:
         st.markdown(f"#### 10 Players Most Similar to {st.session_state.selected_player}")
-
-        # Remove duplicate cols safely
         similar_df = similar_df.loc[:, ~similar_df.columns.duplicated()]
-
-        # Clean order
         similar_df = similar_df[["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]]
-
         st.dataframe(similar_df, use_container_width=True)
 
 # ============================================================
-# 🧮 PLAYER TREND ANALYSIS & IMPROVEMENT TAGS
+# PLAYER TREND ANALYSIS & IMPROVEMENT TAGS (GLOBAL)
 # ============================================================
-
-# Compute per-player-per-season weighted averages
 if "Season" in df_all.columns and "Weighted Z Score" in df_all.columns:
     season_groups = (
-        df_all.groupby(["Player", "Season"], as_index=False)
+        df_all.groupby([key_col, "Player", "Season"], as_index=False)
         .agg({"Weighted Z Score": "mean", "Minutes played": "sum"})
     )
 
-    # Calculate change between first and last available season
     trend_calc = (
-        season_groups.sort_values(["Player", "Season"])
-        .groupby("Player")
+        season_groups.sort_values([key_col, "Season"])
+        .groupby(key_col)
         .agg(first_z=("Weighted Z Score", "first"), last_z=("Weighted Z Score", "last"))
     )
     trend_calc["ΔZ"] = trend_calc["last_z"] - trend_calc["first_z"]
 
-    # Classify into five levels
     trend_calc["Trend"] = np.select(
         [
             trend_calc["ΔZ"] >= 0.5,
@@ -1955,38 +1601,29 @@ if "Season" in df_all.columns and "Weighted Z Score" in df_all.columns:
         default="➖ Stable",
     )
 
-    # Merge into main table (by player)
-    df_all = df_all.merge(trend_calc[["Trend"]], on="Player", how="left")
-
+    df_all = df_all.merge(trend_calc[["Trend"]], left_on=key_col, right_index=True, how="left")
 else:
     df_all["Trend"] = "Unknown"
 
-# ---------- Ranking table with favourites ----------
+# ============================================================
+# RANKING TABLE + FAVOURITES INTEGRATION
+# ============================================================
 st.markdown("### Players Ranked by Score (0–100)")
 
 cols_for_table = [
     "Player", "Positions played", "Team", "Competition_norm", "Multiplier",
     "Avg Z Score", "Weighted Z Score", "Score (0–100)", "LFC Score (0–100)",
-    "Trend", "Age", "Minutes played", "Rank"
+    "Trend", "Age", "Minutes played", "Rank", "Season", "Season_norm"
 ]
 
 for c in cols_for_table:
     if c not in plot_data.columns:
-        plot_data[c] = np.nan
+        plot_data[c] = df_all.loc[plot_data.index, c] if c in df_all.columns else np.nan
 
-# Build ranking table from the current plot_data
-extra_cols = ["Season", "Season_norm"]
-for c in extra_cols:
-    if c in df_all.columns and c not in plot_data.columns:
-        plot_data[c] = df_all.loc[df.index, c].values
+z_ranking = plot_data[cols_for_table].copy()
 
-z_ranking = plot_data[cols_for_table + [c for c in extra_cols if c in plot_data.columns]].copy()
-
-# Remove duplicates — keep the one matching the selected season
-if "Season" in z_ranking.columns and "selected_season" in st.session_state:
+if "Season" in z_ranking.columns and "selected_season" in st.session_state and st.session_state["selected_season"] != "All (3-Season Avg)":
     sel_season = st.session_state["selected_season"]
-
-    # Drop duplicates but prioritise the chosen season first
     z_ranking = (
         z_ranking.assign(
             _is_selected=z_ranking["Season"].astype(str).eq(sel_season)
@@ -1996,75 +1633,19 @@ if "Season" in z_ranking.columns and "selected_season" in st.session_state:
         .drop(columns="_is_selected")
     )
 else:
-    # Fallback if no season filtering
     z_ranking = z_ranking.sort_values("Weighted Z Score", ascending=False)
     z_ranking = z_ranking.drop_duplicates(subset=["Player"], keep="first")
 
-# Re-rank after filtering
 z_ranking = z_ranking.sort_values("Weighted Z Score", ascending=False, ignore_index=True)
 z_ranking["Rank"] = np.arange(1, len(z_ranking) + 1)
 
-# Rename Competition_norm → League for display consistency
 if "Competition_norm" in z_ranking.columns:
     z_ranking.rename(columns={"Competition_norm": "League"}, inplace=True)
 
-# ---------- LFC Score logic (identical to Team Rankings) ----------
-plot_data = plot_data.copy()
-
-# Step 1: Apply custom LFC multiplier (1.20 for Scottish Premiership)
-plot_data["LFC Multiplier"] = pd.to_numeric(plot_data.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-plot_data.loc[
-    plot_data["Competition_norm"] == "Scotland Premiership",
-    "LFC Multiplier"
-] = 1.20
-
-avg_z = pd.to_numeric(plot_data.get("Avg Z Score", 0), errors="coerce").fillna(0)
-lfc_mult = pd.to_numeric(plot_data["LFC Multiplier"], errors="coerce").fillna(1.0)
-
-# Step 2: Weighted logic (boost positives, soften negatives)
-plot_data["LFC Weighted Z"] = np.select(
-    [avg_z > 0, avg_z < 0],
-    [avg_z * lfc_mult, avg_z / lfc_mult],
-    default=0.0
-)
-
-# Step 3: Anchors based on Weighted Z (not LFC one)
-eligible = plot_data[pd.to_numeric(plot_data["Minutes played"], errors="coerce") >= 600].copy()
-if eligible.empty:
-    eligible = plot_data.copy()
-
-anchors = (
-    eligible.groupby("Six-Group Position", dropna=False)["Weighted Z Score"]
-    .agg(_scale_min="min", _scale_max="max")
-    .fillna(0)
-)
-plot_data = plot_data.merge(anchors, on="Six-Group Position", how="left")
-
-# Step 4: Convert to 0–100 scale
-def _to100(v, lo, hi):
-    if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
-        return 50.0
-    return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
-
-plot_data["LFC Score (0–100)"] = [
-    _to100(v, lo, hi)
-    for v, lo, hi in zip(plot_data["LFC Weighted Z"], plot_data["_scale_min"], plot_data["_scale_max"])
-]
-plot_data["LFC Score (0–100)"] = (
-    pd.to_numeric(plot_data["LFC Score (0–100)"], errors="coerce")
-    .round(1)
-    .fillna(0)
-)
-
-# ============================================================
-# 🟢 LOAD FAVOURITES FROM SUPABASE AND APPLY COLOURS
-# ============================================================
-
-# --- Load current favourites ---
+# Favourites from Supabase
 from lib.favourites_repo import get_supabase_client
 
 def get_favourites_with_colours_live():
-    """Fetch favourites (shared cloud data) — no caching, no globals."""
     sb = get_supabase_client()
     if sb is None:
         return {}
@@ -2086,13 +1667,8 @@ def get_favourites_with_colours_live():
         st.warning(f"⚠️ Could not load favourites: {e}")
         return {}
 
-# --- Build local dictionary for colouring ---
 favs = get_favourites_with_colours_live()
 
-print("[DEBUG] Sample favs from Supabase:")
-print({k: v for k, v in list(favs.items())[:5]})
-
-# --- Colour emoji map ---
 COLOUR_EMOJI = {
     "🟣 Needs Checked": "🟣",
     "🟡 Monitor": "🟡",
@@ -2111,16 +1687,12 @@ COLOUR_EMOJI = {
 }
 
 def colourize_player_name(name: str, favs_dict: dict) -> str:
-    """Attach correct emoji to player name."""
     data = favs_dict.get(name)
     if not data:
         return name
     emoji = COLOUR_EMOJI.get(str(data.get("colour", "")).strip(), "")
     return f"{emoji} {name}" if emoji else name
 
-# ============================================================
-# 🧾 ENSURE TABLE COLUMNS EXIST & REORDER
-# ============================================================
 z_ranking["Player (coloured)"] = z_ranking["Player"].apply(lambda n: colourize_player_name(n, favs))
 z_ranking["⭐ Favourite"] = z_ranking["Player"].apply(lambda n: bool(favs.get(n, {}).get("visible", False)))
 
@@ -2128,25 +1700,21 @@ required_cols = [
     "⭐ Favourite", "Player (coloured)", "Positions played", "Team", "League",
     "Multiplier", "Avg Z Score", "Weighted Z Score",
     "Score (0–100)", "LFC Score (0–100)",
-    "Age", "Minutes played", "Rank"
+    "Trend", "Age", "Minutes played", "Rank"
 ]
 for col in required_cols:
     if col not in z_ranking.columns:
         z_ranking[col] = np.nan
 z_ranking = z_ranking[required_cols]
 
-# ============================================================
-# 📋 EDITABLE TABLE (NO CACHING SO FILTERS ALWAYS REFRESH)
-# ============================================================
-
-# Build a stable signature so Streamlit resets editor state when filters change
+# Editable table
 sig_parts = (
     tuple(sorted(selected_leagues)),
     int(min_minutes),
     tuple(selected_groups),
     selected_position_template,
-    len(z_ranking),                         # size change
-    float(z_ranking["Score (0–100)"].sum()) # quick content checksum
+    len(z_ranking),
+    float(z_ranking["Score (0–100)"].sum())
 )
 editor_key = f"ranking_editor_{hash(sig_parts)}"
 
@@ -2172,23 +1740,18 @@ edited_df = st.data_editor(
 )
 
 # ============================================================
-# 💾 APPLY CHANGES TO SUPABASE + SMART GOOGLE SHEET LOGGING
+# SYNC FAVOURITES TO SUPABASE
 # ============================================================
 import time
 
-# Cache favourites for smoother reloads (prevents needless reruns)
 @st.cache_data(ttl=5, show_spinner=False)
 def load_favourites_cached():
     return get_favourites_with_colours_live()
 
 favs_live = load_favourites_cached()
 
-print("[DEBUG] === Sync section triggered ===")
-print(f"[DEBUG] Total rows in table: {len(edited_df)}")
-
-# --- Run guard to stop immediate re-execution ---
 if st.session_state.get("_last_sync_time") and time.time() - st.session_state["_last_sync_time"] < 3:
-    print("[DEBUG] Skipping sync — triggered too soon after last run")
+    pass
 else:
     st.session_state["_last_sync_time"] = time.time()
 
@@ -2196,9 +1759,6 @@ else:
         st.warning("⚠️ Could not find the '⭐ Favourite' column — skipping sync.")
     else:
         favourite_rows = edited_df[edited_df["⭐ Favourite"] == True].copy()
-        print(f"[DEBUG] Favourites to sync: {len(favourite_rows)} of {len(edited_df)}")
-
-        # ---- UPSERT NEW OR UPDATED FAVOURITES ----
         deleted_players = {p for p, d in favs_live.items() if not d.get("visible", True)}
 
         for _, row in favourite_rows.iterrows():
@@ -2211,12 +1771,9 @@ else:
             prev_data = favs_live.get(player_name, {})
             prev_visible = bool(prev_data.get("visible", False))
 
-            # 🧠 Skip if player was deleted (hidden) and not manually re-starred
             if player_name in deleted_players and not prev_visible:
-                print(f"[DEBUG] Skipping {player_name} — hidden in Supabase (won’t auto-revive)")
                 continue
 
-            # 🧠 Only upsert if not already visible in Supabase
             if not prev_visible:
                 payload = {
                     "player": player_name,
@@ -2227,15 +1784,13 @@ else:
                     "comment": prev_data.get("comment", ""),
                     "visible": True,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "source": "radar-page",
+                    "source": "radar-test-page",
                 }
 
                 upsert_favourite(payload, log_to_sheet=True)
-                print(f"[LOG] ✅ Added or reactivated {player_name}")
             else:
-                print(f"[DEBUG] Skipping {player_name} — already visible in Supabase")
+                pass
 
-        # ---- HIDE UNSTARRED FAVOURITES ----
         non_fav_rows = edited_df[edited_df["⭐ Favourite"] == False]
         for _, row in non_fav_rows.iterrows():
             player_raw = str(row.get("Player (coloured)", "")).strip()
@@ -2244,4 +1799,3 @@ else:
             old_visible = favs_live.get(player_name, {}).get("visible", False)
             if old_visible:
                 hide_favourite(player_name)
-                print(f"[INFO] Hid favourite: {player_name}")
