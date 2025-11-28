@@ -722,16 +722,16 @@ def load_data_once():
 # ============================================================
 # ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
 # ============================================================
- # ========= Dataset Selector (Current vs Old) =========
- st.markdown("### Select Dataset")
+# ========= Dataset Selector (Current vs Old) =========
+st.markdown("### Select Dataset")
 
- dataset_choice = st.selectbox(
-     "Choose which StatsBomb dataset to use",
-     ["Current Data", "06 October 2025 Data"],
-     index=0
- )
+dataset_choice = st.selectbox(
+    "Choose which StatsBomb dataset to use",
+    ["Current Data", "06 October 2025 Data"],
+    index=0
+)
 
- OLD_DATA_PATH = ROOT_DIR / "06_10_25_clean.csv"
+OLD_DATA_PATH = ROOT_DIR / "06_10_25_clean.csv"
 
 if dataset_choice == "06 October 2025 Data":
     # Load old dataset separately, do not overwrite anything else
