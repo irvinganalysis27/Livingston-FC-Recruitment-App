@@ -722,7 +722,24 @@ def load_data_once():
 # ============================================================
 # ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
 # ============================================================
-df_all_raw = load_data_once()
+ # ========= Dataset Selector (Current vs Old) =========
+ st.markdown("### Select Dataset")
+
+ dataset_choice = st.selectbox(
+     "Choose which StatsBomb dataset to use",
+     ["Current Data", "06 October 2025 Data"],
+     index=0
+ )
+
+ OLD_DATA_PATH = ROOT_DIR / "06_10_25_clean.csv"
+
+if dataset_choice == "06 October 2025 Data":
+    # Load old dataset separately, do not overwrite anything else
+    df_raw_old = load_one_file(OLD_DATA_PATH)
+    df_raw_old = add_age_column(df_raw_old)
+    df_all_raw = preprocess_df(df_raw_old)
+else:
+    df_all_raw = load_data_once()
 
 if df_all_raw is None or df_all_raw.empty:
     st.error("❌ No player data loaded. Check your StatsBomb CSV path or contents.")
