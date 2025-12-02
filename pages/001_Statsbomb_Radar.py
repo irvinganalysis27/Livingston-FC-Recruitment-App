@@ -892,8 +892,44 @@ st.caption(
     f"Players remaining: {len(df)}"
 )
 
+# ---------- Age Filter (Slider) ----------
+st.markdown("### Age")
+
+age_col = "Age"
+if age_col not in df.columns:
+    df[age_col] = np.nan
+
+df["_age_numeric"] = pd.to_numeric(df[age_col], errors="coerce")
+
+age_min_dataset = int(df["_age_numeric"].min(skipna=True)) if df["_age_numeric"].notna().any() else 0
+age_max_dataset = int(df["_age_numeric"].max(skipna=True)) if df["_age_numeric"].notna().any() else 50
+
+if "age_range" not in st.session_state:
+    st.session_state.age_range = (age_min_dataset, age_max_dataset)
+
+age_min, age_max = st.slider(
+    "Select age range",
+    min_value=age_min_dataset,
+    max_value=age_max_dataset,
+    value=st.session_state.age_range,
+    step=1,
+    key="age_slider"
+)
+
+st.session_state.age_range = (age_min, age_max)
+
+df = df[
+    (df["_age_numeric"] >= age_min) &
+    (df["_age_numeric"] <= age_max)
+].copy()
+
+st.caption(
+    f"Filtering players with Age between {age_min} and {age_max}. "
+    f"Players remaining: {len(df)}"
+)
+
 if df.empty:
-    st.warning("No players match the minutes range. Adjust values and try again.")
+    st.warning("No players match the age range. Adjust values and try again.")
     st.stop()
 
 # ---------- Position Group Section ----------
