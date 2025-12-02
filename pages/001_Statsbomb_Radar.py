@@ -858,25 +858,25 @@ st.markdown("### Minutes")
 c1, c2 = st.columns(2)
 
 with c1:
+    st.markdown("<span style='font-size:14px;'>From</span>", unsafe_allow_html=True)
     st.session_state.min_minutes_typed = st.number_input(
-        "**<span style='font-size:14px;'>From</span>**",
+        "",
         min_value=0,
         max_value=dataset_max,
         value=st.session_state.min_minutes_typed,
         step=50,
-        key="min_minutes_typed_input",
-        unsafe_allow_html=True
+        key="min_minutes_typed_input"
     )
 
 with c2:
+    st.markdown("<span style='font-size:14px;'>To</span>", unsafe_allow_html=True)
     st.session_state.max_minutes_typed = st.number_input(
-        "**<span style='font-size:14px;'>To</span>**",
+        "",
         min_value=0,
         max_value=dataset_max,
         value=st.session_state.max_minutes_typed,
         step=50,
-        key="max_minutes_typed_input",
-        unsafe_allow_html=True
+        key="max_minutes_typed_input"
     )
 
 min_minutes = st.session_state.min_minutes_typed
