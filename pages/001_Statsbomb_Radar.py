@@ -856,27 +856,29 @@ if "max_minutes_typed" not in st.session_state:
 
 st.markdown("### Minutes")
 
-c1, c2 = st.columns(2)
+c1, c2 = st.columns([1, 1])
 
 with c1:
-    st.session_state.min_minutes_typed = st.number_input(
-        "From",
-        min_value=0,
-        max_value=dataset_max,
-        value=st.session_state.min_minutes_typed,
-        step=50,
-        key="min_minutes_typed_input"
-    )
+    with st.container():
+        st.session_state.min_minutes_typed = st.number_input(
+            "From",
+            min_value=0,
+            max_value=dataset_max,
+            value=st.session_state.min_minutes_typed,
+            step=50,
+            key="min_minutes_typed_input"
+        )
 
 with c2:
-    st.session_state.max_minutes_typed = st.number_input(
-        "To",
-        min_value=0,
-        max_value=dataset_max,
-        value=st.session_state.max_minutes_typed,
-        step=50,
-        key="max_minutes_typed_input"
-    )
+    with st.container():
+        st.session_state.max_minutes_typed = st.number_input(
+            "To",
+            min_value=0,
+            max_value=dataset_max,
+            value=st.session_state.max_minutes_typed,
+            step=50,
+            key="max_minutes_typed_input"
+        )
 
 min_minutes = st.session_state.min_minutes_typed
 max_minutes = st.session_state.max_minutes_typed
@@ -887,10 +889,7 @@ df = df[
     (df["_minutes_numeric"] <= max_minutes)
 ].copy()
 
-st.caption(
-    f"Filtering players with {minutes_col} between {min_minutes} and {max_minutes}. "
-    f"Players remaining: {len(df)}"
-)
+st.caption(f"Players remaining: {len(df)}")
 
 # ---------- Age Filter (Slider) ----------
 st.markdown("### Age")
