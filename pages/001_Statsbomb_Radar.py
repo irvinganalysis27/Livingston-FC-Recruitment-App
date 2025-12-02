@@ -835,65 +835,21 @@ if selected_leagues:
 else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
-# ---------- Minutes + Age filters (typed min-max boxes) ----------
+# ---------- Minutes + Age filters (combined layout) ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
 
-# Ensure numeric conversion
 df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 
-# Compute dataset min and max
 dataset_min = int(df["_minutes_numeric"].min(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
 dataset_max = int(df["_minutes_numeric"].max(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
 
-# Session defaults
-if "min_minutes_typed" not in st.session_state:
-    st.session_state.min_minutes_typed = 500
+# Defaults
+st.session_state.setdefault("min_minutes_typed", 500)
+st.session_state.setdefault("max_minutes_typed", dataset_max)
 
-if "max_minutes_typed" not in st.session_state:
-    st.session_state.max_minutes_typed = dataset_max
-
-st.markdown("### Minutes")
-
-c1, c2 = st.columns([1, 1])
-
-with c1:
-    with st.container():
-        st.session_state.min_minutes_typed = st.number_input(
-            "From",
-            min_value=0,
-            max_value=dataset_max,
-            value=st.session_state.min_minutes_typed,
-            step=50,
-            key="min_minutes_typed_input"
-        )
-
-with c2:
-    with st.container():
-        st.session_state.max_minutes_typed = st.number_input(
-            "To",
-            min_value=0,
-            max_value=dataset_max,
-            value=st.session_state.max_minutes_typed,
-            step=50,
-            key="max_minutes_typed_input"
-        )
-
-min_minutes = st.session_state.min_minutes_typed
-max_minutes = st.session_state.max_minutes_typed
-
-# Apply typed range filter
-df = df[
-    (df["_minutes_numeric"] >= min_minutes) &
-    (df["_minutes_numeric"] <= max_minutes)
-].copy()
-
-st.caption(f"Players remaining: {len(df)}")
-
-# ---------- Age Filter (Slider) ----------
-st.markdown("### Age")
-
+# ----- AGE -----
 age_col = "Age"
 if age_col not in df.columns:
     df[age_col] = np.nan
@@ -903,32 +859,68 @@ df["_age_numeric"] = pd.to_numeric(df[age_col], errors="coerce")
 age_min_dataset = int(df["_age_numeric"].min(skipna=True)) if df["_age_numeric"].notna().any() else 0
 age_max_dataset = int(df["_age_numeric"].max(skipna=True)) if df["_age_numeric"].notna().any() else 50
 
-if "age_range" not in st.session_state:
-    st.session_state.age_range = (age_min_dataset, age_max_dataset)
+st.session_state.setdefault("age_range", (age_min_dataset, age_max_dataset))
 
-age_min, age_max = st.slider(
-    "Select age range",
-    min_value=age_min_dataset,
-    max_value=age_max_dataset,
-    value=st.session_state.age_range,
-    step=1,
-    key="age_slider"
-)
+# ---------- HEADER ----------
+st.markdown("### Minutes and Age")
+h1, h2, h3 = st.columns([1, 1, 1.5])
+with h1: st.markdown("**From**")
+with h2: st.markdown("**To**")
+with h3: st.markdown("**Age**")
 
+# ---------- INPUT ROW ----------
+c1, c2, c3 = st.columns([1, 1, 2])
+
+with c1:
+    st.session_state.min_minutes_typed = st.number_input(
+        "",
+        min_value=0,
+        max_value=dataset_max,
+        value=st.session_state.min_minutes_typed,
+        step=50,
+        key="min_minutes_typed_input",
+        label_visibility="collapsed",
+    )
+
+with c2:
+    st.session_state.max_minutes_typed = st.number_input(
+        "",
+        min_value=0,
+        max_value=dataset_max,
+        value=st.session_state.max_minutes_typed,
+        step=50,
+        key="max_minutes_typed_input",
+        label_visibility="collapsed",
+    )
+
+with c3:
+    age_min, age_max = st.slider(
+        "",
+        min_value=age_min_dataset,
+        max_value=age_max_dataset,
+        value=st.session_state.age_range,
+        step=1,
+        key="age_slider",
+        label_visibility="collapsed",
+    )
 st.session_state.age_range = (age_min, age_max)
 
+# ---------- APPLY FILTERS ----------
+min_minutes = st.session_state.min_minutes_typed
+max_minutes = st.session_state.max_minutes_typed
+
 df = df[
+    (df["_minutes_numeric"] >= min_minutes) &
+    (df["_minutes_numeric"] <= max_minutes) &
     (df["_age_numeric"] >= age_min) &
     (df["_age_numeric"] <= age_max)
 ].copy()
 
-st.caption(
-    f"Filtering players with Age between {age_min} and {age_max}. "
-    f"Players remaining: {len(df)}"
-)
+# --- ONE caption only ---
+st.caption(f"Players remaining: {len(df)}")
 
 if df.empty:
-    st.warning("No players match the age range. Adjust values and try again.")
+    st.warning("No players match the selected minutes and age filters.")
     st.stop()
 
 # ---------- Position Group Section ----------
