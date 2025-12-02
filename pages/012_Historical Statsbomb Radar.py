@@ -292,47 +292,84 @@ if "Birth Date" in df.columns and "Age" not in df.columns:
     dob = pd.to_datetime(df["Birth Date"], errors="coerce")
     df["Age"] = dob.apply(lambda d: today.year - d.year - ((today.month, today.day) < (d.month, d.day)) if pd.notnull(d) else np.nan)
 
-# ========== Basic filters (same logic as Wyscout radar) ==========
+# ========== Minutes + Age Filters (same layout as main radar) ==========
 
-# Minutes filter
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
+
 df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 
-if "min_minutes" not in st.session_state:
-    st.session_state.min_minutes = 600
+# Determine dataset-wide max for minutes
+max_minutes_available = int(np.nanmax(df["_minutes_numeric"])) if df["_minutes_numeric"].notna().any() else 0
 
-# Minutes filter
-minutes_col = "Minutes played"
-if minutes_col not in df.columns:
-    df[minutes_col] = np.nan
-df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
-c1, c2 = st.columns(2)
-with c1:
-    if "min_minutes" not in st.session_state:
-        st.session_state.min_minutes = 600
-    st.session_state.min_minutes = st.number_input(
-        "Minimum minutes to include", min_value=0, value=st.session_state.min_minutes, step=50, key="min_minutes_input"
+# Initialise session state defaults
+if "min_minutes_typed" not in st.session_state:
+    st.session_state.min_minutes_typed = 500
+
+if "max_minutes_typed" not in st.session_state:
+    st.session_state.max_minutes_typed = max_minutes_available
+
+st.markdown("### Minutes and Age")
+c_min, c_max, c_age = st.columns([1.5, 1.5, 2])
+
+with c_min:
+    st.markdown("**From**")
+    st.session_state.min_minutes_typed = st.number_input(
+        " ",
+        min_value=0,
+        value=st.session_state.min_minutes_typed,
+        step=50,
+        key="min_minutes_input_typed",
+        label_visibility="collapsed"
     )
-    df = df[df["_minutes_numeric"] >= st.session_state.min_minutes].copy()
-    if df.empty:
-        st.warning("No players meet the minutes threshold.")
-        st.stop()
 
-# Age filter
-with c2:
+with c_max:
+    st.markdown("**To**")
+    st.session_state.max_minutes_typed = st.number_input(
+        " ",
+        min_value=0,
+        value=st.session_state.max_minutes_typed,
+        step=50,
+        key="max_minutes_input_typed",
+        label_visibility="collapsed"
+    )
+
+# Apply minutes filter
+df = df[
+    (df["_minutes_numeric"] >= st.session_state.min_minutes_typed)
+    & (df["_minutes_numeric"] <= st.session_state.max_minutes_typed)
+].copy()
+
+players_remaining_after_minutes = len(df)
+
+with c_age:
+    st.markdown("**Age**")
     if "Age" in df.columns:
         df["_age_numeric"] = pd.to_numeric(df["Age"], errors="coerce")
         if df["_age_numeric"].notna().any():
-            a_min, a_max = int(np.nanmin(df["_age_numeric"])), int(np.nanmax(df["_age_numeric"]))
+            age_min = int(np.nanmin(df["_age_numeric"]))
+            age_max = int(np.nanmax(df["_age_numeric"]))
+
             if "age_range" not in st.session_state:
-                st.session_state.age_range = (a_min, a_max)
-            st.session_state.age_range = st.slider("Age range to include", min_value=a_min, max_value=a_max, value=st.session_state.age_range, step=1, key="age_range_slider")
+                st.session_state.age_range = (age_min, age_max)
+
+            st.session_state.age_range = st.slider(
+                " ",
+                min_value=age_min,
+                max_value=age_max,
+                value=st.session_state.age_range,
+                step=1,
+                label_visibility="collapsed",
+                key="historical_age_slider"
+            )
+
             lo, hi = st.session_state.age_range
             df = df[df["_age_numeric"].between(lo, hi)].copy()
 
-st.caption(f"Players after filters: {len(df)}")
+players_remaining = len(df)
+
+st.markdown(f"**Players remaining: {players_remaining}**")
 
 # Position groups
 available_groups = [g for g in SIX_GROUPS if g in df["Six-Group Position"].dropna().unique().tolist()]
