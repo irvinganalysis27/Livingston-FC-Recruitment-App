@@ -854,26 +854,29 @@ if "min_minutes_typed" not in st.session_state:
 if "max_minutes_typed" not in st.session_state:
     st.session_state.max_minutes_typed = dataset_max
 
+st.markdown("### Minutes")
 c1, c2 = st.columns(2)
 
 with c1:
     st.session_state.min_minutes_typed = st.number_input(
-        "From minutes",
+        "**<span style='font-size:14px;'>From</span>**",
         min_value=0,
         max_value=dataset_max,
         value=st.session_state.min_minutes_typed,
         step=50,
-        key="min_minutes_typed_input"
+        key="min_minutes_typed_input",
+        unsafe_allow_html=True
     )
 
 with c2:
     st.session_state.max_minutes_typed = st.number_input(
-        "To minutes",
+        "**<span style='font-size:14px;'>To</span>**",
         min_value=0,
         max_value=dataset_max,
         value=st.session_state.max_minutes_typed,
         step=50,
-        key="max_minutes_typed_input"
+        key="max_minutes_typed_input",
+        unsafe_allow_html=True
     )
 
 min_minutes = st.session_state.min_minutes_typed
