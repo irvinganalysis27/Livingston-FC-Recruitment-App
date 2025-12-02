@@ -679,13 +679,38 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 df = pd.concat([df, new_rows], ignore_index=True)
 
     # ============================================================
+    # 📌 DEDUPLICATE BY PLAYER — KEEP MOST RECENT RECORD
+    # ============================================================
+    def _season_sort(s):
+        try:
+            return int(str(s).split("/")[0])
+        except:
+            return -1
+
+    if "player_id" in df.columns:
+        df["season_sort"] = df.get("season_name", "").apply(_season_sort)
+
+        df["last_match_dt"] = pd.to_datetime(
+            df.get("player_season_most_recent_match", None),
+            errors="coerce"
+        )
+
+        df = df.sort_values(
+            ["player_id", "season_sort", "last_match_dt"],
+            ascending=[True, False, False]
+        )
+
+        before = len(df)
+        df = df.drop_duplicates(subset=["player_id"], keep="first")
+        after = len(df)
+
+        print(f"[DEBUG] Player dedupe by recency: {before} → {after} rows")
+    else:
+        print("[DEBUG] No player_id column found — skipping recency dedupe.")
+    # ============================================================
     # 🧹 FINAL DEDUPLICATION SAFEGUARD
     # ============================================================
-    subset_cols = [c for c in ["Player", "Team", "Competition_norm", "Six-Group Position"] if c in df.columns]
-    before = len(df)
-    df = df.drop_duplicates(subset=subset_cols, keep="first").reset_index(drop=True)
-    after = len(df)
-    print(f"[DEBUG] Deduplicated dataset: {before} → {after} rows after cleanup.")
+    print("[DEBUG] Old dedupe skipped — using player_id-based recency dedupe only.")
 
     return df
 # ---------- Cached Data Loader ----------
