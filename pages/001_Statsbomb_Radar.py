@@ -835,6 +835,7 @@ if selected_leagues:
 else:
     st.info("No leagues selected. Pick at least one or click ‘Select all’.")
     st.stop()
+#
 # ---------- Minutes + Age filters (combined layout) ----------
 minutes_col = "Minutes played"
 if minutes_col not in df.columns:
@@ -863,46 +864,37 @@ st.session_state.setdefault("age_range", (age_min_dataset, age_max_dataset))
 
 # ---------- HEADER ----------
 st.markdown("### Minutes and Age")
-h1, h2, h3 = st.columns([1, 1, 1.5])
-with h1: st.markdown("**From**")
-with h2: st.markdown("**To**")
-with h3: st.markdown("**Age**")
 
-# ---------- INPUT ROW ----------
-c1, c2, c3 = st.columns([1, 1, 2])
+# ---------- MINUTES SLIDER ----------
+minutes_min_dataset = dataset_min
+minutes_max_dataset = dataset_max
 
-with c1:
-    st.session_state.min_minutes_typed = st.number_input(
-        "",
-        min_value=0,
-        max_value=dataset_max,
-        value=st.session_state.min_minutes_typed,
-        step=50,
-        key="min_minutes_typed_input",
-        label_visibility="collapsed",
-    )
+# Ensure the slider always snaps to current dataset limits
+current_min = max(st.session_state.get("min_minutes_typed", minutes_min_dataset), minutes_min_dataset)
+current_max = min(st.session_state.get("max_minutes_typed", minutes_max_dataset), minutes_max_dataset)
 
-with c2:
-    st.session_state.max_minutes_typed = st.number_input(
-        "",
-        min_value=0,
-        max_value=dataset_max,
-        value=st.session_state.max_minutes_typed,
-        step=50,
-        key="max_minutes_typed_input",
-        label_visibility="collapsed",
-    )
+min_minutes, max_minutes = st.slider(
+    "Minutes played",
+    min_value=minutes_min_dataset,
+    max_value=minutes_max_dataset,
+    value=(current_min, current_max),
+    step=10,
+    key="minutes_slider",
+)
 
-with c3:
-    age_min, age_max = st.slider(
-        "",
-        min_value=age_min_dataset,
-        max_value=age_max_dataset,
-        value=st.session_state.age_range,
-        step=1,
-        key="age_slider",
-        label_visibility="collapsed",
-    )
+st.session_state.min_minutes_typed = min_minutes
+st.session_state.max_minutes_typed = max_minutes
+
+# ---------- AGE SLIDER ----------
+age_min, age_max = st.slider(
+    "",
+    min_value=age_min_dataset,
+    max_value=age_max_dataset,
+    value=st.session_state.age_range,
+    step=1,
+    key="age_slider",
+    label_visibility="collapsed",
+)
 st.session_state.age_range = (age_min, age_max)
 
 # ---------- APPLY FILTERS ----------
