@@ -872,11 +872,11 @@ with col_minutes:
     st.markdown("**Minutes played**")
     min_minutes, max_minutes = st.slider(
         "",
-        min_value=minutes_min_dataset,
-        max_value=minutes_max_dataset,
+        min_value=dataset_min,
+        max_value=dataset_max,
         value=(
-            max(st.session_state.get("min_minutes_typed", minutes_min_dataset), minutes_min_dataset),
-            min(st.session_state.get("max_minutes_typed", minutes_max_dataset), minutes_max_dataset)
+            max(st.session_state.get("min_minutes_typed", dataset_min), dataset_min),
+            min(st.session_state.get("max_minutes_typed", dataset_max), dataset_max)
         ),
         step=10,
         key="minutes_slider",
