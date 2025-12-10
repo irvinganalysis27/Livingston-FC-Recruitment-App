@@ -181,7 +181,7 @@ LEAGUE_SYNONYMS = {
 
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"
 ]
 
 # ========== Position → group mapping ==========
@@ -228,6 +228,7 @@ DEFAULT_TEMPLATE = {
     "Centre Back": "Centre Back",
     "Number 6": "Number 6",
     "Number 8": "Number 8",
+    "Number 10": "Number 10",
     "Winger": "Winger",
     "Striker": "Striker"
 }
@@ -724,19 +725,22 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["last_match_dt"] = pd.NaT
         print("[DEBUG] No match timestamp found, skipping date-based dedupe")
 
-    # Sort by: player_id ascending, match date descending
+    # Sort by: player_id + Six-Group Position, match date descending
     if "player_id" in df.columns:
+        if "Six-Group Position" not in df.columns:
+            df["Six-Group Position"] = np.nan
+
         df = df.sort_values(
-            ["player_id", "last_match_dt"],
-            ascending=[True, False]
+            ["player_id", "Six-Group Position", "last_match_dt"],
+            ascending=[True, True, False]
         )
         before = len(df)
-        df = df.drop_duplicates(subset=["player_id"], keep="first")
+        df = df.drop_duplicates(subset=["player_id", "Six-Group Position"], keep="first")
         after = len(df)
-        print(f"[DEBUG] Player dedupe by most recent match: {before} → {after}")
+        print(f"[DEBUG] Player dedupe by most recent match + position: {before} → {after}")
     else:
         print("[DEBUG] No player_id column found — cannot dedupe by player.")
-    print("[DEBUG] Old dedupe skipped — using player_id-based recency dedupe only.")
+    print("[DEBUG] Old dedupe skipped — using player_id + position-based recency dedupe only.")
 
     return df
 # ---------- Cached Data Loader ----------
