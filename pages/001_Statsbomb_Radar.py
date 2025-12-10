@@ -679,6 +679,35 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
                 df = pd.concat([df, new_rows], ignore_index=True)
 
     # ============================================================
+    # 🎯 Duplicate Attacking Mids, Second Striker and '10' into Number 10 also
+    # ============================================================
+    df["_pos_token"] = df.get("Position", "").apply(parse_first_position)
+
+    am_tokens = {
+        "CENTREATTACKINGMIDFIELDER",
+        "RIGHTATTACKINGMIDFIELDER",
+        "LEFTATTACKINGMIDFIELDER",
+        "ATTACKINGMIDFIELDER"
+    }
+    ss_tokens = {"SECONDSTRIKER", "10"}
+
+    # Attacking mids -> also Number 10
+    am_mask = df["_pos_token"].isin(am_tokens)
+    if am_mask.any():
+        am_as_10 = df.loc[am_mask].copy()
+        am_as_10["Six-Group Position"] = "Number 10"
+        df = pd.concat([df, am_as_10], ignore_index=True)
+
+    # Second striker + '10' -> also Number 10
+    ss_mask = df["_pos_token"].isin(ss_tokens)
+    if ss_mask.any():
+        ss_as_10 = df.loc[ss_mask].copy()
+        ss_as_10["Six-Group Position"] = "Number 10"
+        df = pd.concat([df, ss_as_10], ignore_index=True)
+
+    df.drop(columns=["_pos_token"], inplace=True, errors="ignore")
+
+    # ============================================================
     # 📌 DEDUPLICATE BY PLAYER — KEEP MOST RECENT MATCH (Option B)
     # ============================================================
     # Ensure correct column names
