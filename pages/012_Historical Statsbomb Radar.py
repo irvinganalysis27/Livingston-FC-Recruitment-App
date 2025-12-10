@@ -332,6 +332,37 @@ if cm_mask.any():
     cm_as_8 = df.loc[cm_mask].copy(); cm_as_8["Six-Group Position"] = "Number 8"
     df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
+# Duplicate Attacking Mids, Second Striker and 10 into Number 10 as well
+# (keep their original mapped role too)
+df["_pos_token"] = df.get("Position", "").apply(_clean_pos_token)
+
+am_tokens = {
+    "CENTREATTACKINGMIDFIELDER",
+    "RIGHTATTACKINGMIDFIELDER",
+    "LEFTATTACKINGMIDFIELDER",
+}
+ss_tokens = {
+    "SECONDSTRIKER",
+    "10",
+}
+
+# Attacking mids -> also Number 10
+am_mask = df["_pos_token"].isin(am_tokens)
+if am_mask.any():
+    am_as_10 = df.loc[am_mask].copy()
+    am_as_10["Six-Group Position"] = "Number 10"
+    df = pd.concat([df, am_as_10], ignore_index=True)
+
+# Second striker and explicit 10 -> also Number 10
+ss_mask = df["_pos_token"].isin(ss_tokens)
+if ss_mask.any():
+    ss_as_10 = df.loc[ss_mask].copy()
+    ss_as_10["Six-Group Position"] = "Number 10"
+    df = pd.concat([df, ss_as_10], ignore_index=True)
+
+# Clean up helper column
+df.drop(columns=["_pos_token"], inplace=True, errors="ignore")
+
 # Age derivation if Birth Date exists
 if "Birth Date" in df.columns and "Age" not in df.columns:
     today = datetime.today()
