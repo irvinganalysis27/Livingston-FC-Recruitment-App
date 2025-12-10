@@ -25,7 +25,7 @@ st.title("Historical Leagues - statsbombs radar")
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 
-SIX_GROUPS = ["Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"]
+SIX_GROUPS = ["Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"]
 
 def _clean_pos_token(tok: str) -> str:
     if pd.isna(tok): return ""
@@ -116,6 +116,31 @@ position_metrics = {
             "Pass OBV": "Possession", "OBV": "Possession", "Deep Completions": "Possession",
             "Pressure Regains": "Defensive", "PAdj Pressures": "Defensive",
             "Player Season Fhalf Ball Recoveries 90": "Defensive", "Aggressive Actions": "Defensive",
+        }
+    },
+    "Number 10": {
+        "metrics": [
+            "Deep Progressions", "Deep Completions", "OP Passes Into Box", "OBV", "OP Key Passes",
+            "Shots", "xG", "xG Assisted", "Assists", "NP Goals", "xG/Shot",
+            "Touches In Box", "Goal Conversion%",
+            "Aggressive Actions", "PAdj Pressures",
+        ],
+        "groups": {
+            "Deep Progressions": "Possession",
+            "Deep Completions": "Possession",
+            "OBV": "Possession",
+            "OP Passes Into Box": "Possession",
+            "OP Key Passes": "Possession",
+            "Shots": "Attacking",
+            "xG": "Attacking",
+            "xG Assisted": "Attacking",
+            "Assists": "Attacking",
+            "NP Goals": "Attacking",
+            "xG/Shot": "Attacking",
+            "Touches In Box": "Attacking",
+            "Goal Conversion%": "Attacking",
+            "Aggressive Actions": "Defensive",
+            "PAdj Pressures": "Defensive",
         }
     },
     "Winger": {
@@ -250,6 +275,7 @@ if cm_mask.any():
     cm_as_8["Six-Group Position"] = "Number 8"
     df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
+
 # Age derivation if Birth Date exists
 if "Birth Date" in df.columns and "Age" not in df.columns:
     today = datetime.today()
@@ -259,6 +285,26 @@ if "Birth Date" in df.columns and "Age" not in df.columns:
         if pd.notnull(d)
         else np.nan
     )
+
+# ==================== DEDUPE PLAYERS BY MOST RECENT MATCH (Option B) ====================
+match_col_candidates = [
+    "Player Season Most Recent Match",
+    "player_season_most_recent_match",
+    "Most Recent Match"
+]
+match_col = next((c for c in match_col_candidates if c in df.columns), None)
+
+if match_col:
+    df["last_match_dt"] = pd.to_datetime(df[match_col], errors="coerce")
+else:
+    df["last_match_dt"] = pd.NaT
+
+if "Player Id" in df.columns:
+    df = df.sort_values(
+        ["Player Id", "last_match_dt"],
+        ascending=[True, False]
+    )
+    df = df.drop_duplicates(subset=["Player Id"], keep="first")
 
 # Standard id columns
 rename_map = {}
