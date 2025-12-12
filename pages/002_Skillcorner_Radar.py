@@ -87,8 +87,8 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def pct_rank(series: pd.Series, lower_is_better: bool = False) -> pd.Series:
-    """Return percentile ranks (0–100)."""
-    s = pd.to_numeric(series, errors="coerce").fillna(0)
+    """Return percentile ranks (0–100) without forcing missing values."""
+    s = pd.to_numeric(series, errors="coerce")
     r = s.rank(pct=True, ascending=True)
     if lower_is_better:
         r = 1.0 - r
@@ -135,32 +135,29 @@ SKILLCORNER_TO_FIVE = {
 df_raw["Position Group Normalised"] = df_raw["Position"].map(SKILLCORNER_TO_FIVE)
 
 # ========= AGGREGATE TO PLAYER LEVEL =========
-agg_spec = {m: "mean" for m in RADAR_METRICS}
-agg_spec["PSV-99"] = "max"
-agg_spec["Minutes"] = "sum"
-id_cols = ["Player", "Team", "Competition", "Season", "Position Group Normalised"]
+
+def weighted_p90(group: pd.DataFrame, metric: str):
+    vals = pd.to_numeric(group[metric], errors="coerce")
+    mins = pd.to_numeric(group["Minutes"], errors="coerce")
+    mask = vals.notna() & mins.notna()
+    if not mask.any():
+        return np.nan
+    return np.average(vals[mask], weights=mins[mask])
+
 
 df_sorted = df_raw.sort_values(["Player", "Date"], ascending=[True, True]).copy()
-use_cols = list(set(id_cols + ["Date", "Minutes"] + RADAR_METRICS + ["PSV-99"]))
-use_cols = [c for c in use_cols if c in df_sorted.columns]
-df_use = df_sorted[use_cols].copy()
-
-
-def _last_non_null(s: pd.Series):
-    v = s.dropna()
-    return v.iloc[-1] if len(v) else np.nan
-
 
 df_player = (
-    df_use.groupby(["Player", "Position Group Normalised"], dropna=False)
-    .agg(
-        {
-            **agg_spec,
-            "Team": _last_non_null,
-            "Competition": _last_non_null,
-            "Season": _last_non_null,
-        }
-    )
+    df_sorted
+    .groupby(["Player", "Position Group Normalised"], dropna=False)
+    .apply(lambda g: pd.Series({
+        "Minutes": g["Minutes"].sum(),
+        **{m: weighted_p90(g, m) for m in RADAR_METRICS if m != "PSV-99"},
+        "PSV-99": pd.to_numeric(g["PSV-99"], errors="coerce").max(),
+        "Team": g["Team"].dropna().iloc[-1] if g["Team"].notna().any() else np.nan,
+        "Competition": g["Competition"].dropna().iloc[-1] if g["Competition"].notna().any() else np.nan,
+        "Season": g["Season"].dropna().iloc[-1] if g["Season"].notna().any() else np.nan,
+    }))
     .reset_index()
 )
 
@@ -215,6 +212,7 @@ selected_pos_groups = st.multiselect(
 
 # --- Minutes Filter ---
 min_minutes = st.number_input("Minimum total minutes", min_value=0, value=600, step=60)
+st.caption("⚠️ Physical metrics become increasingly unreliable below ~900 minutes.")
 
 # --- Apply Filters ---
 df = df_player.copy()
@@ -239,7 +237,7 @@ else:
     for m in RADAR_METRICS:
         percentile_df[m] = pct_rank(df[m])
 
-percentile_df = percentile_df.fillna(50.0).round(1)
+percentile_df = percentile_df.round(1)
 df["_score_0_100_league"] = percentile_df.mean(axis=1).round(1)
 
 # ========= GLOBAL Z-SCORE =========
