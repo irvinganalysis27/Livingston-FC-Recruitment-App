@@ -136,30 +136,33 @@ df_raw["Position Group Normalised"] = df_raw["Position"].map(SKILLCORNER_TO_FIVE
 
 # ========= AGGREGATE TO PLAYER LEVEL =========
 
-def weighted_p90(group: pd.DataFrame, metric: str):
-    vals = pd.to_numeric(group[metric], errors="coerce")
-    mins = pd.to_numeric(group["Minutes"], errors="coerce")
-    mask = vals.notna() & mins.notna()
-    if not mask.any():
-        return np.nan
-    return np.average(vals[mask], weights=mins[mask])
+@st.cache_data(ttl=86400)
+def build_player_table(df_raw: pd.DataFrame) -> pd.DataFrame:
+    df_sorted = df_raw.sort_values(["Player", "Date"], ascending=[True, True]).copy()
 
+    def weighted_p90(group: pd.DataFrame, metric: str):
+        vals = pd.to_numeric(group[metric], errors="coerce")
+        mins = pd.to_numeric(group["Minutes"], errors="coerce")
+        mask = vals.notna() & mins.notna()
+        if not mask.any():
+            return np.nan
+        return np.average(vals[mask], weights=mins[mask])
 
-df_sorted = df_raw.sort_values(["Player", "Date"], ascending=[True, True]).copy()
+    return (
+        df_sorted
+        .groupby(["Player", "Position Group Normalised"], dropna=False)
+        .apply(lambda g: pd.Series({
+            "Minutes": g["Minutes"].sum(),
+            **{m: weighted_p90(g, m) for m in RADAR_METRICS if m != "PSV-99"},
+            "PSV-99": pd.to_numeric(g["PSV-99"], errors="coerce").max(),
+            "Team": g["Team"].dropna().iloc[-1] if g["Team"].notna().any() else np.nan,
+            "Competition": g["Competition"].dropna().iloc[-1] if g["Competition"].notna().any() else np.nan,
+            "Season": g["Season"].dropna().iloc[-1] if g["Season"].notna().any() else np.nan,
+        }))
+        .reset_index()
+    )
 
-df_player = (
-    df_sorted
-    .groupby(["Player", "Position Group Normalised"], dropna=False)
-    .apply(lambda g: pd.Series({
-        "Minutes": g["Minutes"].sum(),
-        **{m: weighted_p90(g, m) for m in RADAR_METRICS if m != "PSV-99"},
-        "PSV-99": pd.to_numeric(g["PSV-99"], errors="coerce").max(),
-        "Team": g["Team"].dropna().iloc[-1] if g["Team"].notna().any() else np.nan,
-        "Competition": g["Competition"].dropna().iloc[-1] if g["Competition"].notna().any() else np.nan,
-        "Season": g["Season"].dropna().iloc[-1] if g["Season"].notna().any() else np.nan,
-    }))
-    .reset_index()
-)
+df_player = build_player_table(df_raw)
 
 # ========= FILTERS =========
 st.markdown("#### Filters")
@@ -227,17 +230,23 @@ if df.empty:
     st.stop()
 
 # ========= PERCENTILES =========
+
+@st.cache_data(ttl=3600)
+def compute_percentiles(df: pd.DataFrame, within_league: bool) -> pd.DataFrame:
+    percentile_df = pd.DataFrame(index=df.index, columns=RADAR_METRICS, dtype=float)
+
+    if within_league and "Competition" in df.columns:
+        for m in RADAR_METRICS:
+            percentile_df[m] = df.groupby("Competition", group_keys=False)[m].apply(pct_rank)
+    else:
+        for m in RADAR_METRICS:
+            percentile_df[m] = pct_rank(df[m])
+
+    return percentile_df.round(1)
+
+
 compute_within_league = st.checkbox("Percentiles within each league", value=True)
-percentile_df = pd.DataFrame(index=df.index, columns=RADAR_METRICS, dtype=float)
-
-if compute_within_league and "Competition" in df.columns:
-    for m in RADAR_METRICS:
-        percentile_df[m] = df.groupby("Competition", group_keys=False)[m].apply(lambda s: pct_rank(s))
-else:
-    for m in RADAR_METRICS:
-        percentile_df[m] = pct_rank(df[m])
-
-percentile_df = percentile_df.round(1)
+percentile_df = compute_percentiles(df, compute_within_league)
 df["_score_0_100_league"] = percentile_df.mean(axis=1).round(1)
 
 # ========= GLOBAL Z-SCORE =========
@@ -261,7 +270,12 @@ df["_score_0_100_global"] = (
 players = sorted(df["Player"].dropna().unique().tolist())
 if "sc_selected_player" not in st.session_state or st.session_state.sc_selected_player not in players:
     st.session_state.sc_selected_player = players[0]
-selected_player = st.selectbox("Choose a player", players, index=players.index(st.session_state.sc_selected_player))
+selected_player = st.selectbox(
+    "Choose a player",
+    players,
+    index=players.index(st.session_state.sc_selected_player),
+    key="player_select"
+)
 st.session_state.sc_selected_player = selected_player
 
 # ========= RADAR PLOT =========
