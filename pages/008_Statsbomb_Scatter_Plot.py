@@ -184,13 +184,19 @@ y_metric = st.selectbox("Y-axis metric", options=numeric_cols, index=1, key="sb_
 # Toggles
 # ============================================================
 st.markdown("#### Highlight Options")
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     highlight_outliers = st.toggle("Highlight Outliers", key="sb_outliers")
 with c2:
     highlight_all = st.toggle("Colour by Position Group", key="sb_color_pos")
 with c3:
     highlight_team = st.toggle("Highlight My Team", key="sb_team_highlight")
+with c4:
+    highlight_players = st.multiselect(
+        "Highlight player(s)",
+        options=sorted(df_all["Name"].dropna().unique().tolist()) if "Name" in df_all.columns else [],
+        key="sb_player_highlight",
+    )
 
 my_team_name = "Livingston FC"
 
@@ -311,6 +317,40 @@ if highlight_team and "Team" in df.columns:
             ),
             showlegend=False,
         )
+
+ # --- Specific Player Highlight ---
+if "Name" in df.columns and "sb_player_highlight" in st.session_state:
+    selected_players = st.session_state.sb_player_highlight
+    if selected_players:
+        player_mask = df["Name"].isin(selected_players)
+        if player_mask.any():
+            player_df = df[player_mask]
+
+            fig.add_scatter(
+                x=player_df[x_metric],
+                y=player_df[y_metric],
+                mode="markers+text",
+                text=player_df["Name"],
+                textposition="top center",
+                marker=dict(
+                    color="#E10600",  # strong red highlight
+                    size=16,
+                    symbol="diamond",
+                    line=dict(color="black", width=1),
+                ),
+                name="Highlighted Players",
+                customdata=np.stack(
+                    [player_df["Team"]] if "Team" in player_df.columns else [player_df["Name"]],
+                    axis=-1,
+                ),
+                hovertemplate=(
+                    "%{text}<br>"
+                    + ("Team: %{customdata[0]}<br>" if "Team" in player_df.columns else "")
+                    + "%{xaxis.title.text}: %{x:.2f}<br>"
+                    + "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
+                ),
+                showlegend=True,
+            )
 
 fig.update_layout(
     xaxis_title=x_metric,
