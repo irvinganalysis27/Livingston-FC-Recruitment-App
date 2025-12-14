@@ -939,6 +939,18 @@ df = df[
     (df["_age_numeric"] <= age_max)
 ].copy()
 
+# ---------- Primary Position (derived from Positions played) ----------
+if "Positions played" in df.columns:
+    df["Primary Position"] = (
+        df["Positions played"]
+        .astype(str)
+        .str.split(",")
+        .str[0]
+        .str.strip()
+    )
+else:
+    df["Primary Position"] = np.nan
+
 # --- ONE caption only ---
 st.caption(f"Players remaining: {len(df)}")
 
@@ -1754,6 +1766,23 @@ if st.button("Find 10 Similar Players", key="similar_players_button"):
         similar_df = similar_df[["Player", "Team", "League", "Age", "Minutes played", "Score (0–100)", "Similarity Score"]]
 
         st.dataframe(similar_df, use_container_width=True)
+st.markdown("#### Filter by Primary Position")
+
+primary_positions = (
+    df["Primary Position"]
+    .dropna()
+    .unique()
+    .tolist()
+)
+primary_positions = sorted(primary_positions)
+
+selected_primary_positions = st.multiselect(
+    "Primary Position",
+    options=primary_positions,
+    default=[],
+    help="Filter ranking table by primary position only",
+)
+
 # ---------- Ranking table with favourites ----------
 st.markdown("### Players Ranked by Score (0–100)")
 
@@ -1766,6 +1795,11 @@ cols_for_table = [
 for c in cols_for_table:
     if c not in plot_data.columns:
         plot_data[c] = np.nan
+
+if selected_primary_positions:
+    plot_data = plot_data[
+        plot_data["Primary Position"].isin(selected_primary_positions)
+    ].copy()
 
 # Build ranking table from the current plot_data
 z_ranking = plot_data[cols_for_table].copy()
