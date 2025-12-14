@@ -1231,9 +1231,22 @@ percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, metrics].fil
 
 # --- Assemble plot_data (radar uses the CHART percentiles) ---
 metrics_df = df[metrics].copy()
+# Ensure Primary Position exists for downstream filters
+if "Primary Position" not in df.columns:
+    if "Positions played" in df.columns:
+        df["Primary Position"] = (
+            df["Positions played"]
+            .astype(str)
+            .str.split(",")
+            .str[0]
+            .str.strip()
+        )
+    else:
+        df["Primary Position"] = np.nan
 keep_cols = [
     "Player", "Team within selected timeframe", "Team", "Age", "Height",
-    "Positions played", "Minutes played", "Six-Group Position",
+    "Positions played", "Primary Position",
+    "Minutes played", "Six-Group Position",
     "Competition", "Competition_norm", "Multiplier"
 ]
 for c in keep_cols:
