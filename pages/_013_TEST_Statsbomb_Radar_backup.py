@@ -12,24 +12,18 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+from lib.sidebar import render_sidebar
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-st.markdown(
-    """
-    <style>
-        [data-testid="stSidebarNav"] { display: none; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ---------- Authentication ----------
 if not check_password():
     st.stop()
+render_sidebar()
 
 # ---------- Branding ----------
 show_branding()

@@ -7,23 +7,17 @@ from pathlib import Path
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
+from ui.sidebar import render_sidebar
 from openai import OpenAI
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-st.markdown(
-    """
-    <style>
-        [data-testid="stSidebarNav"] { display: none; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ---------- Authentication ----------
 if not check_password():
     st.stop()
+render_sidebar()
 
 # ---------- Branding ----------
 show_branding()
@@ -344,7 +338,7 @@ position_metrics = {
     "Striker": {
         "metrics": [
             "Aggressive Actions", "NP Goals", "xG", "Shots", "xG/Shot",
-            "Goal Conversion%", 
+            "Goal Conversion%",
             "Touches In Box", "xG Assisted",
             "Fouls Won", "Deep Completions", "OP Key Passes",
             "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90",

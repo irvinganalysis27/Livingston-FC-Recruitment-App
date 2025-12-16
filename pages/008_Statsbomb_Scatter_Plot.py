@@ -7,23 +7,17 @@ from pathlib import Path
 import re
 from auth import check_password
 from branding import show_branding
+from ui.sidebar import render_sidebar
 
 # ============================================================
 # Page Config & Authentication
 # ============================================================
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-st.markdown(
-    """
-    <style>
-        [data-testid="stSidebarNav"] { display: none; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 if not check_password():
     st.stop()
+render_sidebar()
 
 show_branding()
 st.title("StatsBomb Scatter Plot")

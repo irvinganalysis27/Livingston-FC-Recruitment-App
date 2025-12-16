@@ -8,22 +8,16 @@ from PIL import Image
 from datetime import datetime, timezone
 from auth import check_password
 from branding import show_branding
+from ui.sidebar import render_sidebar
 from openai import OpenAI
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
-st.markdown(
-    """
-    <style>
-        [data-testid="stSidebarNav"] { display: none; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ---------- Authentication ----------
 if not check_password():
     st.stop()
+render_sidebar()
 
 # ---------- Branding ----------
 show_branding()
