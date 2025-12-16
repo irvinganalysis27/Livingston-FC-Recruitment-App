@@ -3,9 +3,11 @@ from pathlib import Path
 from PIL import Image
 from auth import check_password
 from branding import show_branding
+from ui.sidebar import render_sidebar
 
 # ---------- Page setup ----------
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="wide")
+render_sidebar()
 
 # ---------- Password protection ----------
 if not check_password():
