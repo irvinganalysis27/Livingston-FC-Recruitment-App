@@ -12,7 +12,7 @@ import matplotlib.colors as mcolors
 from datetime import datetime
 from auth import check_password
 from branding import show_branding
-from sidebar import render_sidebar
+from ui.sidebar import render_sidebar
 from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
