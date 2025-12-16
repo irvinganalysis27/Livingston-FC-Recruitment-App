@@ -13,6 +13,15 @@ from branding import show_branding
 
 st.set_page_config(page_title="Historical Leagues - statsbombs radar", layout="centered")
 
+st.markdown(
+    """
+    <style>
+        [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # ---------- Auth ----------
 if not check_password():
     st.stop()

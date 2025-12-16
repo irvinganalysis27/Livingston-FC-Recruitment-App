@@ -12,6 +12,15 @@ from lib.shadow_team_repo import list_shadow_team, delete_shadow_team, upsert_sh
 if not check_password():
     st.stop()
 
+st.markdown(
+    """
+    <style>
+        [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # ---------- Branding ----------
 show_branding()
 st.title("Shadow Team")
