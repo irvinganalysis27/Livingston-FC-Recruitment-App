@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from datetime import datetime
 import sqlite3
-
 from auth import check_password
 from branding import show_branding
 from ui.sidebar import render_sidebar
