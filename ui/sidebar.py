@@ -69,11 +69,4 @@ def render_sidebar():
                 label="Benchmarks"
             )
 
-        # ---------- Test / Dev ----------
-        with st.expander("🧪 Test / Dev"):
-            st.page_link(
-                "pages/013_TEST_Statsbomb_Radar_backup.py",
-                label="TEST StatsBomb Radar (Backup)"
-            )
-
         st.divider()
