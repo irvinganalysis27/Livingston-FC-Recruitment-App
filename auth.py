@@ -1,6 +1,7 @@
 # auth.py
 import streamlit as st
 from datetime import datetime, timedelta
+from ui.sidebar import render_sidebar
 
 PASSWORD = "Livi2025"
 SESSION_HOURS = 24
@@ -11,6 +12,12 @@ def check_password():
     Password protection that persists across pages for up to 24 hours
     (even after reruns or navigation, as long as the Streamlit server stays alive).
     """
+
+    # Render sidebar even on login screen
+    try:
+        render_sidebar()
+    except Exception:
+        pass
 
     # 1️⃣ If we already have a stored login timestamp
     if "auth_timestamp" in st.session_state:
