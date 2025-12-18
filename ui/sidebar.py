@@ -7,6 +7,17 @@ def render_sidebar():
         """
         <style>
             [data-testid="stSidebarNav"] { display: none; }
+            /* Allow sidebar titles and links to wrap instead of truncating */
+            section[data-testid="stSidebar"] * {
+                white-space: normal !important;
+                word-wrap: break-word !important;
+            }
+
+            /* Specifically target page links */
+            a[data-testid="stPageLink"] {
+                white-space: normal !important;
+                line-height: 1.3;
+            }
         </style>
         """,
         unsafe_allow_html=True
