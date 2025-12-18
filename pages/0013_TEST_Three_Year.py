@@ -797,6 +797,9 @@ def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
         d = load_one_file(r["file"])
         d["Season"] = r["season"]
         d["Season End Year"] = r["end_year"]
+        # --- Add explicit appearance-based season key for history ---
+        d["_season_label"] = r["season"]
+        d["_season_sort"] = r["end_year"]
         dfs.append(d)
 
     return pd.concat(dfs, ignore_index=True)
@@ -827,8 +830,9 @@ def load_current_season(league_folder: Path) -> pd.DataFrame:
 
 
 # ============================================================
-# ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
+# ✅ Load + prepare the data (TOP-LEVEL CODE — now inside a cache function!)
 # ============================================================
+
 # ========= League Folder Discovery UI (multi-season) =========
 st.markdown("### Select League(s) (multi-season)")
 st.caption("Using last 3 seasons (auto-detected) from stored clean StatsBomb data")
@@ -839,30 +843,141 @@ if not DATA_ROOT.exists():
 
 league_folders = sorted([p for p in DATA_ROOT.iterdir() if p.is_dir()])
 
-current_dfs = []
-history_dfs = []
+# --- Performance fix: cache all heavy data loading and scoring ---
+@st.cache_data(show_spinner=False)
+def load_all_season_data():
+    current_dfs = []
+    history_dfs = []
 
-for lf in league_folders:
-    cur = load_current_season(lf)
-    if not cur.empty:
-        current_dfs.append(cur)
+    for lf in league_folders:
+        cur = load_current_season(lf)
+        if not cur.empty:
+            current_dfs.append(cur)
 
-    hist = load_last_n_seasons(lf, n=3)
-    if not hist.empty:
-        history_dfs.append(hist)
+        hist = load_last_n_seasons(lf, n=3)
+        if not hist.empty:
+            history_dfs.append(hist)
 
-if not current_dfs:
+    if not current_dfs:
+        return None, None, None
+
+    df_current_raw = pd.concat(current_dfs, ignore_index=True)
+    df_history_raw = pd.concat(history_dfs, ignore_index=True)
+
+    df_current = preprocess_df(df_current_raw)
+    df_history = preprocess_df(df_history_raw)
+
+    # --- After preprocessing, recompute scores ONCE for all historical appearances ---
+    df_history_all = df_history.copy()
+
+    # --- Use the same scoring pipeline as for df_all ---
+    # Metrics for scoring (same as chart)
+    # Use the default template for metrics, as at top-level
+    # (If needed, can be adapted to use all metrics present)
+    pos_col = "Six-Group Position"
+    metric_groups = {}
+    for pm in position_metrics.values():
+        metric_groups.update(pm["groups"])
+    sel_metrics = list(metric_groups.keys())
+    for m in sel_metrics:
+        if m not in df_history_all.columns:
+            df_history_all[m] = 0
+        df_history_all[m] = pd.to_numeric(df_history_all[m], errors="coerce").fillna(0)
+    if pos_col not in df_history_all.columns:
+        df_history_all[pos_col] = np.nan
+
+    # Percentiles for 0–100 SCORE (baseline = WHOLE DATASET by position)
+    percentile_df_globalpos_all = pd.DataFrame(index=df_history_all.index, columns=sel_metrics, dtype=float)
+    for m in sel_metrics:
+        percentile_df_globalpos_all[m] = (
+            df_history_all.groupby(pos_col, group_keys=False)[m]
+            .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+        )
+    # Z-Scores for RANKING (eligible players only for baseline)
+    _mins_all = pd.to_numeric(df_history_all.get("Minutes played", np.nan), errors="coerce")
+    eligible = df_history_all[_mins_all >= 600].copy()
+    if eligible.empty:
+        eligible = df_history_all.copy()
+    baseline_stats = eligible.groupby(pos_col)[sel_metrics].agg(["mean", "std"]).fillna(0)
+    baseline_stats.columns = baseline_stats.columns.map("_".join)
+    raw_z_all = pd.DataFrame(index=df_history_all.index, columns=sel_metrics, dtype=float)
+    for m in sel_metrics:
+        df_history_all[m] = pd.to_numeric(df_history_all[m], errors="coerce").fillna(0)
+        mean_col = f"{m}_mean"
+        std_col = f"{m}_std"
+        if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
+            raw_z_all[m] = 0
+            continue
+        mean_vals = df_history_all[pos_col].map(baseline_stats[mean_col])
+        std_vals = df_history_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
+        z = (df_history_all[m] - mean_vals) / std_vals
+        if m in LOWER_IS_BETTER:
+            z *= -1
+        raw_z_all[m] = z.fillna(0)
+    avg_z_all = raw_z_all.mean(axis=1).fillna(0)
+    df_history_all["Avg Z Score"] = avg_z_all
+    mult = pd.to_numeric(df_history_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
+    avg_z = df_history_all["Avg Z Score"]
+    df_history_all["Weighted Z Score"] = np.select(
+        [avg_z > 0, avg_z < 0],
+        [avg_z * mult, avg_z / mult],
+        default=0.0
+    )
+    df_history_all["LFC Multiplier"] = mult
+    df_history_all.loc[df_history_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
+    lfc_mult = df_history_all["LFC Multiplier"]
+    df_history_all["LFC Weighted Z"] = np.select(
+        [avg_z > 0, avg_z < 0],
+        [avg_z * lfc_mult, avg_z / lfc_mult],
+        default=0.0
+    )
+    eligible = df_history_all[_mins_all >= 600].copy()
+    if eligible.empty:
+        eligible = df_history_all.copy()
+    anchors = (
+        eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
+        .agg(_scale_min="min", _scale_max="max")
+        .fillna(0)
+    )
+    df_history_all = df_history_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
+    def _to100(v, lo, hi):
+        if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
+            return 50.0
+        return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
+    df_history_all["Score (0–100)"] = [
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_history_all["Weighted Z Score"], df_history_all["_scale_min"], df_history_all["_scale_max"])
+    ]
+    df_history_all["LFC Score (0–100)"] = [
+        _to100(v, lo, hi)
+        for v, lo, hi in zip(df_history_all["LFC Weighted Z"], df_history_all["_scale_min"], df_history_all["_scale_max"])
+    ]
+    df_history_all[["Score (0–100)", "LFC Score (0–100)"]] = (
+        df_history_all[["Score (0–100)", "LFC Score (0–100)"]]
+        .apply(pd.to_numeric, errors="coerce")
+        .round(1)
+        .fillna(0)
+    )
+
+    # --- Build a cached per-player season score table (appearance-based) ---
+    hist_scores = (
+        df_history_all
+        .groupby(["Player", "_season_label"], as_index=False)
+        .agg({
+            "Score (0–100)": "mean",
+            "_season_sort": "max"
+        })
+        .sort_values("_season_sort")
+    )
+
+    return df_current, df_history_all, hist_scores
+
+# --- Replace inline execution with a single call ---
+df, df_all, hist_scores = load_all_season_data()
+if df is None or df_all is None:
     st.error("❌ No current season files found")
     st.stop()
-
-df_current_raw = pd.concat(current_dfs, ignore_index=True)
-df_history_raw = pd.concat(history_dfs, ignore_index=True)
-
-df_current = preprocess_df(df_current_raw)
-df_history = preprocess_df(df_history_raw)
-
-df = df_current.copy()
-df_all = df_current.copy()
+st.session_state["hist_scores"] = hist_scores
 
 # ============================================================
 # 3️⃣ LEAGUE FILTER
@@ -1661,31 +1776,36 @@ if st.session_state.selected_player:
 # ---------- Three-Season Performance Trend ----------
 st.markdown("### 📈 Three-Season Performance Trend")
 
-player_hist = df_history[
-    df_history["Player"] == st.session_state.selected_player
-].copy()
+# --- Use cached per-player season score table, appearance-based ---
+hist_scores = st.session_state.get("hist_scores", pd.DataFrame())
 
-if "Season Start Year" in player_hist.columns and not player_hist.empty:
-    trend = (
-        player_hist
-        .sort_values("Season Start Year")
-        .drop_duplicates(subset=["Season Start Year"])
-        .tail(3)
-    )
+player_hist = hist_scores[
+    hist_scores["Player"] == st.session_state.selected_player
+].sort_values("_season_sort")
+player_hist = player_hist.tail(3)
 
+if not player_hist.empty:
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.plot(
-        trend["Season Start Year"],
-        trend["Score (0–100)"],
-        marker="o",
-        linewidth=2
-    )
+    if len(player_hist) == 1:
+        ax.plot(
+            player_hist["_season_label"],
+            player_hist["Score (0–100)"],
+            marker="o",
+            linewidth=0,
+            markersize=8
+        )
+    else:
+        ax.plot(
+            player_hist["_season_label"],
+            player_hist["Score (0–100)"],
+            marker="o",
+            linewidth=2
+        )
     ax.set_ylim(0, 100)
     ax.set_xlabel("Season")
     ax.set_ylabel("Score (0–100)")
     ax.set_title("Recent Season Score Trend")
     ax.grid(True, alpha=0.3)
-
     st.pyplot(fig, width="stretch")
 else:
     st.info("Not enough historical data to show a trend.")
