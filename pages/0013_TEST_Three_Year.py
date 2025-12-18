@@ -764,45 +764,6 @@ def season_to_start_year(season: str) -> int:
 
 
 # --- Add missing helper function for season end year ---
-def season_to_end_year(season: str) -> int:
-    """
-    2025           -> 2025
-    2025_2026      -> 2026
-    2024-2025      -> 2025
-    """
-    if season.isdigit():
-        return int(season)
-
-    parts = re.split(r"[_\-\/]", season)
-    if len(parts) >= 2 and parts[1].isdigit():
-        return int(parts[1])
-
-    # Fallback: assume single-year season
-    return int(parts[0])
-
-def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
-    files = sorted(league_folder.glob("*_clean.csv"))
-    if not files:
-        return pd.DataFrame()
-
-    meta = []
-    for f in files:
-        s = f.stem.replace("_clean", "")
-        meta.append({"file": f, "end_year": season_to_end_year(s), "season": s})
-
-    meta_df = pd.DataFrame(meta).sort_values("end_year", ascending=False).head(n)
-
-    dfs = []
-    for _, r in meta_df.iterrows():
-        d = load_one_file(r["file"])
-        d["Season"] = r["season"]
-        d["Season End Year"] = r["end_year"]
-        # --- Add explicit appearance-based season key for history ---
-        d["_season_label"] = r["season"]
-        d["_season_sort"] = r["end_year"]
-        dfs.append(d)
-
-    return pd.concat(dfs, ignore_index=True)
 
 # --- Loader for current season ---
 def load_current_season(league_folder: Path) -> pd.DataFrame:
@@ -872,9 +833,14 @@ def load_all_season_data():
         if not cur.empty:
             current_dfs.append(cur)
 
-        hist = load_last_n_seasons(lf, n=3)
-        if not hist.empty:
-            history_dfs.append(hist)
+        # Load ALL historical appearances (clean files only)
+        files = sorted(lf.glob("*_clean.csv"))
+        for f in files:
+            d = load_one_file(f)
+            season_label = f.stem.replace("_clean", "")
+            d["Season"] = season_label
+            d["season_year"] = season_to_start_year(season_label)
+            history_dfs.append(d)
 
     if not current_dfs:
         return None, None, None
@@ -980,12 +946,12 @@ def load_all_season_data():
     # --- Build a cached per-player season score table (appearance-based) ---
     hist_scores = (
         df_history_all
-        .groupby(["Player", "_season_label"], as_index=False)
+        .assign(season_year=lambda x: x["season_year"])
+        .groupby(["Player", "season_year"], as_index=False)
         .agg({
-            "Score (0–100)": "mean",
-            "_season_sort": "max"
+            "Score (0–100)": "mean"
         })
-        .sort_values("_season_sort")
+        .sort_values("season_year")
     )
 
     return df_current, df_history_all, hist_scores
@@ -1449,133 +1415,6 @@ plot_data = pd.concat(
     axis=1
 )
 
-# ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
-
-# Metrics for scoring (same as chart)
-sel_metrics = list(metric_groups.keys())
-
-# --- A) Percentiles for SCORE BASELINE (full dataset by position, for reference) ---
-pos_col = "Six-Group Position"
-if pos_col not in df_all.columns: df_all[pos_col] = np.nan
-if pos_col not in df.columns: df[pos_col] = np.nan
-
-percentile_df_globalpos_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    # Ensure metric is numeric
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    percentile_df_globalpos_all[m] = (
-        df_all.groupby(pos_col, group_keys=False)[m]
-              .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
-    )
-percentile_df_globalpos = percentile_df_globalpos_all.loc[df.index, sel_metrics].round(1)
-
-# --- B) Raw Z-Scores for RANKING (eligible players only for baseline) ---
-pos_col = "Six-Group Position"
-
-# Define eligible baseline (600+ minutes)
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
-eligible = df_all[_mins_all >= 600].copy()
-if eligible.empty:
-    eligible = df_all.copy()
-
-# Compute per-position mean/std using eligible only
-baseline_stats = eligible.groupby(pos_col)[sel_metrics].agg(["mean", "std"]).fillna(0)
-baseline_stats.columns = baseline_stats.columns.map("_".join)
-
-# Compute Z per metric using baseline stats
-raw_z_all = pd.DataFrame(index=df_all.index, columns=sel_metrics, dtype=float)
-for m in sel_metrics:
-    df_all[m] = pd.to_numeric(df_all[m], errors="coerce").fillna(0)
-    mean_col = f"{m}_mean"
-    std_col = f"{m}_std"
-    
-    if mean_col not in baseline_stats.columns or std_col not in baseline_stats.columns:
-        raw_z_all[m] = 0
-        continue
-        
-    mean_vals = df_all[pos_col].map(baseline_stats[mean_col])
-    std_vals = df_all[pos_col].map(baseline_stats[std_col].replace(0, 1))
-    z = (df_all[m] - mean_vals) / std_vals
-    
-    if m in LOWER_IS_BETTER:
-        z *= -1
-    raw_z_all[m] = z.fillna(0)
-
-# ---------- Average + Weighted Z (sign-aware) ----------
-avg_z_all = raw_z_all.mean(axis=1).fillna(0)
-df_all["Avg Z Score"] = avg_z_all
-
-mult = pd.to_numeric(df_all.get("Multiplier", 1.0), errors="coerce").fillna(1.0)
-avg_z = df_all["Avg Z Score"]
-
-# ✅ Apply proper weighting logic (strong leagues boost, weak leagues dampen)
-df_all["Weighted Z Score"] = np.select(
-    [avg_z > 0, avg_z < 0],
-    [avg_z * mult, avg_z / mult],
-    default=0.0
-)
-
-# ---------- LFC Weighted Z (Scottish Premiership 1.20) ----------
-df_all["LFC Multiplier"] = mult
-df_all.loc[df_all["Competition_norm"] == "Scotland Premiership", "LFC Multiplier"] = 1.20
-lfc_mult = df_all["LFC Multiplier"]
-
-df_all["LFC Weighted Z"] = np.select(
-    [avg_z > 0, avg_z < 0],
-    [avg_z * lfc_mult, avg_z / lfc_mult],
-    default=0.0
-)
-
-# ---------- Anchors for df_all (required before 0–100 scaling) ----------
-eligible_all = df_all[pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce") >= 600].copy()
-if eligible_all.empty:
-    eligible_all = df_all.copy()
-
-anchors_all = (
-    eligible_all
-    .groupby("Six-Group Position", dropna=False)["Weighted Z Score"]
-    .agg(_scale_min="min", _scale_max="max")
-    .fillna(0)
-)
-
-df_all = df_all.merge(
-    anchors_all,
-    left_on="Six-Group Position",
-    right_index=True,
-    how="left"
-)
-
-def _to100(v, lo, hi):
-    if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
-        return 50.0
-    return np.clip((v - lo) / (hi - lo) * 100.0, 0.0, 100.0)
-
-df_all["Score (0–100)"] = [
-    _to100(v, lo, hi)
-    for v, lo, hi in zip(df_all["Weighted Z Score"], df_all["_scale_min"], df_all["_scale_max"])
-]
-df_all["LFC Score (0–100)"] = [
-    _to100(v, lo, hi)
-    for v, lo, hi in zip(df_all["LFC Weighted Z"], df_all["_scale_min"], df_all["_scale_max"])
-]
-
-df_all[["Score (0–100)", "LFC Score (0–100)"]] = (
-    df_all[["Score (0–100)", "LFC Score (0–100)"]]
-    .apply(pd.to_numeric, errors="coerce")
-    .round(1)
-    .fillna(0)
-)
-
-# ---------- Copy relevant columns into plot_data ----------
-plot_data["Avg Z Score"] = df_all.loc[df.index, "Avg Z Score"].fillna(0).values
-plot_data["Weighted Z Score"] = df_all.loc[df.index, "Weighted Z Score"].fillna(0).values
-plot_data["LFC Weighted Z"] = df_all.loc[df.index, "LFC Weighted Z"].fillna(0).values
-plot_data["Score (0–100)"] = df_all.loc[df.index, "Score (0–100)"].fillna(0).values
-plot_data["LFC Score (0–100)"] = df_all.loc[df.index, "LFC Score (0–100)"].fillna(0).values
-
-# ---------- Rank ----------
-plot_data.sort_values("Weighted Z Score", ascending=False, inplace=True, ignore_index=True)
-plot_data["Rank"] = np.arange(1, len(plot_data) + 1)
 # ---------- Chart ----------
 def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=None):
     import matplotlib.patches as mpatches
@@ -1803,32 +1642,34 @@ st.markdown("### 📈 Three-Season Performance Trend")
 # --- Use cached per-player season score table, appearance-based ---
 hist_scores = st.session_state.get("hist_scores", pd.DataFrame())
 
-player_hist = hist_scores[
-    hist_scores["Player"] == st.session_state.selected_player
-].sort_values("_season_sort")
-player_hist = player_hist.tail(3)
+player_hist = (
+    hist_scores[hist_scores["Player"] == st.session_state.selected_player]
+    .sort_values("season_year")
+    .tail(3)
+)
 
+# ---------- Three-Season Performance Trend ----------
 if not player_hist.empty:
     fig, ax = plt.subplots(figsize=(6, 3))
+
     if len(player_hist) == 1:
-        ax.plot(
-            player_hist["_season_label"],
+        ax.scatter(
+            player_hist["season_year"],
             player_hist["Score (0–100)"],
-            marker="o",
-            linewidth=0,
-            markersize=8
+            s=80
         )
     else:
         ax.plot(
-            player_hist["_season_label"],
+            player_hist["season_year"],
             player_hist["Score (0–100)"],
             marker="o",
             linewidth=2
         )
+
     ax.set_ylim(0, 100)
-    ax.set_xlabel("Season")
+    ax.set_xlabel("Season start year")
     ax.set_ylabel("Score (0–100)")
-    ax.set_title("Recent Season Score Trend")
+    ax.set_title("Recent Performance Trend")
     ax.grid(True, alpha=0.3)
     st.pyplot(fig, width="stretch")
 else:
