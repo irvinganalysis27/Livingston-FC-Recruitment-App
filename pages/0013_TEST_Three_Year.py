@@ -1526,18 +1526,24 @@ df_all["LFC Weighted Z"] = np.select(
     default=0.0
 )
 
-# ---------- Anchors + Scaling ----------
-_mins_all = pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce")
-eligible = df_all[_mins_all >= 600].copy()
-if eligible.empty:
-    eligible = df_all.copy()
+# ---------- Anchors for df_all (required before 0–100 scaling) ----------
+eligible_all = df_all[pd.to_numeric(df_all.get("Minutes played", np.nan), errors="coerce") >= 600].copy()
+if eligible_all.empty:
+    eligible_all = df_all.copy()
 
-anchors = (
-    eligible.groupby(pos_col, dropna=False)["Weighted Z Score"]
+anchors_all = (
+    eligible_all
+    .groupby("Six-Group Position", dropna=False)["Weighted Z Score"]
     .agg(_scale_min="min", _scale_max="max")
     .fillna(0)
 )
-df_all = df_all.merge(anchors, left_on=pos_col, right_index=True, how="left")
+
+df_all = df_all.merge(
+    anchors_all,
+    left_on="Six-Group Position",
+    right_index=True,
+    how="left"
+)
 
 def _to100(v, lo, hi):
     if pd.isna(v) or pd.isna(lo) or pd.isna(hi) or hi <= lo:
