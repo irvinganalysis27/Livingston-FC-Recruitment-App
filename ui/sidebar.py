@@ -25,7 +25,7 @@ def render_sidebar():
                 label="Historical StatsBomb Radar"
             )
             st.page_link(
-                "pages/013_Three_Season_Profile.py",
+                "pages/0013_TEST_Three_Year.py",
                 label="3-Season Player Profile"
             )
 
