@@ -917,36 +917,30 @@ minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
 
+# --- PATCH: robust minutes slider bounds and defaults ---
 df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 
-dataset_min = int(df["_minutes_numeric"].min(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
-dataset_max = int(df["_minutes_numeric"].max(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
+# Use only non-null minutes for bounds
+valid_minutes = df["_minutes_numeric"].dropna()
 
-# Set safe defaults based on dataset (prevents empty results on first load)
-default_min_minutes = max(300, dataset_min)
+dataset_min = int(valid_minutes.min()) if not valid_minutes.empty else 0
+dataset_max = int(valid_minutes.max()) if not valid_minutes.empty else 0
+
+# Safe defaults
+default_min_minutes = 0
 default_max_minutes = dataset_max
-
-if "min_minutes_typed" not in st.session_state:
-    st.session_state.min_minutes_typed = default_min_minutes
-if "max_minutes_typed" not in st.session_state:
-    st.session_state.max_minutes_typed = default_max_minutes
 
 # ----- AGE -----
 age_col = "Age"
 if age_col not in df.columns:
     df[age_col] = np.nan
 
+# --- PATCH: robust age slider bounds ---
 df["_age_numeric"] = pd.to_numeric(df[age_col], errors="coerce")
 
-age_min_dataset = int(df["_age_numeric"].min(skipna=True)) if df["_age_numeric"].notna().any() else 0
-age_max_dataset = int(df["_age_numeric"].max(skipna=True)) if df["_age_numeric"].notna().any() else 50
-
-# Safer age defaults to avoid filtering everyone out
-if "age_range" not in st.session_state:
-    st.session_state.age_range = (
-        max(age_min_dataset, 16),
-        min(age_max_dataset, 40)
-    )
+valid_ages = df["_age_numeric"].dropna()
+age_min_dataset = int(valid_ages.min()) if not valid_ages.empty else 15
+age_max_dataset = int(valid_ages.max()) if not valid_ages.empty else 50
 
 # ---------- HEADER ----------
 st.markdown("### Minutes and Age")
@@ -956,20 +950,16 @@ col_minutes, col_age = st.columns(2)
 
 with col_minutes:
     st.markdown("**Minutes played**")
+    # PATCH: robust minutes slider
     min_minutes, max_minutes = st.slider(
         "",
         min_value=dataset_min,
         max_value=dataset_max,
-        value=(
-            max(st.session_state.get("min_minutes_typed", dataset_min), dataset_min),
-            min(st.session_state.get("max_minutes_typed", dataset_max), dataset_max)
-        ),
+        value=(dataset_min, dataset_max),
         step=10,
         key="minutes_slider",
         label_visibility="collapsed",
     )
-    st.session_state.min_minutes_typed = min_minutes
-    st.session_state.max_minutes_typed = max_minutes
 
 with col_age:
     st.markdown("**Age**")
@@ -977,23 +967,27 @@ with col_age:
         "",
         min_value=age_min_dataset,
         max_value=age_max_dataset,
-        value=st.session_state.age_range,
+        value=(age_min_dataset, age_max_dataset),
         step=1,
         key="age_slider",
         label_visibility="collapsed",
     )
-    st.session_state.age_range = (age_min, age_max)
 
 # ---------- APPLY FILTERS ----------
-min_minutes = st.session_state.min_minutes_typed
-max_minutes = st.session_state.max_minutes_typed
-
+# PATCH: robust filter to prevent NaNs from wiping dataset
 df = df[
-    (df["_minutes_numeric"] >= min_minutes) &
-    (df["_minutes_numeric"] <= max_minutes) &
-    (df["_age_numeric"] >= age_min) &
-    (df["_age_numeric"] <= age_max)
+    (df["_minutes_numeric"].fillna(0) >= min_minutes) &
+    (df["_minutes_numeric"].fillna(0) <= max_minutes) &
+    (df["_age_numeric"].fillna(age_min_dataset) >= age_min) &
+    (df["_age_numeric"].fillna(age_max_dataset) <= age_max)
 ].copy()
+
+# PATCH: Add debug caption immediately after filtering
+st.caption(
+    f"Players after filters: {len(df)} | "
+    f"Minutes range in data: {dataset_min}-{dataset_max} | "
+    f"Age range in data: {age_min_dataset}-{age_max_dataset}"
+)
 
 # ---------- Debug guard: prevent silent empty state ----------
 if df.empty:
