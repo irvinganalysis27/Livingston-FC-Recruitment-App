@@ -29,7 +29,7 @@ def render_sidebar():
 
             /* Make dividers thinner and tighter */
             hr {
-                margin: 6px 0 !important;
+                margin: 2px 0 !important;
                 border-top: 1px solid rgba(0,0,0,0.15) !important;
             }
         </style>
