@@ -750,11 +750,17 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 # ========= MULTI-SEASON HELPERS =========
 DATA_ROOT = ROOT_DIR / "data" / "statsbomb"
 
-def season_to_end_year(season: str) -> int:
+def season_to_start_year(season: str) -> int:
+    """
+    2025           -> 2025
+    2025_2026      -> 2025
+    2024-2025      -> 2024
+    """
     if season.isdigit():
         return int(season)
+
     parts = re.split(r"[_\-\/]", season)
-    return int(parts[-1])
+    return int(parts[0])
 
 def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
     files = sorted(league_folder.glob("*_clean.csv"))
@@ -777,6 +783,29 @@ def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
 
     return pd.concat(dfs, ignore_index=True)
 
+# --- Loader for current season ---
+def load_current_season(league_folder: Path) -> pd.DataFrame:
+    files = sorted(league_folder.glob("*_clean.csv"))
+    if not files:
+        return pd.DataFrame()
+
+    meta = []
+    for f in files:
+        s = f.stem.replace("_clean", "")
+        meta.append({
+            "file": f,
+            "start_year": season_to_start_year(s),
+            "season": s
+        })
+
+    meta_df = pd.DataFrame(meta).sort_values("start_year", ascending=False)
+    row = meta_df.iloc[0]
+
+    d = load_one_file(row["file"])
+    d["Season"] = row["season"]
+    d["Season Start Year"] = row["start_year"]
+    return d
+
 
 
 # ============================================================
@@ -792,19 +821,30 @@ if not DATA_ROOT.exists():
 
 league_folders = sorted([p for p in DATA_ROOT.iterdir() if p.is_dir()])
 
-dfs = []
-for lf in league_folders:
-    d = load_last_n_seasons(lf, n=3)
-    if not d.empty:
-        dfs.append(d)
+current_dfs = []
+history_dfs = []
 
-if not dfs:
-    st.error("❌ No clean season files found in any league folders")
+for lf in league_folders:
+    cur = load_current_season(lf)
+    if not cur.empty:
+        current_dfs.append(cur)
+
+    hist = load_last_n_seasons(lf, n=3)
+    if not hist.empty:
+        history_dfs.append(hist)
+
+if not current_dfs:
+    st.error("❌ No current season files found")
     st.stop()
 
-df_raw = pd.concat(dfs, ignore_index=True)
-df_all = preprocess_df(df_raw)
-df = df_all.copy()
+df_current_raw = pd.concat(current_dfs, ignore_index=True)
+df_history_raw = pd.concat(history_dfs, ignore_index=True)
+
+df_current = preprocess_df(df_current_raw)
+df_history = preprocess_df(df_history_raw)
+
+df = df_current.copy()
+df_all = df_current.copy()
 
 # ============================================================
 # 3️⃣ LEAGUE FILTER
@@ -1609,19 +1649,21 @@ if st.session_state.selected_player:
 # ---------- Three-Season Performance Trend ----------
 st.markdown("### 📈 Three-Season Performance Trend")
 
-player_hist = df_all[df_all["Player"] == st.session_state.selected_player].copy()
+player_hist = df_history[
+    df_history["Player"] == st.session_state.selected_player
+].copy()
 
-if "Season End Year" in player_hist.columns and not player_hist.empty:
+if "Season Start Year" in player_hist.columns and not player_hist.empty:
     trend = (
         player_hist
-        .sort_values("Season End Year")
-        .groupby("Season End Year", as_index=False)
-        .agg({"Score (0–100)": "mean"})
+        .sort_values("Season Start Year")
+        .drop_duplicates(subset=["Season Start Year"])
+        .tail(3)
     )
 
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.plot(
-        trend["Season End Year"],
+        trend["Season Start Year"],
         trend["Score (0–100)"],
         marker="o",
         linewidth=2
@@ -1629,12 +1671,12 @@ if "Season End Year" in player_hist.columns and not player_hist.empty:
     ax.set_ylim(0, 100)
     ax.set_xlabel("Season")
     ax.set_ylabel("Score (0–100)")
-    ax.set_title("3-Season Average Score Trend")
+    ax.set_title("Recent Season Score Trend")
     ax.grid(True, alpha=0.3)
 
     st.pyplot(fig, width="stretch")
 else:
-    st.info("Not enough season data to display a 3-season trend.")
+    st.info("Not enough historical data to show a trend.")
 # ================== Glossary Section ==================
 metric_definitions = {
     # Core metrics
