@@ -843,6 +843,24 @@ if not DATA_ROOT.exists():
 
 league_folders = sorted([p for p in DATA_ROOT.iterdir() if p.is_dir()])
 
+#
+# ---------- Shared helpers (must be defined BEFORE cached loaders) ----------
+#
+# Metrics where lower values are better
+LOWER_IS_BETTER = {
+    "Turnovers",
+    "Fouls",
+    "Pr. Long Balls",
+    "UPr. Long Balls",
+}
+
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
+    r = series.rank(pct=True, ascending=True)
+    if lower_is_better:
+        r = 1.0 - r
+    return (r * 100.0).round(1)
+
 # --- Performance fix: cache all heavy data loading and scoring ---
 @st.cache_data(show_spinner=False)
 def load_all_season_data():
