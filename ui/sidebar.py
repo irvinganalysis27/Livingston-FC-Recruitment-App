@@ -29,8 +29,11 @@ def render_sidebar():
         # ---------- Radars ----------
         with st.expander("📊 Radars"):
             st.page_link("pages/001_Statsbomb_Radar.py", label="StatsBomb Radar")
+            st.divider()
             st.page_link("pages/002_Skillcorner_Radar.py", label="SkillCorner Radar")
+            st.divider()
             st.page_link("pages/003_Wyscout_Radar.py", label="Wyscout Radar")
+            st.divider()
             st.page_link(
                 "pages/012_Historical_Statsbomb_Radar.py",
                 label="Historical StatsBomb Radar"
@@ -42,6 +45,7 @@ def render_sidebar():
                 "pages/008_Statsbomb_Scatter_Plot.py",
                 label="StatsBomb Scatter Plot"
             )
+            st.divider()
             st.page_link(
                 "pages/009_SkillCorner_Scatter_Plot.py",
                 label="SkillCorner Scatter Plot"
@@ -53,6 +57,7 @@ def render_sidebar():
                 "pages/004_Player_Comparison.py",
                 label="Player Comparison"
             )
+            st.divider()
             st.page_link(
                 "pages/005_Team_Rankings.py",
                 label="Team Rankings"
@@ -64,6 +69,7 @@ def render_sidebar():
                 "pages/006_Favourites.py",
                 label="Favourites"
             )
+            st.divider()
             st.page_link(
                 "pages/007_Shadow_Team.py",
                 label="Shadow Team"
@@ -75,6 +81,7 @@ def render_sidebar():
                 "pages/010_Weightings.py",
                 label="Weightings"
             )
+            st.divider()
             st.page_link(
                 "pages/011_Benchmarks.py",
                 label="Benchmarks"
