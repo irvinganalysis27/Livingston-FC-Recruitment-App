@@ -783,27 +783,26 @@ def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
 # ✅ Load + prepare the data (TOP-LEVEL CODE — not inside function!)
 # ============================================================
 # ========= League Folder Discovery UI (multi-season) =========
-st.markdown("### Select League (multi-season)")
+st.markdown("### Select League(s) (multi-season)")
+st.caption("Using last 3 seasons (auto-detected) from stored clean StatsBomb data")
 
 if not DATA_ROOT.exists():
     st.error("❌ data/statsbomb folder not found in project root")
     st.stop()
 
 league_folders = sorted([p for p in DATA_ROOT.iterdir() if p.is_dir()])
-league_names = [p.name.replace("_", " ").title() for p in league_folders]
 
-league_choice = st.selectbox("League", league_names)
-league_path = league_folders[league_names.index(league_choice)]
+dfs = []
+for lf in league_folders:
+    d = load_last_n_seasons(lf, n=3)
+    if not d.empty:
+        dfs.append(d)
 
-st.caption("Using last 3 seasons (auto-detected) from stored clean StatsBomb data")
-
-# ========== DATA LOADING (multi-season) ==========
-df_raw = load_last_n_seasons(league_path, n=3)
-if df_raw.empty:
-    st.error("❌ No clean season files found for this league")
+if not dfs:
+    st.error("❌ No clean season files found in any league folders")
     st.stop()
 
-df_raw = add_age_column(df_raw)
+df_raw = pd.concat(dfs, ignore_index=True)
 df_all = preprocess_df(df_raw)
 df = df_all.copy()
 
@@ -1578,6 +1577,7 @@ def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: 
         return f"⚠️ AI summary generation failed: {e}"
 
 # ---------- Plot ----------
+# ---------- Plot ----------
 if st.session_state.selected_player:
     plot_radial_bar_grouped(
         st.session_state.selected_player,
@@ -1585,6 +1585,36 @@ if st.session_state.selected_player:
         metric_groups,
         group_colors
     )
+
+# ---------- Three-Season Performance Trend ----------
+st.markdown("### 📈 Three-Season Performance Trend")
+
+player_hist = df_all[df_all["Player"] == st.session_state.selected_player].copy()
+
+if "Season End Year" in player_hist.columns and not player_hist.empty:
+    trend = (
+        player_hist
+        .sort_values("Season End Year")
+        .groupby("Season End Year", as_index=False)
+        .agg({"Score (0–100)": "mean"})
+    )
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.plot(
+        trend["Season End Year"],
+        trend["Score (0–100)"],
+        marker="o",
+        linewidth=2
+    )
+    ax.set_ylim(0, 100)
+    ax.set_xlabel("Season")
+    ax.set_ylabel("Score (0–100)")
+    ax.set_title("3-Season Average Score Trend")
+    ax.grid(True, alpha=0.3)
+
+    st.pyplot(fig, width="stretch")
+else:
+    st.info("Not enough season data to display a 3-season trend.")
 # ================== Glossary Section ==================
 metric_definitions = {
     # Core metrics
