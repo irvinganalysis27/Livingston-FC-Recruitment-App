@@ -22,7 +22,7 @@ render_sidebar()
 
 # ---------- Branding ----------
 show_branding()
-st.title("Historical Leagues - statsbombs radar")
+st.title("Historical League Radars")
 
 # ========== Helpers ==========
 APP_DIR = Path(__file__).parent
@@ -202,10 +202,37 @@ def open_image(path: Path):
     except Exception:
         return None
 
+def prettify_league_name(slug: str) -> str:
+    name = slug.replace("_", " ").title()
+
+    # Common football-specific fixes
+    replacements = {
+        "Usa": "USA",
+        "Usl": "USL",
+        "A League": "A-League",
+        "1 Liga": "1. Liga",
+        "2 Liga": "2. Liga",
+        "3 Liga": "3. Liga",
+        "Liga 1": "Liga 1",
+        "Liga 3": "Liga 3",
+        "Sub 23": "Sub-23",
+        "Premier Division": "Premier Division",
+        "First League": "First League",
+        "First Tier": "First Tier",
+        "Super Liga": "Super Liga",
+        "Championship": "Championship",
+        "Ekstraklasa": "Ekstraklasa",
+        "Challenge League": "Challenge League",
+    }
+
+    for k, v in replacements.items():
+        name = name.replace(k, v)
+
+    return name
+
 # ========== League & Season Selection (disk-based) ==========
 st.markdown("### League & Season Selection")
 
-# Discover leagues from folders
 league_dirs = sorted([
     p.name for p in DATA_DIR.iterdir()
     if p.is_dir()
@@ -215,11 +242,16 @@ if not league_dirs:
     st.error("No leagues found in data/statsbomb.")
     st.stop()
 
-selected_league = st.selectbox(
+league_display_map = {p: prettify_league_name(p) for p in league_dirs}
+display_to_slug = {v: k for k, v in league_display_map.items()}
+
+selected_display_league = st.selectbox(
     "League",
-    league_dirs,
+    sorted(league_display_map.values()),
     key="historical_league_select"
 )
+
+selected_league = display_to_slug[selected_display_league]
 
 league_path = DATA_DIR / selected_league
 
