@@ -24,10 +24,6 @@ def render_sidebar():
                 "pages/012_Historical_Statsbomb_Radar.py",
                 label="Historical StatsBomb Radar"
             )
-            st.page_link(
-                "pages/0013_TEST_Three_Year.py",
-                label="3-Season Player Profile"
-            )
 
         # ---------- Scatter Plots ----------
         with st.expander("📈 Scatter Plots"):
