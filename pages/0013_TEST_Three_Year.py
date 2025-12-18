@@ -762,6 +762,24 @@ def season_to_start_year(season: str) -> int:
     parts = re.split(r"[_\-\/]", season)
     return int(parts[0])
 
+
+# --- Add missing helper function for season end year ---
+def season_to_end_year(season: str) -> int:
+    """
+    2025           -> 2025
+    2025_2026      -> 2026
+    2024-2025      -> 2025
+    """
+    if season.isdigit():
+        return int(season)
+
+    parts = re.split(r"[_\-\/]", season)
+    if len(parts) >= 2 and parts[1].isdigit():
+        return int(parts[1])
+
+    # Fallback: assume single-year season
+    return int(parts[0])
+
 def load_last_n_seasons(league_folder: Path, n: int = 3) -> pd.DataFrame:
     files = sorted(league_folder.glob("*_clean.csv"))
     if not files:
