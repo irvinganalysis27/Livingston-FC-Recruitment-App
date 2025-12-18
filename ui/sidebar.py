@@ -18,6 +18,20 @@ def render_sidebar():
                 white-space: normal !important;
                 line-height: 1.3;
             }
+
+            /* Make page links more compact */
+            a[data-testid="stPageLink"] {
+                padding-top: 6px !important;
+                padding-bottom: 6px !important;
+                margin: 0 !important;
+                line-height: 1.2 !important;
+            }
+
+            /* Make dividers thinner and tighter */
+            hr {
+                margin: 6px 0 !important;
+                border-top: 1px solid rgba(0,0,0,0.15) !important;
+            }
         </style>
         """,
         unsafe_allow_html=True
