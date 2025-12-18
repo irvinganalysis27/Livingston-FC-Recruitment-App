@@ -864,9 +864,14 @@ df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 dataset_min = int(df["_minutes_numeric"].min(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
 dataset_max = int(df["_minutes_numeric"].max(skipna=True)) if df["_minutes_numeric"].notna().any() else 0
 
-# Defaults
-st.session_state.setdefault("min_minutes_typed", 500)
-st.session_state.setdefault("max_minutes_typed", dataset_max)
+# Set safe defaults based on dataset (prevents empty results on first load)
+default_min_minutes = max(300, dataset_min)
+default_max_minutes = dataset_max
+
+if "min_minutes_typed" not in st.session_state:
+    st.session_state.min_minutes_typed = default_min_minutes
+if "max_minutes_typed" not in st.session_state:
+    st.session_state.max_minutes_typed = default_max_minutes
 
 # ----- AGE -----
 age_col = "Age"
@@ -878,7 +883,12 @@ df["_age_numeric"] = pd.to_numeric(df[age_col], errors="coerce")
 age_min_dataset = int(df["_age_numeric"].min(skipna=True)) if df["_age_numeric"].notna().any() else 0
 age_max_dataset = int(df["_age_numeric"].max(skipna=True)) if df["_age_numeric"].notna().any() else 50
 
-st.session_state.setdefault("age_range", (age_min_dataset, age_max_dataset))
+# Safer age defaults to avoid filtering everyone out
+if "age_range" not in st.session_state:
+    st.session_state.age_range = (
+        max(age_min_dataset, 16),
+        min(age_max_dataset, 40)
+    )
 
 # ---------- HEADER ----------
 st.markdown("### Minutes and Age")
@@ -927,6 +937,16 @@ df = df[
     (df["_age_numeric"] <= age_max)
 ].copy()
 
+# ---------- Debug guard: prevent silent empty state ----------
+if df.empty:
+    st.warning(
+        f"No players match current filters. "
+        f"Minutes: {min_minutes}-{max_minutes}, "
+        f"Age: {age_min}-{age_max}. "
+        f"Try widening the ranges."
+    )
+    st.stop()
+
 # ---------- Primary Position (derived from Positions played) ----------
 if "Positions played" in df.columns:
     df["Primary Position"] = (
@@ -940,11 +960,11 @@ else:
     df["Primary Position"] = np.nan
 
 # --- ONE caption only ---
-st.caption(f"Players remaining: {len(df)}")
-
-if df.empty:
-    st.warning("No players match the selected minutes and age filters.")
-    st.stop()
+st.caption(
+    f"Players remaining: {len(df)} | "
+    f"Minutes {min_minutes}-{max_minutes} | "
+    f"Age {age_min}-{age_max}"
+)
 
 # ---------- Position Group Section ----------
 st.markdown("#### 🟡 Select Position Group")
