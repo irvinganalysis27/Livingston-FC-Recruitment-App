@@ -27,6 +27,7 @@ st.title("Historical Leagues - statsbombs radar")
 # ========== Helpers ==========
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
+DATA_DIR = ROOT_DIR / "data" / "statsbomb"
 
 SIX_GROUPS = ["Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"]
 
@@ -201,25 +202,52 @@ def open_image(path: Path):
     except Exception:
         return None
 
-# ========== Upload area ==========
-st.markdown("### 📂 Upload a StatsBomb or Wyscout export file")
-uploaded = st.file_uploader("Upload Excel or CSV file", type=["csv", "xlsx", "xls"])
-if uploaded is None:
-    st.info("Please upload your player data file to continue.")
+# ========== League & Season Selection (disk-based) ==========
+st.markdown("### League & Season Selection")
+
+# Discover leagues from folders
+league_dirs = sorted([
+    p.name for p in DATA_DIR.iterdir()
+    if p.is_dir()
+])
+
+if not league_dirs:
+    st.error("No leagues found in data/statsbomb.")
     st.stop()
 
-# Read file (no fallback)
-try:
-    if uploaded.name.lower().endswith((".xlsx", ".xls")):
-        df = pd.read_excel(uploaded)
-    else:
-        df = pd.read_csv(uploaded)
-except Exception as e:
-    st.error(f"Error reading file: {e}")
+selected_league = st.selectbox(
+    "League",
+    league_dirs,
+    key="historical_league_select"
+)
+
+league_path = DATA_DIR / selected_league
+
+season_files = sorted([
+    f.name for f in league_path.glob("*_clean.csv")
+])
+
+if not season_files:
+    st.error(f"No cleaned season files found for {selected_league}.")
     st.stop()
+
+season_labels = [f.replace("_clean.csv", "") for f in season_files]
+
+selected_season = st.selectbox(
+    "Season",
+    season_labels,
+    key="historical_season_select"
+)
+
+@st.cache_data(show_spinner=False)
+def load_season_data(league: str, season: str) -> pd.DataFrame:
+    path = DATA_DIR / league / f"{season}_clean.csv"
+    return pd.read_csv(path)
+
+df = load_season_data(selected_league, selected_season)
 
 if df.empty:
-    st.error("Uploaded file is empty.")
+    st.error("Selected season file is empty.")
     st.stop()
 
 # ========== Light preprocessing (names, positions, etc.) ==========
