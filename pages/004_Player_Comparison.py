@@ -120,7 +120,7 @@ LEAGUE_SYNONYMS = {
 
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Winger", "Striker"
+    "Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"
 ]
 
 # ========== Position → group mapping ==========
@@ -301,6 +301,35 @@ position_metrics = {
             "Player Season Fhalf Ball Recoveries 90": "Defensive",
             "Aggressive Actions": "Defensive",
             "OBV": "Possession",
+        }
+    },
+
+    # ---------- Number 10 ----------
+    "Number 10": {
+        "metrics": [
+            "Deep Progressions", "Deep Completions", "OP Passes Into Box", "OBV", "OP Key Passes",
+            "Shots", "xG", "xG Assisted", "Assists", "NP Goals", "xG/Shot",
+            "Touches In Box", "Goal Conversion%",
+            "Aggressive Actions", "PAdj Pressures",
+        ],
+        "groups": {
+            "Deep Progressions": "Possession",
+            "Deep Completions": "Possession",
+            "OP Passes Into Box": "Possession",
+            "OP Key Passes": "Possession",
+            "OBV": "Possession",
+
+            "Shots": "Attacking",
+            "xG": "Attacking",
+            "xG Assisted": "Attacking",
+            "Assists": "Attacking",
+            "NP Goals": "Attacking",
+            "xG/Shot": "Attacking",
+            "Touches In Box": "Attacking",
+            "Goal Conversion%": "Attacking",
+
+            "Aggressive Actions": "Defensive",
+            "PAdj Pressures": "Defensive",
         }
     },
 
@@ -758,6 +787,8 @@ if st.session_state.template_select != st.session_state.last_template_choice:
 # ---------- Metrics for radar ----------
 current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
 metrics = position_metrics[current_template_name]["metrics"]
+# Force metric order to exactly match StatsBomb Radar templates
+metrics = list(position_metrics[current_template_name]["metrics"])
 metric_groups = position_metrics[current_template_name]["groups"]
 
 # ---------- Player A & B ----------
