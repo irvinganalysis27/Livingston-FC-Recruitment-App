@@ -791,7 +791,17 @@ metrics = position_metrics[current_template_name]["metrics"]
 metrics = list(position_metrics[current_template_name]["metrics"])
 metric_groups = position_metrics[current_template_name]["groups"]
 
-# ---------- Player A & B ----------
+# ---------- Season handling ----------
+SEASON_COL_CANDIDATES = ["Season", "season", "Season Name", "season_name"]
+season_col = next((c for c in SEASON_COL_CANDIDATES if c in df.columns), None)
+
+if season_col:
+    df[season_col] = df[season_col].astype(str).str.strip()
+    all_seasons = sorted([s for s in df[season_col].dropna().unique() if s])
+else:
+    all_seasons = []
+
+# ---------- Player A & B (with season selection) ----------
 players = df["Player"].dropna().unique().tolist()
 if not players:
     st.stop()
@@ -801,18 +811,53 @@ if "cmpA" not in st.session_state:
 if "cmpB" not in st.session_state:
     st.session_state.cmpB = players[1] if len(players) > 1 else None
 
+if "seasonA" not in st.session_state:
+    st.session_state.seasonA = all_seasons[0] if all_seasons else None
+if "seasonB" not in st.session_state:
+    st.session_state.seasonB = all_seasons[0] if all_seasons else None
+
 c1, c2 = st.columns(2)
+
 with c1:
-    pA = st.selectbox("Player A", players,
-                      index=players.index(st.session_state.cmpA) if st.session_state.cmpA in players else 0,
-                      key="cmpA_sel")
+    pA = st.selectbox(
+        "Player A",
+        players,
+        index=players.index(st.session_state.cmpA) if st.session_state.cmpA in players else 0,
+        key="cmpA_sel"
+    )
     st.session_state.cmpA = pA
+
+    if season_col and all_seasons:
+        seasonA = st.selectbox(
+            "Season (Player A)",
+            all_seasons,
+            index=all_seasons.index(st.session_state.seasonA) if st.session_state.seasonA in all_seasons else 0,
+            key="seasonA_sel"
+        )
+        st.session_state.seasonA = seasonA
+    else:
+        seasonA = None
+
 with c2:
-    pB = st.selectbox("Player B (optional)", ["(none)"] + players,
-                      index=(players.index(st.session_state.cmpB) + 1) if st.session_state.cmpB in players else 0,
-                      key="cmpB_sel")
+    pB = st.selectbox(
+        "Player B (optional)",
+        ["(none)"] + players,
+        index=(players.index(st.session_state.cmpB) + 1) if st.session_state.cmpB in players else 0,
+        key="cmpB_sel"
+    )
     pB = None if pB == "(none)" else pB
     st.session_state.cmpB = pB
+
+    if pB and season_col and all_seasons:
+        seasonB = st.selectbox(
+            "Season (Player B)",
+            all_seasons,
+            index=all_seasons.index(st.session_state.seasonB) if st.session_state.seasonB in all_seasons else 0,
+            key="seasonB_sel"
+        )
+        st.session_state.seasonB = seasonB
+    else:
+        seasonB = None
 
 # ---------- Metrics where lower values are better ----------
 LOWER_IS_BETTER = {
@@ -844,8 +889,18 @@ def compute_percentiles(metrics_list, group_df):
 
 # ---------- Extract player percentiles ----------
 raw_df, pct_df = compute_percentiles(metrics, df)
-rowA_pct = pct_df.loc[df["Player"] == pA, metrics].iloc[0] if pA in df["Player"].values else None
-rowB_pct = pct_df.loc[df["Player"] == pB, metrics].iloc[0] if pB and pB in df["Player"].values else None
+
+def get_player_row(player, season):
+    sub = df[df["Player"] == player]
+    if season_col and season:
+        sub = sub[sub[season_col] == season]
+    return sub.iloc[0] if not sub.empty else None
+
+rowA = get_player_row(pA, seasonA)
+rowB = get_player_row(pB, seasonB) if pB else None
+
+rowA_pct = pct_df.loc[rowA.name, metrics] if rowA is not None else None
+rowB_pct = pct_df.loc[rowB.name, metrics] if rowB is not None else None
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
