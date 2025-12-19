@@ -337,6 +337,12 @@ rename_map.update({
 
 df.rename(columns=rename_map, inplace=True)
 
+# ✅ Guard against duplicate column names created by normalisation (common in historical exports)
+# Example: multiple xGBuildup source columns can become duplicate `xGBuildup` after rename.
+if df.columns.duplicated().any():
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+
 if "Primary Position" in df.columns:
     if "Secondary Position" in df.columns:
         df["Positions played"] = df["Primary Position"].fillna("") + np.where(
@@ -412,6 +418,12 @@ if "Name" in df.columns: rename_map["Name"] = "Player"
 if "Primary Position" in df.columns: rename_map["Primary Position"] = "Position"
 if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
 df.rename(columns=rename_map, inplace=True)
+
+# ✅ Guard against duplicate column names created by normalisation (common in historical exports)
+# Example: multiple xGBuildup source columns can become duplicate `xGBuildup` after rename.
+if df.columns.duplicated().any():
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
 
 # League column normalisation (no mapping needed)
 if "Competition" not in df.columns:
