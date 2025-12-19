@@ -1260,6 +1260,31 @@ plot_data = pd.concat(
     axis=1
 )
 
+#
+# ============================================================
+# 📈 Historical Season Ratings (Precomputed)
+# ============================================================
+
+HIST_RATINGS_PATH = ROOT_DIR / "data" / "player_season_ratings_statsbomb.csv"
+
+@st.cache_data(show_spinner=False)
+def load_historical_season_ratings(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path)
+    df.columns = df.columns.str.strip()
+    return df
+
+hist_df = load_historical_season_ratings(HIST_RATINGS_PATH)
+
+show_history = False
+if not hist_df.empty:
+    show_history = st.checkbox(
+        "Show historical season ratings for this player",
+        value=False,
+        help="Uses precomputed season-level ratings (all leagues, all seasons)."
+    )
+
 # ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
 
 # Metrics for scoring (same as chart)
@@ -1523,6 +1548,44 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         pass
 
     st.pyplot(fig, width="stretch")
+
+    # ============================================================
+    # 📊 Historical Seasons Bar Chart
+    # ============================================================
+    if show_history and not hist_df.empty:
+        pid = row.get("player_id")
+        pname = row.get("Player")
+
+        hist_rows = hist_df[
+            (hist_df.get("player_id") == pid) |
+            (hist_df.get("Player") == pname)
+        ].copy()
+
+        if not hist_rows.empty:
+            hist_rows["Season_Label"] = (
+                hist_rows["Season"].astype(str)
+                + " | "
+                + hist_rows["League"].astype(str)
+                + " | "
+                + hist_rows["Team"].astype(str)
+            )
+
+            hist_rows = hist_rows.sort_values("Season")
+
+            fig2, ax2 = plt.subplots(figsize=(10, 4))
+            ax2.bar(
+                hist_rows["Season_Label"],
+                hist_rows["LFC Score (0–100)"],
+                color="goldenrod",
+                edgecolor="black"
+            )
+
+            ax2.set_ylabel("LFC Score (0–100)")
+            ax2.set_title(f"{pname} — Season Ratings")
+            ax2.set_ylim(0, 100)
+            ax2.tick_params(axis="x", rotation=30, labelsize=9)
+
+            st.pyplot(fig2, width="stretch")
 
 def generate_player_summary(player_name: str, plot_data: pd.DataFrame, metrics: dict):
     """Generate a realistic, scout-style summary in Tom's critical tone using OpenAI (GPT-4o-mini)."""
