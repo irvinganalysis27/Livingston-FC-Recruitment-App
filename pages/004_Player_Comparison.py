@@ -967,7 +967,7 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         return fig
 
     # Colours to match Livingston badge
-    color_A = "#FFD700"  # Yellow
+    color_A = "#C9A227"  # Gold
     color_B = "#000000"  # Black
 
     N = len(labels)
