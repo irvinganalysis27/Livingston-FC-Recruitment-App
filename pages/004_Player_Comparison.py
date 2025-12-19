@@ -997,8 +997,8 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     if B_name:
         # Player A (left, yellow)
         ax.text(
-            0.02, 1.12,
-            f"{A_name}\n{seasonA} {rowA.get('Team', '')}",
+            0.02, 1.14,
+            f"{A_name}\n{rowA.get('Team', '')}\n{seasonA}",
             transform=ax.transAxes,
             ha="left", va="top",
             fontsize=15, fontweight="bold", color=color_A
@@ -1006,8 +1006,8 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
 
         # Player B (right, black)
         ax.text(
-            0.98, 1.12,
-            f"{B_name}\n{seasonB} {rowB.get('Team', '')}",
+            0.98, 1.14,
+            f"{B_name}\n{rowB.get('Team', '')}\n{seasonB}",
             transform=ax.transAxes,
             ha="right", va="top",
             fontsize=15, fontweight="bold", color=color_B
@@ -1015,8 +1015,8 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
     else:
         # Single-player title (left aligned)
         ax.text(
-            0.02, 1.12,
-            f"{A_name}\n{seasonA} {rowA.get('Team', '')}",
+            0.02, 1.14,
+            f"{A_name}\n{rowA.get('Team', '')}\n{seasonA}",
             transform=ax.transAxes,
             ha="left", va="top",
             fontsize=15, fontweight="bold", color=color_A
