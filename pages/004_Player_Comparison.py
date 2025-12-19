@@ -993,31 +993,34 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.text(ang, 108, lbl, ha="center", va="center",
                 fontsize=10, fontweight="bold", color=color)
 
-    # Title with A vs B, centred
+    # ----- Custom left/right aligned titles -----
     if B_name:
-        # Player A (yellow), right-aligned before "vs"
-        ax.text(0.48, 1.08, A_name,
-                transform=ax.transAxes,
-                ha="right", va="center",
-                fontsize=16, fontweight="bold", color=color_A)
+        # Player A (left, yellow)
+        ax.text(
+            0.02, 1.12,
+            f"{A_name}\n{seasonA} {rowA.get('Team', '')}",
+            transform=ax.transAxes,
+            ha="left", va="top",
+            fontsize=15, fontweight="bold", color=color_A
+        )
 
-        # "vs" in grey, centered
-        ax.text(0.5, 1.08, "vs",
-                transform=ax.transAxes,
-                ha="center", va="center",
-                fontsize=16, fontweight="bold", color="grey")
-
-        # Player B (black), left-aligned after "vs"
-        ax.text(0.52, 1.08, B_name,
-                transform=ax.transAxes,
-                ha="left", va="center",
-                fontsize=16, fontweight="bold", color=color_B)
+        # Player B (right, black)
+        ax.text(
+            0.98, 1.12,
+            f"{B_name}\n{seasonB} {rowB.get('Team', '')}",
+            transform=ax.transAxes,
+            ha="right", va="top",
+            fontsize=15, fontweight="bold", color=color_B
+        )
     else:
-        # Single-player title
-        ax.text(0.5, 1.08, A_name,
-                transform=ax.transAxes,
-                ha="center", va="center",
-                fontsize=16, fontweight="bold", color=color_A)
+        # Single-player title (left aligned)
+        ax.text(
+            0.02, 1.12,
+            f"{A_name}\n{seasonA} {rowA.get('Team', '')}",
+            transform=ax.transAxes,
+            ha="left", va="top",
+            fontsize=15, fontweight="bold", color=color_A
+        )
 
     # Legend for metric groups at the bottom
     if labels_to_genre and genre_colors:
