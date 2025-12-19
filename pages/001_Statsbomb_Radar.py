@@ -1554,8 +1554,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         show_history = st.checkbox(
             "Show historical season ratings for this player",
             value=False,
-            help="Uses precomputed season-level ratings (all leagues, all seasons).",
-            key=f"show_history_{player_name}_{row.get('Six-Group Position')}"
+            help="Uses precomputed season-level ratings (all leagues, all seasons)."
         )
 
     # ============================================================
@@ -1567,18 +1566,10 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
         # --- Filter strictly to THIS player only ---
         hist_rows = hist_df.copy()
-
-        # Filter by player (ID preferred)
         if pid is not None and "player_id" in hist_rows.columns:
             hist_rows = hist_rows[hist_rows["player_id"] == pid]
         else:
             hist_rows = hist_rows[hist_rows["Player"] == pname]
-
-        # 🔁 Filter by currently selected position template
-        if "Six-Group Position" in hist_rows.columns:
-            hist_rows = hist_rows[
-                hist_rows["Six-Group Position"] == row.get("Six-Group Position")
-            ]
 
         if hist_rows.empty:
             st.info("No historical season ratings found for this player.")
@@ -1588,7 +1579,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         hist_rows = (
             hist_rows
             .sort_values("LFC Score (0–100)", ascending=False)
-            .drop_duplicates(subset=["Season", "Six-Group Position"], keep="first")
+            .drop_duplicates(subset=["Season"], keep="first")
             .sort_values("Season")
         )
 
