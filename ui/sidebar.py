@@ -78,7 +78,7 @@ def render_sidebar():
             )
             st.divider()
             st.page_link(
-                "pages/014_League_Transition_Explorer.py",
+                "pages/014_League_Transfer_Analysis.py",
                 label="League Transition Explorer"
             )
 
