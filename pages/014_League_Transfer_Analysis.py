@@ -39,38 +39,48 @@ def load_transition_data():
 df = load_transition_data()
 
 # --------------------------------------------------
-# Sidebar filters
+# Filters
 # --------------------------------------------------
 st.subheader("Filters")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    position = st.selectbox(
-        "Position",
-        sorted(df["position"].dropna().unique())
+    league_a = st.selectbox(
+        "League A",
+        sorted(pd.unique(pd.concat([df["from_league"], df["to_league"]]).dropna()))
     )
+
+# Filter rows that involve League A
+df_a = df[(df["from_league"] == league_a) | (df["to_league"] == league_a)]
 
 with col2:
-    from_league = st.selectbox(
-        "From league",
-        sorted(df["from_league"].dropna().unique())
+    league_b = st.selectbox(
+        "League B",
+        sorted(pd.unique(
+            pd.concat([
+                df_a["from_league"],
+                df_a["to_league"]
+            ]).dropna().unique())
+        )
     )
 
+# Filter rows that involve both leagues
+df_ab = df_a[
+    ((df_a["from_league"] == league_a) & (df_a["to_league"] == league_b)) |
+    ((df_a["from_league"] == league_b) & (df_a["to_league"] == league_a))
+]
+
 with col3:
-    to_league = st.selectbox(
-        "To league",
-        sorted(df["to_league"].dropna().unique())
+    position = st.selectbox(
+        "Position",
+        sorted(df_ab["position"].dropna().unique())
     )
 
 # --------------------------------------------------
 # Filter data
 # --------------------------------------------------
-filt = df[
-    (df["position"] == position) &
-    (df["from_league"] == from_league) &
-    (df["to_league"] == to_league)
-]
+filt = df_ab[df_ab["position"] == position]
 
 # --------------------------------------------------
 # Display result
@@ -98,8 +108,8 @@ st.markdown(
     f"""
 ### Expected outcome
 
-A **{position}** moving from  
-**{from_league} → {to_league}**
+A **{position}** moving between  
+**{league_a} ↔ {league_b}**
 
 is expected to change performance by:
 
