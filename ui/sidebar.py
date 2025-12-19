@@ -76,6 +76,11 @@ def render_sidebar():
                 "pages/005_Team_Rankings.py",
                 label="Team Rankings"
             )
+            st.divider()
+            st.page_link(
+                "pages/014_League_Transition_Explorer.py",
+                label="League Transition Explorer"
+            )
 
         # ---------- Squad Tools ----------
         with st.expander("🧠 Squad Tools"):
