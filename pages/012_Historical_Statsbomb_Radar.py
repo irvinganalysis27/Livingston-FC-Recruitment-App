@@ -290,52 +290,52 @@ df.columns = (
       .str.replace(r"\s+", " ", regex=True)
 )
 
-    # ============================================================
-    # 🪪 3. Rename Identifiers & NORMALISE STATSBOMB METRICS
-    # ============================================================
-    rename_map = {}
+# ============================================================
+# 🪪 3. Rename Identifiers & NORMALISE STATSBOMB METRICS
+# ============================================================
+rename_map = {}
 
-    # --- Core identifiers ---
-    if "Name" in df.columns:
-        rename_map["Name"] = "Player"
-    if "Primary Position" in df.columns:
-        rename_map["Primary Position"] = "Position"
-    if "Minutes" in df.columns:
-        rename_map["Minutes"] = "Minutes played"
+# --- Core identifiers ---
+if "Name" in df.columns:
+    rename_map["Name"] = "Player"
+if "Primary Position" in df.columns:
+    rename_map["Primary Position"] = "Position"
+if "Minutes" in df.columns:
+    rename_map["Minutes"] = "Minutes played"
 
-    # --- Passing & pressure behaviour ---
-    rename_map.update({
-        "Successful Box Cross %": "Successful Box Cross%",
-        "Player Season Box Cross Ratio": "Successful Box Cross%",
-        "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
-        "Player Season Pressured Long Balls 90": "Pr. Long Balls",
-        "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
-    })
+# --- Passing & pressure behaviour ---
+rename_map.update({
+    "Successful Box Cross %": "Successful Box Cross%",
+    "Player Season Box Cross Ratio": "Successful Box Cross%",
+    "Player Season Change In Passing Ratio": "Pr. Pass% Dif.",
+    "Player Season Pressured Long Balls 90": "Pr. Long Balls",
+    "Player Season Unpressured Long Balls 90": "UPr. Long Balls",
+})
 
-    # --- xG buildup (CRITICAL for 6s / 8s historical data) ---
-    rename_map.update({
-        "Player Season Xgbuildup 90": "xGBuildup",
-        "Player Season Op Xgbuildup 90": "xGBuildup",
-        "Player Season Xgbuildup": "xGBuildup",
-        "Player Season Op Xgbuildup": "xGBuildup",
-    })
+# --- xG buildup (CRITICAL for 6s / 8s historical data) ---
+rename_map.update({
+    "Player Season Xgbuildup 90": "xGBuildup",
+    "Player Season Op Xgbuildup 90": "xGBuildup",
+    "Player Season Xgbuildup": "xGBuildup",
+    "Player Season Op Xgbuildup": "xGBuildup",
+})
 
-    # --- Defensive / pressure location ---
-    rename_map.update({
-        "Player Season F3 Pressures 90": "Pressures in Final 1/3",
-        "Player Season Fhalf Pressures 90": "Player Season Fhalf Pressures 90",
-        "Player Season Fhalf Ball Recoveries 90": "Player Season Fhalf Ball Recoveries 90",
-        "Player Season Ball Recoveries 90": "Player Season Ball Recoveries 90",
-    })
+# --- Defensive / pressure location ---
+rename_map.update({
+    "Player Season F3 Pressures 90": "Pressures in Final 1/3",
+    "Player Season Fhalf Pressures 90": "Player Season Fhalf Pressures 90",
+    "Player Season Fhalf Ball Recoveries 90": "Player Season Fhalf Ball Recoveries 90",
+    "Player Season Ball Recoveries 90": "Player Season Ball Recoveries 90",
+})
 
-    # --- Possession progression naming consistency ---
-    rename_map.update({
-        "Progressions to Final 1/3": "Deep Progressions",
-        "Completed Passes Final 1/3": "Deep Completions",
-        "Lost Balls": "Turnovers",
-    })
+# --- Possession progression naming consistency ---
+rename_map.update({
+    "Progressions to Final 1/3": "Deep Progressions",
+    "Completed Passes Final 1/3": "Deep Completions",
+    "Lost Balls": "Turnovers",
+})
 
-    df.rename(columns=rename_map, inplace=True)
+df.rename(columns=rename_map, inplace=True)
 
 if "Primary Position" in df.columns:
     if "Secondary Position" in df.columns:
