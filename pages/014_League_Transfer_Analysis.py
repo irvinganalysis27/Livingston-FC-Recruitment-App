@@ -48,7 +48,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     position = st.selectbox(
         "Position",
-        sorted(df["position_group"].dropna().unique())
+        sorted(df["position"].dropna().unique())
     )
 
 with col2:
@@ -67,7 +67,7 @@ with col3:
 # Filter data
 # --------------------------------------------------
 filt = df[
-    (df["position_group"] == position) &
+    (df["position"] == position) &
     (df["from_league"] == from_league) &
     (df["to_league"] == to_league)
 ]
