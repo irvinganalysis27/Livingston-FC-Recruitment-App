@@ -292,27 +292,6 @@ df.columns = (
 
 # Standard ID columns
 rename_map = {}
-# ------------------------------------------------------------
-# 🛠 Handle historical StatsBomb column name variants
-# ------------------------------------------------------------
-historical_rename_map = {
-    # Passing under pressure
-    "Player Season Change In Passing Ratio 90": "Pr. Pass% Dif.",
-    "Change In Passing Ratio": "Pr. Pass% Dif.",
-
-    # Long balls
-    "Pressured Long Balls 90": "Pr. Long Balls",
-    "Unpressured Long Balls 90": "UPr. Long Balls",
-
-    # xG buildup
-    "xG Buildup": "xGBuildup",
-    "Player Season xG Buildup 90": "xGBuildup",
-}
-
-for old_col, new_col in historical_rename_map.items():
-    if old_col in df.columns and new_col not in df.columns:
-        df.rename(columns={old_col: new_col}, inplace=True)
-
 if "Name" in df.columns:
     rename_map["Name"] = "Player"
 if "Primary Position" in df.columns:
@@ -588,6 +567,10 @@ if st.session_state.template_select != st.session_state.last_template_choice:
 # Ensure metric columns exist and numeric
 metrics = position_metrics[selected_position_template]["metrics"]
 metric_groups = position_metrics[selected_position_template]["groups"]
+for m in metrics:
+    if m not in df.columns:
+        df[m] = 0
+df[metrics] = df[metrics].apply(pd.to_numeric, errors="coerce").fillna(0)
 
 # Essential Criteria (same UX, simple)
 with st.expander("Essential Criteria", expanded=False):
@@ -656,16 +639,6 @@ with st.expander("Essential Criteria", expanded=False):
 keep_cols = ["Player", "Team", "Age", "Height", "Positions played", "Minutes played", "Six-Group Position"]
 for c in keep_cols:
     if c not in df.columns: df[c] = np.nan
-
-# ---------- Ensure all template metrics exist AFTER preprocessing ----------
-current_template_name = st.session_state.template_select or list(position_metrics.keys())[0]
-current_metrics = position_metrics[current_template_name]["metrics"]
-
-for m in current_metrics:
-    if m not in df.columns:
-        df[m] = np.nan
-
-df[current_metrics] = df[current_metrics].apply(pd.to_numeric, errors="coerce").fillna(0)
 
 metrics_df = df[metrics].copy()
 
