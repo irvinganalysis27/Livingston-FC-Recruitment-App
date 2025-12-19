@@ -1585,7 +1585,7 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         hist_rows["Season_Label"] = (
             hist_rows["Season"].astype(str)
             + " | "
-            + hist_rows["League"].astype(str)
+            + hist_rows["Competition_norm"].astype(str)
             + " | "
             + hist_rows["Team"].astype(str)
         )
