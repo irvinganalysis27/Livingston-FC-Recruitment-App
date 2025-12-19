@@ -1283,13 +1283,6 @@ if not hist_df.empty:
         errors="coerce"
     ).fillna(0)
 
-show_history = False
-if not hist_df.empty:
-    show_history = st.checkbox(
-        "Show historical season ratings for this player",
-        value=False,
-        help="Uses precomputed season-level ratings (all leagues, all seasons)."
-    )
 
 # ---------- Z + 0–100 score (raw Z-scores for ranking, percentiles for radar only) ----------
 
@@ -1554,6 +1547,15 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
         pass
 
     st.pyplot(fig, width="stretch")
+
+    # ---------- Toggle historical season ratings (placed below radar) ----------
+    show_history = False
+    if not hist_df.empty:
+        show_history = st.checkbox(
+            "Show historical season ratings for this player",
+            value=False,
+            help="Uses precomputed season-level ratings (all leagues, all seasons)."
+        )
 
     # ============================================================
     # 📊 Historical Seasons Bar Chart
