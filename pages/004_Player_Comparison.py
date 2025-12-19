@@ -797,9 +797,8 @@ season_col = next((c for c in SEASON_COL_CANDIDATES if c in df.columns), None)
 
 if season_col:
     df[season_col] = df[season_col].astype(str).str.strip()
-    all_seasons = sorted([s for s in df[season_col].dropna().unique() if s])
 else:
-    all_seasons = []
+    season_col = None
 
 # ---------- Player A & B (with season selection) ----------
 players = df["Player"].dropna().unique().tolist()
@@ -810,11 +809,6 @@ if "cmpA" not in st.session_state:
     st.session_state.cmpA = players[0]
 if "cmpB" not in st.session_state:
     st.session_state.cmpB = players[1] if len(players) > 1 else None
-
-if "seasonA" not in st.session_state:
-    st.session_state.seasonA = all_seasons[0] if all_seasons else None
-if "seasonB" not in st.session_state:
-    st.session_state.seasonB = all_seasons[0] if all_seasons else None
 
 c1, c2 = st.columns(2)
 
@@ -827,11 +821,22 @@ with c1:
     )
     st.session_state.cmpA = pA
 
-    if season_col and all_seasons:
+    if season_col:
+        seasons_A = (
+            df.loc[df["Player"] == pA, season_col]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        seasons_A = sorted(seasons_A)
+
+        if "seasonA" not in st.session_state or st.session_state.seasonA not in seasons_A:
+            st.session_state.seasonA = seasons_A[0] if seasons_A else None
+
         seasonA = st.selectbox(
             "Season (Player A)",
-            all_seasons,
-            index=all_seasons.index(st.session_state.seasonA) if st.session_state.seasonA in all_seasons else 0,
+            seasons_A,
+            index=seasons_A.index(st.session_state.seasonA) if st.session_state.seasonA in seasons_A else 0,
             key="seasonA_sel"
         )
         st.session_state.seasonA = seasonA
@@ -848,11 +853,22 @@ with c2:
     pB = None if pB == "(none)" else pB
     st.session_state.cmpB = pB
 
-    if pB and season_col and all_seasons:
+    if pB and season_col:
+        seasons_B = (
+            df.loc[df["Player"] == pB, season_col]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+        seasons_B = sorted(seasons_B)
+
+        if "seasonB" not in st.session_state or st.session_state.seasonB not in seasons_B:
+            st.session_state.seasonB = seasons_B[0] if seasons_B else None
+
         seasonB = st.selectbox(
             "Season (Player B)",
-            all_seasons,
-            index=all_seasons.index(st.session_state.seasonB) if st.session_state.seasonB in all_seasons else 0,
+            seasons_B,
+            index=seasons_B.index(st.session_state.seasonB) if st.session_state.seasonB in seasons_B else 0,
             key="seasonB_sel"
         )
         st.session_state.seasonB = seasonB
