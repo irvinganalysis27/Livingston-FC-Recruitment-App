@@ -604,12 +604,42 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-# ---------- Data path ----------
-ROOT_DIR = Path(__file__).parent.parent
-DATA_PATH = ROOT_DIR / "statsbomb_player_stats_clean.csv"
 
-# ---------- Load + preprocess ----------
-df_all_raw = load_statsbomb(DATA_PATH, _sig=_data_signature(DATA_PATH))
+# ---------- Data source: historical StatsBomb season files ----------
+ROOT_DIR = Path(__file__).parent.parent
+HIST_DIR = ROOT_DIR / "data" / "statsbomb"
+
+@st.cache_data(show_spinner=False)
+def load_all_historical_statsbomb(base_dir: Path) -> pd.DataFrame:
+    frames = []
+
+    for league_dir in sorted(base_dir.iterdir()):
+        if not league_dir.is_dir():
+            continue
+
+        league_name = league_dir.name
+
+        for f in league_dir.glob("*_clean.csv"):
+            season = f.stem.replace("_clean", "")
+
+            try:
+                df_season = pd.read_csv(f)
+            except Exception:
+                continue
+
+            df_season["League"] = league_name
+            df_season["Season"] = season
+            frames.append(df_season)
+
+    if not frames:
+        raise ValueError("No historical StatsBomb files found in data/statsbomb")
+
+    df_all = pd.concat(frames, ignore_index=True, sort=False)
+    return df_all
+
+# ---------- Load + preprocess historical data ----------
+df_all_raw = load_all_historical_statsbomb(HIST_DIR)
+
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
     .str.strip()
@@ -617,14 +647,15 @@ df_all_raw.columns = (
     .str.replace(r"\s+", " ", regex=True)
 )
 
-# ---------- Add Age column from Birth Date (fix for comparison page) ----------
+# Add Age column from Birth Date if available
 if "Birth Date" in df_all_raw.columns:
     today = datetime.today()
-    df_all_raw["Age"] = pd.to_datetime(df_all_raw["Birth Date"], errors="coerce").apply(
+    df_all_raw["Age"] = pd.to_datetime(
+        df_all_raw["Birth Date"], errors="coerce"
+    ).apply(
         lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if pd.notna(dob) else np.nan
     )
-    print(f"[DEBUG] Age column created. Non-null ages: {df_all_raw['Age'].notna().sum()}")
 
 df_all = preprocess_df(df_all_raw)
 df = df_all.copy()
