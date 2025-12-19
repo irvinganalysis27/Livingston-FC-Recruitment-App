@@ -79,7 +79,7 @@ def render_sidebar():
             st.divider()
             st.page_link(
                 "pages/014_League_Transfer_Analysis.py",
-                label="League Transition Explorer"
+                label="League Transfeer Analysis"
             )
 
         # ---------- Squad Tools ----------
