@@ -120,7 +120,13 @@ LEAGUE_SYNONYMS = {
 
 # ========== Role groups shown in filters ==========
 SIX_GROUPS = [
-    "Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"
+    "Full Back",
+    "Centre Back",
+    "Number 6",
+    "Number 8",
+    "Number 10",
+    "Winger",
+    "Striker"
 ]
 
 # ========== Position → group mapping ==========
@@ -150,11 +156,11 @@ RAW_TO_SIX = {
     "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "CENTREDEFENSIVEMIDFIELDER": "Number 6",
 
-    # Attacking mids / 10 → 8
-    "CENTREATTACKINGMIDFIELDER": "Number 8",
-    "ATTACKINGMIDFIELDER": "Number 8",
-    "SECONDSTRIKER": "Number 8",
-    "10": "Number 8",
+    # Attacking mids / 10 → Number 10
+    "CENTREATTACKINGMIDFIELDER": "Number 10",
+    "ATTACKINGMIDFIELDER": "Number 10",
+    "SECONDSTRIKER": "Number 10",
+    "10": "Number 10",
 
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
