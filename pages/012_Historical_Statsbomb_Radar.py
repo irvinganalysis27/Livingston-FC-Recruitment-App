@@ -410,7 +410,10 @@ if "Player Id" in df.columns:
         ["Player Id", "last_match_dt"],
         ascending=[True, False]
     )
-    df = df.drop_duplicates(subset=["Player Id"], keep="first")
+    df = df.drop_duplicates(
+        subset=["Player Id", "Six-Group Position"],
+        keep="first"
+    )
 
 # Standard id columns
 rename_map = {}
@@ -423,6 +426,12 @@ df.rename(columns=rename_map, inplace=True)
 # Example: multiple xGBuildup source columns can become duplicate `xGBuildup` after rename.
 if df.columns.duplicated().any():
     df = df.loc[:, ~df.columns.duplicated()].copy()
+
+if "Player Id" in df.columns:
+    df = df.drop_duplicates(
+        subset=["Player Id", "Six-Group Position"],
+        keep="first"
+    )
 
 
 # League column normalisation (no mapping needed)
