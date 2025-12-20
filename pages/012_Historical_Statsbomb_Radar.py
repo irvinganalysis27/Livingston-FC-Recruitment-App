@@ -405,16 +405,6 @@ if match_col:
 else:
     df["last_match_dt"] = pd.NaT
 
-if "Player Id" in df.columns:
-    df = df.sort_values(
-        ["Player Id", "last_match_dt"],
-        ascending=[True, False]
-    )
-    # At this point Six-Group Position may not exist yet, so dedupe only by Player Id
-    df = df.drop_duplicates(
-        subset=["Player Id"],
-        keep="first"
-    )
 
 # Standard id columns
 rename_map = {}
@@ -444,8 +434,12 @@ df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competiti
 df["Six-Group Position"] = df.get("Positions played", "").apply(map_positions_to_groups)
 df = df.explode("Six-Group Position").reset_index(drop=True)
 
-# Final dedupe: player + role + season context
+# Final dedupe: keep most recent match per player + role
 if "Player Id" in df.columns:
+    df = df.sort_values(
+        ["Player Id", "Six-Group Position", "last_match_dt"],
+        ascending=[True, True, False]
+    )
     df = df.drop_duplicates(
         subset=["Player Id", "Six-Group Position"],
         keep="first"
