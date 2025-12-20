@@ -399,8 +399,9 @@ if "Player Id" in df.columns:
         ["Player Id", "last_match_dt"],
         ascending=[True, False]
     )
+    # At this point Six-Group Position may not exist yet, so dedupe only by Player Id
     df = df.drop_duplicates(
-        subset=["Player Id", "Six-Group Position"],
+        subset=["Player Id"],
         keep="first"
     )
 
@@ -416,11 +417,6 @@ df.rename(columns=rename_map, inplace=True)
 if df.columns.duplicated().any():
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
-if "Player Id" in df.columns:
-    df = df.drop_duplicates(
-        subset=["Player Id", "Six-Group Position"],
-        keep="first"
-    )
 
 
 # League column normalisation (no mapping needed)
