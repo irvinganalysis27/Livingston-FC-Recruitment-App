@@ -51,9 +51,20 @@ RAW_TO_SIX = {
     "SECONDSTRIKER": "Striker", "10": "Striker",
 }
 
-def map_first_position_to_group(primary_pos_cell) -> str:
-    tok = _clean_pos_token(primary_pos_cell)
-    return RAW_TO_SIX.get(tok, None)
+def map_positions_to_groups(pos_cell):
+    if pd.isna(pos_cell):
+        return []
+    tokens = [
+        _clean_pos_token(t)
+        for t in str(pos_cell).split(",")
+        if _clean_pos_token(t)
+    ]
+    groups = []
+    for tok in tokens:
+        g = RAW_TO_SIX.get(tok)
+        if g and g not in groups:
+            groups.append(g)
+    return groups
 
 # Position templates (same as your StatsBomb radar)
 position_metrics = {
@@ -430,65 +441,8 @@ df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competiti
 
 # ================== POSITION → SIX-GROUP EXPANSION (AUTHORITATIVE) ==================
 
-# Base mapping
-df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
-
-# Clean token once
-df["_pos_token"] = df.get("Position", "").apply(_clean_pos_token)
-
-rows = [df]
-
-# --- True centre midfielders → duplicate into 6 and 8 ---
-cm_tokens = {
-    "CENTREMIDFIELDER",
-    "RIGHTCENTREMIDFIELDER",
-    "LEFTCENTREMIDFIELDER",
-}
-cm_mask = df["_pos_token"].isin(cm_tokens)
-if cm_mask.any():
-    cm6 = df.loc[cm_mask].copy()
-    cm6["Six-Group Position"] = "Number 6"
-    cm8 = df.loc[cm_mask].copy()
-    cm8["Six-Group Position"] = "Number 8"
-    rows.extend([cm6, cm8])
-
-# --- Attacking midfielders → ALSO Number 8 and Number 10 ---
-am_tokens = {
-    "CENTREATTACKINGMIDFIELDER",
-    "RIGHTATTACKINGMIDFIELDER",
-    "LEFTATTACKINGMIDFIELDER",
-}
-am_mask = df["_pos_token"].isin(am_tokens)
-if am_mask.any():
-    am8 = df.loc[am_mask].copy()
-    am8["Six-Group Position"] = "Number 8"
-    am10 = df.loc[am_mask].copy()
-    am10["Six-Group Position"] = "Number 10"
-    rows.extend([am8, am10])
-
-# --- Defensive midfielders → ALSO Number 6 ---
-dm_tokens = {
-    "DEFENSIVEMIDFIELDER",
-    "RIGHTDEFENSIVEMIDFIELDER",
-    "LEFTDEFENSIVEMIDFIELDER",
-    "CENTREDEFENSIVEMIDFIELDER",
-}
-dm_mask = df["_pos_token"].isin(dm_tokens)
-if dm_mask.any():
-    dm6 = df.loc[dm_mask].copy()
-    dm6["Six-Group Position"] = "Number 6"
-    rows.append(dm6)
-
-# --- Second striker / explicit 10 → ALSO Number 10 ---
-ss_tokens = {"SECONDSTRIKER", "10"}
-ss_mask = df["_pos_token"].isin(ss_tokens)
-if ss_mask.any():
-    ss10 = df.loc[ss_mask].copy()
-    ss10["Six-Group Position"] = "Number 10"
-    rows.append(ss10)
-
-# Rebuild dataframe with all role variants
-df = pd.concat(rows, ignore_index=True)
+df["Six-Group Position"] = df.get("Positions played", "").apply(map_positions_to_groups)
+df = df.explode("Six-Group Position").reset_index(drop=True)
 
 # Final dedupe: player + role + season context
 if "Player Id" in df.columns:
@@ -496,9 +450,6 @@ if "Player Id" in df.columns:
         subset=["Player Id", "Six-Group Position"],
         keep="first"
     )
-
-# Cleanup
-df.drop(columns=["_pos_token"], inplace=True, errors="ignore")
 
 # Age derivation if Birth Date exists
 if "Birth Date" in df.columns and "Age" not in df.columns:
