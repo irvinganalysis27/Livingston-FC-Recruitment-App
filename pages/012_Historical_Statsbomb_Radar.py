@@ -369,17 +369,6 @@ if "Successful Box Cross %" in df.columns:
 if "Player Season Box Cross Ratio" in df.columns:
     df.rename(columns={"Player Season Box Cross Ratio": "Successful Box Cross%"}, inplace=True)
 
-# Position mapping (no league logic)
-df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
-
-# Duplicate true central midfielders into 6 and 8
-cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-if cm_mask.any():
-    cm_as_6 = df.loc[cm_mask].copy()
-    cm_as_6["Six-Group Position"] = "Number 6"
-    cm_as_8 = df.loc[cm_mask].copy()
-    cm_as_8["Six-Group Position"] = "Number 8"
-    df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
 
 # Age derivation if Birth Date exists
@@ -443,45 +432,76 @@ if "Competition" not in df.columns:
 
 df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competition" in df.columns else np.nan
 
-# Position mapping
+# ================== POSITION → SIX-GROUP EXPANSION (AUTHORITATIVE) ==================
+
+# Base mapping
 df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
 
-# Duplicate true central midfielders into 6 and 8
-cm_mask = df["Six-Group Position"].eq("Centre Midfield")
-if cm_mask.any():
-    cm_as_6 = df.loc[cm_mask].copy(); cm_as_6["Six-Group Position"] = "Number 6"
-    cm_as_8 = df.loc[cm_mask].copy(); cm_as_8["Six-Group Position"] = "Number 8"
-    df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
-
-# Duplicate Attacking Mids, Second Striker and 10 into Number 10 as well
-# (keep their original mapped role too)
+# Clean token once
 df["_pos_token"] = df.get("Position", "").apply(_clean_pos_token)
 
+rows = [df]
+
+# --- True centre midfielders → duplicate into 6 and 8 ---
+cm_tokens = {
+    "CENTREMIDFIELDER",
+    "RIGHTCENTREMIDFIELDER",
+    "LEFTCENTREMIDFIELDER",
+}
+cm_mask = df["_pos_token"].isin(cm_tokens)
+if cm_mask.any():
+    cm6 = df.loc[cm_mask].copy()
+    cm6["Six-Group Position"] = "Number 6"
+    cm8 = df.loc[cm_mask].copy()
+    cm8["Six-Group Position"] = "Number 8"
+    rows.extend([cm6, cm8])
+
+# --- Attacking midfielders → ALSO Number 8 and Number 10 ---
 am_tokens = {
     "CENTREATTACKINGMIDFIELDER",
     "RIGHTATTACKINGMIDFIELDER",
     "LEFTATTACKINGMIDFIELDER",
 }
-ss_tokens = {
-    "SECONDSTRIKER",
-    "10",
-}
-
-# Attacking mids -> also Number 10
 am_mask = df["_pos_token"].isin(am_tokens)
 if am_mask.any():
-    am_as_10 = df.loc[am_mask].copy()
-    am_as_10["Six-Group Position"] = "Number 10"
-    df = pd.concat([df, am_as_10], ignore_index=True)
+    am8 = df.loc[am_mask].copy()
+    am8["Six-Group Position"] = "Number 8"
+    am10 = df.loc[am_mask].copy()
+    am10["Six-Group Position"] = "Number 10"
+    rows.extend([am8, am10])
 
-# Second striker and explicit 10 -> also Number 10
+# --- Defensive midfielders → ALSO Number 6 ---
+dm_tokens = {
+    "DEFENSIVEMIDFIELDER",
+    "RIGHTDEFENSIVEMIDFIELDER",
+    "LEFTDEFENSIVEMIDFIELDER",
+    "CENTREDEFENSIVEMIDFIELDER",
+}
+dm_mask = df["_pos_token"].isin(dm_tokens)
+if dm_mask.any():
+    dm6 = df.loc[dm_mask].copy()
+    dm6["Six-Group Position"] = "Number 6"
+    rows.append(dm6)
+
+# --- Second striker / explicit 10 → ALSO Number 10 ---
+ss_tokens = {"SECONDSTRIKER", "10"}
 ss_mask = df["_pos_token"].isin(ss_tokens)
 if ss_mask.any():
-    ss_as_10 = df.loc[ss_mask].copy()
-    ss_as_10["Six-Group Position"] = "Number 10"
-    df = pd.concat([df, ss_as_10], ignore_index=True)
+    ss10 = df.loc[ss_mask].copy()
+    ss10["Six-Group Position"] = "Number 10"
+    rows.append(ss10)
 
-# Clean up helper column
+# Rebuild dataframe with all role variants
+df = pd.concat(rows, ignore_index=True)
+
+# Final dedupe: player + role + season context
+if "Player Id" in df.columns:
+    df = df.drop_duplicates(
+        subset=["Player Id", "Six-Group Position"],
+        keep="first"
+    )
+
+# Cleanup
 df.drop(columns=["_pos_token"], inplace=True, errors="ignore")
 
 # Age derivation if Birth Date exists
