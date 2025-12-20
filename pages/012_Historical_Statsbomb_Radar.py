@@ -429,19 +429,40 @@ if "Competition" not in df.columns:
 
 df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competition" in df.columns else np.nan
 
+
+# ================== EARLY MINUTES SANITISATION (CRITICAL) ==================
+minutes_col = "Minutes played"
+if minutes_col not in df.columns:
+    df[minutes_col] = np.nan
+
+df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+
+# Drop rows with completely missing minutes BEFORE position explosion
+df = df[df["_minutes_numeric"].notna()].copy()
+
 # ================== POSITION → SIX-GROUP EXPANSION (AUTHORITATIVE) ==================
 
 df["Six-Group Position"] = df.get("Positions played", "").apply(map_positions_to_groups)
 df = df.explode("Six-Group Position").reset_index(drop=True)
 
-# Final dedupe: keep most recent match per player + role
-if "Player Id" in df.columns:
+# ================== SAFE FINAL DEDUPE ==================
+if "Player Id" in df.columns and df["Player Id"].notna().any():
     df = df.sort_values(
         ["Player Id", "Six-Group Position", "last_match_dt"],
         ascending=[True, True, False]
     )
     df = df.drop_duplicates(
         subset=["Player Id", "Six-Group Position"],
+        keep="first"
+    )
+else:
+    # Fallback when Player Id is missing or unreliable (common in historical files)
+    df = df.sort_values(
+        ["Player", "Team", "Six-Group Position", "last_match_dt"],
+        ascending=[True, True, True, False]
+    )
+    df = df.drop_duplicates(
+        subset=["Player", "Team", "Six-Group Position"],
         keep="first"
     )
 
@@ -453,11 +474,6 @@ if "Birth Date" in df.columns and "Age" not in df.columns:
 
 # ========== Minutes + Age Filters (same layout as main radar) ==========
 
-minutes_col = "Minutes played"
-if minutes_col not in df.columns:
-    df[minutes_col] = np.nan
-
-df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 
 # Determine dataset-wide max for minutes
 max_minutes_available = int(np.nanmax(df["_minutes_numeric"])) if df["_minutes_numeric"].notna().any() else 0
