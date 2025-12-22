@@ -29,6 +29,19 @@ APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 DATA_DIR = ROOT_DIR / "data" / "statsbomb"
 
+# ========== Historical Ratings Path ==========
+HIST_RATINGS_PATH = ROOT_DIR / "data" / "player_season_ratings_statsbomb.csv"
+# ========== Historical Season Ratings Loader ==========
+@st.cache_data(show_spinner=False)
+def load_historical_season_ratings(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path)
+    df.columns = df.columns.str.strip()
+    if "LFC Score (0–100)" in df.columns:
+        df["LFC Score (0–100)"] = pd.to_numeric(df["LFC Score (0–100)"], errors="coerce").fillna(0)
+    return df
+
 SIX_GROUPS = ["Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"]
 
 def _clean_pos_token(tok: str) -> str:
@@ -865,6 +878,70 @@ group_colors = {
 }
 if st.session_state.selected_player:
     plot_radial_bar_grouped(st.session_state.selected_player, plot_data, metric_groups, group_colors)
+
+
+# ============================================================
+# 📈 Historical Season Ratings (Player-level)
+# ============================================================
+
+hist_df = load_historical_season_ratings(HIST_RATINGS_PATH)
+
+if not hist_df.empty:
+    show_history = st.checkbox(
+        "Show historical season ratings for this player",
+        value=False,
+        help="Shows precomputed season-level LFC scores across all leagues."
+    )
+
+    if show_history:
+        row = plot_data.loc[plot_data["Player"] == st.session_state.selected_player].iloc[0]
+        pid = row.get("Player Id") or row.get("player_id")
+        pname = row.get("Player")
+
+        hist_rows = hist_df.copy()
+
+        # Prefer player_id if available
+        if pid is not None and "player_id" in hist_rows.columns:
+            hist_rows = hist_rows[hist_rows["player_id"] == pid]
+        else:
+            hist_rows = hist_rows[hist_rows["Player"] == pname]
+
+        if hist_rows.empty:
+            st.info("No historical season ratings found for this player.")
+        else:
+            # One row per season (best score if duplicates)
+            hist_rows = (
+                hist_rows
+                .sort_values("LFC Score (0–100)", ascending=False)
+                .drop_duplicates(subset=["Season"], keep="first")
+                .sort_values("Season")
+            )
+
+            # Build display labels
+            hist_rows["Season_Label"] = (
+                hist_rows["Season"].astype(str)
+                + " | "
+                + hist_rows.get("Competition_norm", hist_rows.get("Competition", "")).astype(str)
+                + " | "
+                + hist_rows.get("Team", "").astype(str)
+            )
+
+            # Plot
+            fig2, ax2 = plt.subplots(figsize=(8, 3))
+            ax2.bar(
+                hist_rows["Season_Label"],
+                hist_rows["LFC Score (0–100)"],
+                color="goldenrod",
+                edgecolor="black"
+            )
+
+            ax2.set_ylabel("LFC Score (0–100)")
+            ax2.set_title(f"{pname} — Season Ratings")
+            ax2.set_ylim(0, 100)
+            ax2.tick_params(axis="x", rotation=30, labelsize=8)
+            ax2.margins(x=0.02)
+
+            st.pyplot(fig2, width="stretch")
 
 # ================== Ranking Table (identical layout) ==================
 st.markdown("### Players Ranked by Z-Score")
