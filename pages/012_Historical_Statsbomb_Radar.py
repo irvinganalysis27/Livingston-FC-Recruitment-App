@@ -51,20 +51,9 @@ RAW_TO_SIX = {
     "SECONDSTRIKER": "Striker", "10": "Striker",
 }
 
-def map_positions_to_groups(pos_cell):
-    if pd.isna(pos_cell):
-        return []
-    tokens = [
-        _clean_pos_token(t)
-        for t in str(pos_cell).split(",")
-        if _clean_pos_token(t)
-    ]
-    groups = []
-    for tok in tokens:
-        g = RAW_TO_SIX.get(tok)
-        if g and g not in groups:
-            groups.append(g)
-    return groups
+def map_first_position_to_group(primary_pos_cell) -> str:
+    tok = _clean_pos_token(primary_pos_cell)
+    return RAW_TO_SIX.get(tok, None)
 
 # Position templates (same as your StatsBomb radar)
 position_metrics = {
@@ -380,6 +369,17 @@ if "Successful Box Cross %" in df.columns:
 if "Player Season Box Cross Ratio" in df.columns:
     df.rename(columns={"Player Season Box Cross Ratio": "Successful Box Cross%"}, inplace=True)
 
+# Position mapping (no league logic)
+df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
+
+# Duplicate true central midfielders into 6 and 8
+cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+if cm_mask.any():
+    cm_as_6 = df.loc[cm_mask].copy()
+    cm_as_6["Six-Group Position"] = "Number 6"
+    cm_as_8 = df.loc[cm_mask].copy()
+    cm_as_8["Six-Group Position"] = "Number 8"
+    df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
 
 # Age derivation if Birth Date exists
@@ -405,6 +405,12 @@ if match_col:
 else:
     df["last_match_dt"] = pd.NaT
 
+if "Player Id" in df.columns:
+    df = df.sort_values(
+        ["Player Id", "last_match_dt"],
+        ascending=[True, False]
+    )
+    df = df.drop_duplicates(subset=["Player Id"], keep="first")
 
 # Standard id columns
 rename_map = {}
@@ -419,7 +425,6 @@ if df.columns.duplicated().any():
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
 
-
 # League column normalisation (no mapping needed)
 if "Competition" not in df.columns:
     for alt in ["competition", "competition_name", "league", "league_name"]:
@@ -429,42 +434,46 @@ if "Competition" not in df.columns:
 
 df["Competition_norm"] = df["Competition"].astype(str).str.strip() if "Competition" in df.columns else np.nan
 
+# Position mapping
+df["Six-Group Position"] = df.get("Position", "").apply(map_first_position_to_group)
 
-# ================== EARLY MINUTES SANITISATION (CRITICAL) ==================
-minutes_col = "Minutes played"
-if minutes_col not in df.columns:
-    df[minutes_col] = np.nan
+# Duplicate true central midfielders into 6 and 8
+cm_mask = df["Six-Group Position"].eq("Centre Midfield")
+if cm_mask.any():
+    cm_as_6 = df.loc[cm_mask].copy(); cm_as_6["Six-Group Position"] = "Number 6"
+    cm_as_8 = df.loc[cm_mask].copy(); cm_as_8["Six-Group Position"] = "Number 8"
+    df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
-df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+# Duplicate Attacking Mids, Second Striker and 10 into Number 10 as well
+# (keep their original mapped role too)
+df["_pos_token"] = df.get("Position", "").apply(_clean_pos_token)
 
-# Drop rows with completely missing minutes BEFORE position explosion
-df = df[df["_minutes_numeric"].notna()].copy()
+am_tokens = {
+    "CENTREATTACKINGMIDFIELDER",
+    "RIGHTATTACKINGMIDFIELDER",
+    "LEFTATTACKINGMIDFIELDER",
+}
+ss_tokens = {
+    "SECONDSTRIKER",
+    "10",
+}
 
-# ================== POSITION → SIX-GROUP EXPANSION (AUTHORITATIVE) ==================
+# Attacking mids -> also Number 10
+am_mask = df["_pos_token"].isin(am_tokens)
+if am_mask.any():
+    am_as_10 = df.loc[am_mask].copy()
+    am_as_10["Six-Group Position"] = "Number 10"
+    df = pd.concat([df, am_as_10], ignore_index=True)
 
-df["Six-Group Position"] = df.get("Positions played", "").apply(map_positions_to_groups)
-df = df.explode("Six-Group Position").reset_index(drop=True)
+# Second striker and explicit 10 -> also Number 10
+ss_mask = df["_pos_token"].isin(ss_tokens)
+if ss_mask.any():
+    ss_as_10 = df.loc[ss_mask].copy()
+    ss_as_10["Six-Group Position"] = "Number 10"
+    df = pd.concat([df, ss_as_10], ignore_index=True)
 
-# ================== SAFE FINAL DEDUPE ==================
-if "Player Id" in df.columns and df["Player Id"].notna().any():
-    df = df.sort_values(
-        ["Player Id", "Six-Group Position", "last_match_dt"],
-        ascending=[True, True, False]
-    )
-    df = df.drop_duplicates(
-        subset=["Player Id", "Six-Group Position"],
-        keep="first"
-    )
-else:
-    # Fallback when Player Id is missing or unreliable (common in historical files)
-    df = df.sort_values(
-        ["Player", "Team", "Six-Group Position", "last_match_dt"],
-        ascending=[True, True, True, False]
-    )
-    df = df.drop_duplicates(
-        subset=["Player", "Team", "Six-Group Position"],
-        keep="first"
-    )
+# Clean up helper column
+df.drop(columns=["_pos_token"], inplace=True, errors="ignore")
 
 # Age derivation if Birth Date exists
 if "Birth Date" in df.columns and "Age" not in df.columns:
@@ -474,6 +483,11 @@ if "Birth Date" in df.columns and "Age" not in df.columns:
 
 # ========== Minutes + Age Filters (same layout as main radar) ==========
 
+minutes_col = "Minutes played"
+if minutes_col not in df.columns:
+    df[minutes_col] = np.nan
+
+df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
 
 # Determine dataset-wide max for minutes
 max_minutes_available = int(np.nanmax(df["_minutes_numeric"])) if df["_minutes_numeric"].notna().any() else 0
