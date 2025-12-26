@@ -971,8 +971,25 @@ def get_player_row(player, season):
 rowA = get_player_row(pA, seasonA)
 rowB = get_player_row(pB, seasonB) if pB else None
 
-rowA_pct = pct_df.loc[rowA.name, metrics] if rowA is not None else None
-rowB_pct = pct_df.loc[rowB.name, metrics] if rowB is not None else None
+if rowA is not None:
+    rowA_pct = (
+        pct_df.loc[rowA.name]
+        .reindex(metrics)
+        .fillna(0)
+        .values
+    )
+else:
+    rowA_pct = np.zeros(len(metrics))
+
+if rowB is not None:
+    rowB_pct = (
+        pct_df.loc[rowB.name]
+        .reindex(metrics)
+        .fillna(0)
+        .values
+    )
+else:
+    rowB_pct = None
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
