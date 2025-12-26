@@ -981,8 +981,15 @@ def get_pct_row(player, season):
         sub = sub[sub[season_col] == season]
     if sub.empty:
         return None
+
     idx = sub.index[0]
-    return pct_df.loc[idx].reindex(metrics)
+    row = pct_df.loc[idx]
+
+    # Ensure no duplicate index labels before reindexing
+    row = row[~row.index.duplicated(keep="first")]
+
+    # Reindex safely to metrics order
+    return row.reindex(metrics).fillna(0)
 
 rowA_pct = get_pct_row(pA, seasonA)
 rowB_pct = get_pct_row(pB, seasonB) if pB else None
