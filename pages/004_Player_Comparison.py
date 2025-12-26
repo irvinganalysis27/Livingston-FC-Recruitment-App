@@ -959,6 +959,18 @@ def compute_percentiles(metrics_list, group_df):
 
     return raw, pct.round(1)
 
+# --- Ensure ONE row per player-season for radar ---
+dedupe_cols = ["Player"]
+if season_col:
+    dedupe_cols.append(season_col)
+
+df = (
+    df
+    .sort_values(dedupe_cols)
+    .drop_duplicates(subset=dedupe_cols, keep="first")
+    .copy()
+)
+
 # ---------- Extract player percentiles ----------
 raw_df, pct_df = compute_percentiles(metrics, df)
 
