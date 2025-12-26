@@ -991,8 +991,19 @@ def get_pct_row(player, season):
     # Reindex safely to metrics order
     return row.reindex(metrics).fillna(0)
 
+
 rowA_pct = get_pct_row(pA, seasonA)
 rowB_pct = get_pct_row(pB, seasonB) if pB else None
+
+# --- Resolve single rows for title display (team / season) ---
+def get_player_row_for_title(player, season):
+    sub = df_radar[df_radar["Player"] == player]
+    if season_col and season:
+        sub = sub[sub[season_col] == season]
+    return sub.iloc[0] if not sub.empty else None
+
+rowA = get_player_row_for_title(pA, seasonA)
+rowB = get_player_row_for_title(pB, seasonB) if pB else None
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
