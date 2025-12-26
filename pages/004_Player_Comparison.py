@@ -996,6 +996,7 @@ rowB_pct = get_pct_row(pB, seasonB) if pB else None
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
+                  A_team="", B_team="", A_season="", B_season="",
                   labels_to_genre=None, genre_colors=None):
     import matplotlib.patches as mpatches
 
@@ -1043,7 +1044,7 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         # Player A (left, yellow)
         ax.text(
             0.02, 1.14,
-            f"{A_name}\n{rowA.get('Team', '')}\n{seasonA}",
+            f"{A_name}\n{A_team}\n{A_season}",
             transform=ax.transAxes,
             ha="left", va="top",
             fontsize=15, fontweight="bold", color=color_A
@@ -1052,7 +1053,7 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         # Player B (right, black)
         ax.text(
             0.98, 1.14,
-            f"{B_name}\n{rowB.get('Team', '')}\n{seasonB}",
+            f"{B_name}\n{B_team}\n{B_season}",
             transform=ax.transAxes,
             ha="right", va="top",
             fontsize=15, fontweight="bold", color=color_B
@@ -1061,7 +1062,7 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         # Single-player title (left aligned)
         ax.text(
             0.02, 1.14,
-            f"{A_name}\n{rowA.get('Team', '')}\n{seasonA}",
+            f"{A_name}\n{A_team}\n{A_season}",
             transform=ax.transAxes,
             ha="left", va="top",
             fontsize=15, fontweight="bold", color=color_A
@@ -1094,8 +1095,12 @@ B_vals = rowB_pct.values if rowB_pct is not None else None
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
     A_name=pA, B_name=pB,
+    A_team=rowA.get("Team", "") if rowA is not None else "",
+    B_team=rowB.get("Team", "") if rowB is not None else "",
+    A_season=seasonA,
+    B_season=seasonB,
     labels_to_genre=labels_to_genre,
-    genre_colors=group_colors   # <-- FIXED
+    genre_colors=group_colors
 )
 st.pyplot(fig, use_container_width=True)
 
