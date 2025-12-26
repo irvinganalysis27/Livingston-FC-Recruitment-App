@@ -161,6 +161,9 @@ RAW_TO_SIX = {
     "ATTACKINGMIDFIELDER": "Number 10",
     "SECONDSTRIKER": "Number 10",
     "10": "Number 10",
+    # Wide attacking midfielders → Number 10
+    "RIGHTATTACKINGMIDFIELDER": "Number 10",
+    "LEFTATTACKINGMIDFIELDER": "Number 10",
 
     # Wingers / wide mids
     "RIGHTWING": "Winger", "LEFTWING": "Winger",
@@ -593,20 +596,36 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Height" not in df.columns:
         df["Height"] = np.nan
 
-    # --- Six-Group Position mapping ---
+    # --- Six-Group Position mapping (primary + secondary, fully aligned with Historical Radar) ---
+    def map_positions_to_groups(row):
+        groups = set()
+
+        primary = map_first_position_to_group(row.get("Position", None))
+        secondary = map_first_position_to_group(row.get("Secondary Position", None))
+
+        if primary:
+            groups.add(primary)
+        if secondary:
+            groups.add(secondary)
+
+        # Expand generic Centre Midfield into both 6 & 8
+        if "Centre Midfield" in groups:
+            groups.remove("Centre Midfield")
+            groups.update(["Number 6", "Number 8"])
+
+        # Expand attacking midfielders into Number 8 as well
+        if "Number 10" in groups:
+            groups.add("Number 8")
+
+        return list(groups)
+
     if "Position" in df.columns:
-        df["Six-Group Position"] = df["Position"].apply(map_first_position_to_group)
+        df["_six_groups_list"] = df.apply(map_positions_to_groups, axis=1)
+        df = df.explode("_six_groups_list")
+        df["Six-Group Position"] = df["_six_groups_list"]
+        df.drop(columns="_six_groups_list", inplace=True)
     else:
         df["Six-Group Position"] = np.nan
-
-    # --- Duplicate generic CMs into both 6 & 8 ---
-    if "Six-Group Position" in df.columns:
-        cm_mask = df["Six-Group Position"] == "Centre Midfield"
-        if cm_mask.any():
-            cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
-            df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
 
