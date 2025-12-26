@@ -1085,8 +1085,8 @@ labels_to_genre = {
     for lbl, m in zip(labels_clean, metrics)
 }
 
-A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
-B_vals = rowB_pct.values if rowB_pct is not None else None
+A_vals = rowA_pct if rowA_pct is not None else np.zeros(len(metrics))
+B_vals = rowB_pct if rowB_pct is not None else None
 
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
