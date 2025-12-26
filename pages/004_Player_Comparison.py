@@ -959,49 +959,33 @@ def compute_percentiles(metrics_list, group_df):
 
     return raw, pct.round(1)
 
-# --- Ensure ONE row per player-season for radar ---
+# --- Ensure unique index for percentile lookup ---
+# After exploding positions, multiple rows per player-season can exist.
+# For radar plotting we must enforce ONE row per player-season.
 dedupe_cols = ["Player"]
 if season_col:
     dedupe_cols.append(season_col)
 
-df = (
+df_radar = (
     df
     .sort_values(dedupe_cols)
     .drop_duplicates(subset=dedupe_cols, keep="first")
     .copy()
 )
 
-# ---------- Extract player percentiles ----------
-raw_df, pct_df = compute_percentiles(metrics, df)
+raw_df, pct_df = compute_percentiles(metrics, df_radar)
 
-def get_player_row(player, season):
-    sub = df[df["Player"] == player]
+def get_pct_row(player, season):
+    sub = df_radar[df_radar["Player"] == player]
     if season_col and season:
         sub = sub[sub[season_col] == season]
-    return sub.iloc[0] if not sub.empty else None
+    if sub.empty:
+        return None
+    idx = sub.index[0]
+    return pct_df.loc[idx].reindex(metrics)
 
-rowA = get_player_row(pA, seasonA)
-rowB = get_player_row(pB, seasonB) if pB else None
-
-if rowA is not None:
-    rowA_pct = (
-        pct_df.loc[rowA.name]
-        .reindex(metrics)
-        .fillna(0)
-        .values
-    )
-else:
-    rowA_pct = np.zeros(len(metrics))
-
-if rowB is not None:
-    rowB_pct = (
-        pct_df.loc[rowB.name]
-        .reindex(metrics)
-        .fillna(0)
-        .values
-    )
-else:
-    rowB_pct = None
+rowA_pct = get_pct_row(pA, seasonA)
+rowB_pct = get_pct_row(pB, seasonB) if pB else None
 
 # ---------- Radar compare ----------
 def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
@@ -1097,8 +1081,8 @@ labels_to_genre = {
     for lbl, m in zip(labels_clean, metrics)
 }
 
-A_vals = rowA_pct if rowA_pct is not None else np.zeros(len(metrics))
-B_vals = rowB_pct if rowB_pct is not None else None
+A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
+B_vals = rowB_pct.values if rowB_pct is not None else None
 
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
