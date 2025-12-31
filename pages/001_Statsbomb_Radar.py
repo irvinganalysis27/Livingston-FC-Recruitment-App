@@ -1583,14 +1583,22 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             .sort_values("Season")
         )
 
-        # --- Build clean labels ---
-        hist_rows["Season_Label"] = (
-            hist_rows["Season"].astype(str)
-            + " | "
-            + hist_rows["Competition_norm"].astype(str)
+        # --- Build two-line labels ---
+        hist_rows["Top_Label"] = (
+            hist_rows["Competition_norm"].astype(str)
             + " | "
             + hist_rows["Team"].astype(str)
         )
+
+        hist_rows["Bottom_Label"] = (
+            hist_rows["Season"].astype(str)
+            + " | "
+            + hist_rows.get("Minutes played", "").fillna("").astype(int).astype(str)
+            + " mins | "
+            + hist_rows.get("Six-Group Position", "").fillna("").astype(str)
+        )
+
+        hist_rows["Season_Label"] = hist_rows["Top_Label"] + "\n" + hist_rows["Bottom_Label"]
 
         # --- Plot ---
         fig2, ax2 = plt.subplots(figsize=(8, 3))
