@@ -1605,16 +1605,20 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             if col not in hist_rows.columns:
                 hist_rows[col] = ""
 
-        # --- Keep ONE row per season (highest LFC score) ---
+        # --- Keep ONE row per season (highest LFC score across all positions) ---
         hist_rows["LFC Score (0–100)"] = pd.to_numeric(
             hist_rows["LFC Score (0–100)"], errors="coerce"
         ).fillna(0)
 
-        hist_rows = (
+        # idxmax per season guarantees exactly one bar per season
+        idx = (
             hist_rows
-            .sort_values("LFC Score (0–100)", ascending=False)
-            .drop_duplicates(subset=["Season"], keep="first")
+            .groupby("Season")["LFC Score (0–100)"]
+            .idxmax()
+            .dropna()
         )
+
+        hist_rows = hist_rows.loc[idx].copy()
 
         # --- Clean values safely ---
         hist_rows["Minutes played"] = (
