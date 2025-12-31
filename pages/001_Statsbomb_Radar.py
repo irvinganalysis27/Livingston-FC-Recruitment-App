@@ -1276,6 +1276,32 @@ def load_historical_season_ratings(path: Path) -> pd.DataFrame:
     return df
 
 hist_df = load_historical_season_ratings(HIST_RATINGS_PATH)
+# --- NORMALISE historical columns to match app expectations ---
+if not hist_df.empty:
+
+    # Competition
+    if "Competition_norm" not in hist_df.columns:
+        if "Competition" in hist_df.columns:
+            hist_df["Competition_norm"] = hist_df["Competition"]
+        else:
+            hist_df["Competition_norm"] = ""
+
+    # Minutes played
+    if "Minutes played" not in hist_df.columns:
+        for c in ["Minutes played", "Minutes", "minutes", "mins"]:
+            if c in hist_df.columns:
+                hist_df["Minutes played"] = hist_df[c]
+                break
+        else:
+            hist_df["Minutes played"] = 0
+
+    # Position
+    if "Six-Group Position" not in hist_df.columns:
+        if "Position" in hist_df.columns:
+            hist_df["Six-Group Position"] = hist_df["Position"]
+        else:
+            hist_df["Six-Group Position"] = ""
+
 # Safety: ensure numeric + expected columns
 if not hist_df.empty:
     hist_df["LFC Score (0–100)"] = pd.to_numeric(
