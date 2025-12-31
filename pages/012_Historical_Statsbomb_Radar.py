@@ -917,14 +917,14 @@ if not hist_df.empty:
         if hist_rows.empty:
             st.info("No historical season ratings found for this player.")
         else:
-            # --- Keep ONE row per season (highest LFC score across all positions) ---
+            # --- Keep ONE row per season (highest LFC score overall) ---
             hist_rows["LFC Score (0–100)"] = pd.to_numeric(
                 hist_rows["LFC Score (0–100)"], errors="coerce"
             ).fillna(0)
 
             idx = (
                 hist_rows
-                .groupby(["Season", "Team", "Six-Group Position"])["LFC Score (0–100)"]
+                .groupby("Season")["LFC Score (0–100)"]
                 .idxmax()
                 .dropna()
             )
