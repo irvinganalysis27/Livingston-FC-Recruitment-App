@@ -1575,30 +1575,33 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
             st.info("No historical season ratings found for this player.")
             return
 
-        # --- One row per season (best LFC score if duplicates) ---
-        hist_rows = (
-            hist_rows
-            .sort_values("LFC Score (0–100)", ascending=False)
-            .drop_duplicates(subset=["Season"], keep="first")
-            .sort_values("Season")
+        # --- Ensure required columns exist ---
+        for col in ["Competition_norm", "Team", "Season", "Minutes played", "Six-Group Position"]:
+            if col not in hist_rows.columns:
+                hist_rows[col] = ""
+
+        # --- Clean values safely ---
+        hist_rows["Minutes played"] = (
+            pd.to_numeric(hist_rows["Minutes played"], errors="coerce")
+            .fillna(0)
+            .astype(int)
+            .astype(str)
         )
 
-        # --- Build two-line labels ---
-        hist_rows["Top_Label"] = (
+        hist_rows["Six-Group Position"] = hist_rows["Six-Group Position"].fillna("").astype(str)
+
+        # --- Build two-line labels (TOP: League | Team, BOTTOM: Season | Minutes | Position) ---
+        hist_rows["Season_Label"] = (
             hist_rows["Competition_norm"].astype(str)
             + " | "
             + hist_rows["Team"].astype(str)
-        )
-
-        hist_rows["Bottom_Label"] = (
-            hist_rows["Season"].astype(str)
+            + "\n"
+            + hist_rows["Season"].astype(str)
             + " | "
-            + hist_rows.get("Minutes played", "").fillna("").astype(int).astype(str)
+            + hist_rows["Minutes played"]
             + " mins | "
-            + hist_rows.get("Six-Group Position", "").fillna("").astype(str)
+            + hist_rows["Six-Group Position"]
         )
-
-        hist_rows["Season_Label"] = hist_rows["Top_Label"] + "\n" + hist_rows["Bottom_Label"]
 
         # --- Plot ---
         fig2, ax2 = plt.subplots(figsize=(8, 3))
