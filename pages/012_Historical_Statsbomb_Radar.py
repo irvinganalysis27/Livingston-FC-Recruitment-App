@@ -909,24 +909,46 @@ if not hist_df.empty:
         if hist_rows.empty:
             st.info("No historical season ratings found for this player.")
         else:
-            # One row per season (best score if duplicates)
-            hist_rows = (
+            # --- Keep ONE row per season (highest LFC score across all positions) ---
+            hist_rows["LFC Score (0–100)"] = pd.to_numeric(
+                hist_rows["LFC Score (0–100)"], errors="coerce"
+            ).fillna(0)
+
+            idx = (
                 hist_rows
-                .sort_values("LFC Score (0–100)", ascending=False)
-                .drop_duplicates(subset=["Season"], keep="first")
-                .sort_values("Season")
+                .groupby("Season")["LFC Score (0–100)"]
+                .idxmax()
+                .dropna()
             )
 
-            # Build display labels
+            hist_rows = hist_rows.loc[idx].copy()
+
+            # --- Label construction (identical to working page) ---
+            hist_rows["Minutes played"] = (
+                pd.to_numeric(hist_rows["Minutes played"], errors="coerce")
+                .fillna(0)
+                .astype(int)
+                .astype(str)
+            )
+
+            hist_rows["Six-Group Position"] = hist_rows["Six-Group Position"].fillna("").astype(str)
+
             hist_rows["Season_Label"] = (
-                hist_rows["Season"].astype(str)
+                hist_rows["Competition_norm"].fillna("").astype(str)
                 + " | "
-                + hist_rows.get("Competition_norm", hist_rows.get("Competition", "")).astype(str)
+                + hist_rows["Team"].fillna("").astype(str)
+                + "\n"
+                + hist_rows["Season"].fillna("").astype(str)
                 + " | "
-                + hist_rows.get("Team", "").astype(str)
+                + hist_rows["Minutes played"]
+                + " mins | "
+                + hist_rows["Six-Group Position"]
             )
 
-            # Plot
+            # --- Final ordering before plotting ---
+            hist_rows = hist_rows.sort_values("Season")
+
+            # --- Plot: one bar per season, best score only ---
             fig2, ax2 = plt.subplots(figsize=(8, 3))
             ax2.bar(
                 hist_rows["Season_Label"],
