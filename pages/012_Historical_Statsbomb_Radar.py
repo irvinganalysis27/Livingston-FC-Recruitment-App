@@ -885,6 +885,14 @@ if st.session_state.selected_player:
 # ============================================================
 
 hist_df = load_historical_season_ratings(HIST_RATINGS_PATH)
+# --- Normalise competition column for historical ratings ---
+if "Competition_norm" not in hist_df.columns:
+    if "Competition" in hist_df.columns:
+        hist_df["Competition_norm"] = hist_df["Competition"].astype(str).str.strip()
+    elif "League" in hist_df.columns:
+        hist_df["Competition_norm"] = hist_df["League"].astype(str).str.strip()
+    else:
+        hist_df["Competition_norm"] = ""
 
 if not hist_df.empty:
     show_history = st.checkbox(
@@ -916,7 +924,7 @@ if not hist_df.empty:
 
             idx = (
                 hist_rows
-                .groupby("Season")["LFC Score (0–100)"]
+                .groupby(["Season", "Team", "Six-Group Position"])["LFC Score (0–100)"]
                 .idxmax()
                 .dropna()
             )
@@ -934,19 +942,20 @@ if not hist_df.empty:
             hist_rows["Six-Group Position"] = hist_rows["Six-Group Position"].fillna("").astype(str)
 
             hist_rows["Season_Label"] = (
-                hist_rows["Competition_norm"].fillna("").astype(str)
+                hist_rows["Season"].fillna("").astype(str)
+                + " | "
+                + hist_rows["Competition_norm"].fillna("").astype(str)
                 + " | "
                 + hist_rows["Team"].fillna("").astype(str)
-                + "\n"
-                + hist_rows["Season"].fillna("").astype(str)
                 + " | "
+                + hist_rows["Six-Group Position"].fillna("").astype(str)
+                + "\n"
                 + hist_rows["Minutes played"]
-                + " mins | "
-                + hist_rows["Six-Group Position"]
+                + " mins"
             )
 
             # --- Final ordering before plotting ---
-            hist_rows = hist_rows.sort_values("Season")
+            hist_rows = hist_rows.sort_values(["Season", "Team", "Six-Group Position"])
 
             # --- Plot: one bar per season, best score only ---
             fig2, ax2 = plt.subplots(figsize=(8, 3))
