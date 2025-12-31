@@ -931,7 +931,21 @@ if not hist_df.empty:
 
             hist_rows = hist_rows.loc[idx].copy()
 
-            # --- Label construction (identical to working page) ---
+            # --- Normalise columns used for labels ---
+            if "Season" not in hist_rows.columns and "Season Name" in hist_rows.columns:
+                hist_rows["Season"] = hist_rows["Season Name"]
+
+            if "Minutes played" not in hist_rows.columns and "Minutes" in hist_rows.columns:
+                hist_rows["Minutes played"] = hist_rows["Minutes"]
+
+            if "Competition_norm" not in hist_rows.columns:
+                if "Competition Name" in hist_rows.columns:
+                    hist_rows["Competition_norm"] = hist_rows["Competition Name"]
+                elif "Competition" in hist_rows.columns:
+                    hist_rows["Competition_norm"] = hist_rows["Competition"]
+                else:
+                    hist_rows["Competition_norm"] = ""
+
             hist_rows["Minutes played"] = (
                 pd.to_numeric(hist_rows["Minutes played"], errors="coerce")
                 .fillna(0)
@@ -941,17 +955,17 @@ if not hist_df.empty:
 
             hist_rows["Six-Group Position"] = hist_rows["Six-Group Position"].fillna("").astype(str)
 
+            # --- FINAL LABEL: top line league + team, bottom line season | minutes | position ---
             hist_rows["Season_Label"] = (
-                hist_rows["Season"].fillna("").astype(str)
-                + " | "
-                + hist_rows["Competition_norm"].fillna("").astype(str)
+                hist_rows["Competition_norm"].fillna("").astype(str)
                 + " | "
                 + hist_rows["Team"].fillna("").astype(str)
-                + " | "
-                + hist_rows["Six-Group Position"].fillna("").astype(str)
                 + "\n"
+                + hist_rows["Season"].fillna("").astype(str)
+                + " | "
                 + hist_rows["Minutes played"]
-                + " mins"
+                + " mins | "
+                + hist_rows["Six-Group Position"]
             )
 
             # --- Final ordering before plotting ---
