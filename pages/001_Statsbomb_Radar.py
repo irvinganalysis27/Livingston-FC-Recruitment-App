@@ -1267,7 +1267,6 @@ plot_data = pd.concat(
 
 HIST_RATINGS_PATH = ROOT_DIR / "data" / "player_season_ratings_statsbomb.csv"
 
-@st.cache_data(show_spinner=False)
 def load_historical_season_ratings(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
@@ -1618,17 +1617,19 @@ def plot_radial_bar_grouped(player_name, plot_data, metric_groups, group_colors=
 
         # --- Build two-line labels (TOP: League | Team, BOTTOM: Season | Minutes | Position) ---
         hist_rows["Season_Label"] = (
-            hist_rows["Competition_norm"].astype(str)
+            hist_rows["Competition_norm"].fillna("").astype(str)
             + " | "
-            + hist_rows["Team"].astype(str)
+            + hist_rows["Team"].fillna("").astype(str)
             + "\n"
-            + hist_rows["Season"].astype(str)
+            + hist_rows["Season"].fillna("").astype(str)
             + " | "
-            + hist_rows["Minutes played"]
+            + hist_rows["Minutes played"].fillna(0).astype(int).astype(str)
             + " mins | "
-            + hist_rows["Six-Group Position"]
+            + hist_rows["Six-Group Position"].fillna("").astype(str)
         )
 
+        # --- Guarantee redraw ordering ---
+        hist_rows = hist_rows.sort_values("Season")
         # --- Plot ---
         fig2, ax2 = plt.subplots(figsize=(8, 3))
         ax2.bar(
