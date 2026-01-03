@@ -905,7 +905,7 @@ col_minutes, col_age = st.columns(2)
 with col_minutes:
     st.markdown("**Minutes played**")
     min_minutes, max_minutes = st.slider(
-        "",
+        "Minutes played",
         min_value=dataset_min,
         max_value=dataset_max,
         value=(
@@ -922,7 +922,7 @@ with col_minutes:
 with col_age:
     st.markdown("**Age**")
     age_min, age_max = st.slider(
-        "",
+        "Age",
         min_value=age_min_dataset,
         max_value=age_max_dataset,
         value=st.session_state.age_range,
