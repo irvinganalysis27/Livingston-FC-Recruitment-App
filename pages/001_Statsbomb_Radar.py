@@ -1874,6 +1874,9 @@ def find_similar_players_same_scale(
         .copy()
     )
 
+    # Add position column
+    out["Position"] = out[position_col]
+
     # Keep same “Score (0–100)” as ranking table (don’t recalc)
     score_map = base_df.set_index("Player")["Score (0–100)"].to_dict()
     out["Score (0–100)"] = out["Player"].map(score_map)
@@ -1881,7 +1884,16 @@ def find_similar_players_same_scale(
     # Clean columns
     out.rename(columns={"Team within selected timeframe": "Team",
                         "Competition_norm": "League"}, inplace=True)
-    keep_cols = ["Player", "Team", "League", "Age", minutes_col, "Score (0–100)", "Similarity Score"]
+    keep_cols = [
+        "Player",
+        "Position",
+        "Team",
+        "League",
+        "Age",
+        minutes_col,
+        "Score (0–100)",
+        "Similarity Score",
+    ]
     for c in keep_cols:
         if c not in out.columns:
             out[c] = np.nan
