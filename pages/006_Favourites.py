@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import re
 from datetime import datetime
-from auth import check_password
 from branding import show_branding
 from ui.sidebar import render_sidebar
 
@@ -16,8 +15,6 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 
 
 # ========= Password =========
-
-from auth import check_password
 if not check_password():
     st.stop()
 render_sidebar()
@@ -47,6 +44,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.divider()
+
+# --- Make secondary buttons fill width (used by Shadow Team buttons) ---
+st.markdown(
+    """
+    <style>
+    div[data-testid="stButton"] button[kind="secondary"] {
+        width: 100% !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ========= Toast helpers =========
 def toast_ok(msg: str):
@@ -219,12 +228,16 @@ with st.expander("➕ Add New Player to Favourites", expanded=False):
 if not rows:
     st.info("No favourites found for the selected filters.")
 else:
-    for row in rows:
+    for i, row in enumerate(rows):
         with st.container(border=True):
             player = row.get("player", "")
             team = row.get("team", "") or ""
             league = row.get("league", "") or ""
             position = row.get("mapped_position", row.get("position", "") or "")
+
+            # Build a safe, unique key base for Streamlit widgets
+            player_key = re.sub(r"[^a-zA-Z0-9_]+", "_", str(player)).strip("_")
+            key_base = f"fav_{i}_{player_key}" if player_key else f"fav_{i}"
 
             st.markdown(
                 f"**{player}** &nbsp;&nbsp; "
@@ -240,13 +253,13 @@ else:
                     "Status",
                     options=COLOUR_CHOICES,
                     index=COLOUR_CHOICES.index(current_colour) if current_colour in COLOUR_CHOICES else 0,
-                    key=f"colour_{player}",
+                    key=f"{key_base}_colour",
                 )
             with c2:
                 initial_comment = st.text_area(
                     "Initial Watch",
                     value=row.get("initial_watch_comment") or "",
-                    key=f"initial_{player}",
+                    key=f"{key_base}_initial",
                     height=160,
                 )
 
@@ -255,28 +268,28 @@ else:
                 second_comment = st.text_area(
                     "Second Watch",
                     value=row.get("second_watch_comment") or "",
-                    key=f"second_{player}",
+                    key=f"{key_base}_second",
                     height=160,
                 )
 
             latest_action = st.text_area(
                 "Latest Action",
                 value=row.get("latest_action") or "",
-                key=f"latest_{player}",
+                key=f"{key_base}_latest",
                 height=60,
             )
 
             c3, c4, c5, c6 = st.columns([0.4, 0.2, 0.2, 0.2])
             with c3:
-                visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"vis_{player}")
+                visible_val = st.checkbox("Visible", value=bool(row.get("visible", True)), key=f"{key_base}_vis")
 
             with c4:
-                if st.button("💾 Save", key=f"save_{player}"):
+                if st.button("💾 Save", key=f"{key_base}_save"):
                     payload = {
                         "player": player,
                         "team": team,
                         "league": league,
-                        "position": position,
+                        "position": row.get("position", position),
                         "colour": colour_choice,
                         "initial_watch_comment": initial_comment,
                         "second_watch_comment": second_comment,
@@ -293,7 +306,7 @@ else:
                         toast_err(f"Failed to save {player}")
 
             with c5:
-                if st.button("🗑 Remove", key=f"del_{player}"):
+                if st.button("🗑 Remove", key=f"{key_base}_del"):
                     if delete_favourite(player):
                         toast_ok(f"Removed {player}")
                         st.rerun()
@@ -302,27 +315,15 @@ else:
 
             # ✅ NEW: Add to Shadow Team
             with c6:
-                # Make button fill width
-                st.markdown(
-                    """
-                    <style>
-                    div[data-testid="stButton"] button[kind="secondary"] {
-                        width: 100% !important;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
                 # Main button
-                if st.button("➕ Shadow Team", key=f"shadow_{player}", width="stretch"):
-                    st.session_state[f"show_popover_{player}"] = True  # open manually
+                if st.button("➕ Shadow Team", key=f"{key_base}_shadow", use_container_width=True):
+                    st.session_state[f"{key_base}_show_popover"] = True  # open manually
 
                 # Only show popover when clicked
-                if st.session_state.get(f"show_popover_{player}", False):
-                    with st.popover(f"Add {player} to Shadow Team", width="stretch"):
+                if st.session_state.get(f"{key_base}_show_popover", False):
+                    with st.popover(f"Add {player} to Shadow Team"):
                         # Store position in session_state so it persists through reruns
-                        pos_key = f"shadow_pos_{player}"
+                        pos_key = f"{key_base}_shadow_pos"
                         if pos_key not in st.session_state:
                             st.session_state[pos_key] = "ST"
 
@@ -336,7 +337,7 @@ else:
                         )
 
                         # Confirm button inside popover
-                        if st.button("✅ Confirm", key=f"shadow_add_{player}"):
+                        if st.button("✅ Confirm", key=f"{key_base}_shadow_add"):
                             pos_slot = st.session_state[pos_key]
                             payload = {"player": player, "position_slot": pos_slot, "rank": 0}
                             ok = upsert_shadow_team(payload)
@@ -344,4 +345,5 @@ else:
                                 toast_ok(f"✅ Added {player} to Shadow Team as {pos_slot}")
                             else:
                                 toast_err("❌ Failed to add player to Shadow Team")
-                            st.session_state[f"show_popover_{player}"] = False  # close after adding
+                            st.session_state[f"{key_base}_show_popover"] = False  # close after adding
+                            st.rerun()

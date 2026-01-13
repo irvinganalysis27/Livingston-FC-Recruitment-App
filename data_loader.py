@@ -163,6 +163,27 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     if "Minutes" in df.columns: rename_map["Minutes"] = "Minutes played"
     df.rename(columns=rename_map, inplace=True)
 
+    # Drop duplicated column names to prevent crashes
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+    # Create a unified player_uid column to prevent dedupe crashes
+    # Defensive comment: player_uid is created here to provide a single canonical player identifier.
+    if "Player Id" in df.columns:
+        df["player_uid"] = df["Player Id"]
+    elif "player_id" in df.columns:
+        df["player_uid"] = df["player_id"]
+    else:
+        # fallback to stable hash of Player + Birth Date
+        # Defensive comment: Using hash of Player and Birth Date to create player_uid when no explicit ID present.
+        def make_uid(row):
+            player = str(row.get("Player", "")) if pd.notna(row.get("Player", None)) else ""
+            bdate = str(row.get("Birth Date", "")) if pd.notna(row.get("Birth Date", None)) else ""
+            return str(hash(player + bdate))
+        df["player_uid"] = df.apply(make_uid, axis=1)
+
+    # Ensure player_uid is non-null by filling missing with empty string (if any)
+    df["player_uid"] = df["player_uid"].fillna("").astype(str)
+
     # Add age
     if "Birth Date" in df.columns:
         today = datetime.today()
@@ -177,13 +198,21 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     else:
         df["Six-Group Position"] = np.nan
 
-    # Duplicate generic CMs into both 6 & 8
+    # Ensure Six-Group Position always exists as a string column (never None)
+    # Defensive comment: Replace None with empty string to avoid pandas groupby / reindex errors.
+    df["Six-Group Position"] = df["Six-Group Position"].fillna("").astype(str)
+
+    # Duplicate generic CMs into both 6 & 8, removing original CM rows to prevent duplicates
     if "Six-Group Position" in df.columns:
         cm_mask = df["Six-Group Position"] == "Centre Midfield"
         if cm_mask.any():
+            # Defensive comment: Removing original Centre Midfield rows before duplicating into Number 6 and Number 8 to avoid duplicates.
             cm_rows = df.loc[cm_mask].copy()
-            cm_as_6 = cm_rows.copy(); cm_as_6["Six-Group Position"] = "Number 6"
-            cm_as_8 = cm_rows.copy(); cm_as_8["Six-Group Position"] = "Number 8"
+            df = df.loc[~cm_mask].copy()
+            cm_as_6 = cm_rows.copy()
+            cm_as_6["Six-Group Position"] = "Number 6"
+            cm_as_8 = cm_rows.copy()
+            cm_as_8["Six-Group Position"] = "Number 8"
             df = pd.concat([df, cm_as_6, cm_as_8], ignore_index=True)
 
     return df
