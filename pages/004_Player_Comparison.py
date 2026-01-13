@@ -19,9 +19,14 @@ if ROOT not in sys.path:
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
+
 # ---------- Global UI processing lock ----------
 if "is_processing" not in st.session_state:
     st.session_state.is_processing = False
+
+# ---------- Interaction lock helper ----------
+def lock_on_change():
+    st.session_state.is_processing = True
 
 
 # ---------- Authentication ----------
@@ -741,19 +746,18 @@ b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all", key="league_select_all_btn", disabled=st.session_state.is_processing):
         st.session_state[LEAGUE_KEY] = all_leagues.copy()
-        st.rerun()
 
 with b2:
     if st.button("Clear all", key="league_clear_all_btn", disabled=st.session_state.is_processing):
         st.session_state[LEAGUE_KEY] = []
-        st.rerun()
 
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
     key=LEAGUE_KEY,
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing
+    disabled=st.session_state.is_processing,
+    on_change=lock_on_change
 )
 
 # --- Apply filter or stop if empty ---
@@ -784,7 +788,8 @@ with c1:
         value=st.session_state.min_minutes_cmp,
         step=50,
         key="min_minutes_cmp_input",
-        disabled=st.session_state.is_processing
+        disabled=st.session_state.is_processing,
+        on_change=lock_on_change
     )
     min_minutes = st.session_state.min_minutes_cmp
     df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
@@ -805,7 +810,8 @@ with c2:
                 value=st.session_state.age_range_cmp,
                 step=1,
                 key="age_range_cmp_slider",
-                disabled=st.session_state.is_processing
+                disabled=st.session_state.is_processing,
+                on_change=lock_on_change
             )
             st.session_state.age_range_cmp = (sel_min, sel_max)
             df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
@@ -829,7 +835,8 @@ selected_groups = st.multiselect(
     default=st.session_state.selected_groups_cmp,
     key="pos_group_multiselect_cmp",
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing
+    disabled=st.session_state.is_processing,
+    on_change=lock_on_change
 )
 st.session_state.selected_groups_cmp = selected_groups
 
@@ -872,7 +879,8 @@ selected_position_template = st.selectbox(
     index=template_names.index(st.session_state.template_select),
     key="template_select",
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing
+    disabled=st.session_state.is_processing,
+    on_change=lock_on_change
 )
 
 # Handle manual override
@@ -914,7 +922,8 @@ with c1:
         players,
         index=players.index(st.session_state.cmpA) if st.session_state.cmpA in players else 0,
         key="cmpA_sel",
-        disabled=st.session_state.is_processing
+        disabled=st.session_state.is_processing,
+        on_change=lock_on_change
     )
     st.session_state.cmpA = pA
 
@@ -935,7 +944,8 @@ with c1:
             seasons_A,
             index=seasons_A.index(st.session_state.seasonA) if st.session_state.seasonA in seasons_A else 0,
             key="seasonA_sel",
-            disabled=st.session_state.is_processing
+            disabled=st.session_state.is_processing,
+            on_change=lock_on_change
         )
         st.session_state.seasonA = seasonA
     else:
@@ -947,7 +957,8 @@ with c2:
         ["(none)"] + players,
         index=(players.index(st.session_state.cmpB) + 1) if st.session_state.cmpB in players else 0,
         key="cmpB_sel",
-        disabled=st.session_state.is_processing
+        disabled=st.session_state.is_processing,
+        on_change=lock_on_change
     )
     pB = None if pB == "(none)" else pB
     st.session_state.cmpB = pB
@@ -969,7 +980,8 @@ with c2:
             seasons_B,
             index=seasons_B.index(st.session_state.seasonB) if st.session_state.seasonB in seasons_B else 0,
             key="seasonB_sel",
-            disabled=st.session_state.is_processing
+            disabled=st.session_state.is_processing,
+            on_change=lock_on_change
         )
         st.session_state.seasonB = seasonB
     else:
