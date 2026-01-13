@@ -586,6 +586,16 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
     # ============================================================
     # 🪪 3. Rename Identifiers to Match Radar Columns
     # ============================================================
+    # --- Ensure player_id exists ---
+    for c in ["Player Id", "player_id", "Player ID", "playerid"]:
+        if c in df.columns:
+            df.rename(columns={c: "player_id"}, inplace=True)
+            break
+    if "player_id" not in df.columns:
+        df["player_id"] = pd.factorize(
+            df.get("Player", pd.Series(range(len(df))))
+        )[0]
+
     rename_map = {}
     if "Name" in df.columns:
         rename_map["Name"] = "Player"
@@ -2041,8 +2051,8 @@ plot_data["LFC Score (0–100)"] = (
 # --- Load current favourites ---
 from lib.favourites_repo import get_supabase_client
 
+@st.cache_data(ttl=30)
 def get_favourites_with_colours_live():
-    """Fetch favourites (shared cloud data) — no caching, no globals."""
     sb = get_supabase_client()
     if sb is None:
         return {}
@@ -2061,7 +2071,7 @@ def get_favourites_with_colours_live():
             if r.get("player")
         }
     except Exception as e:
-        st.warning(f"⚠️ Could not load favourites: {e}")
+        print(f"[WARN] Supabase favourites fetch failed: {e}")
         return {}
 
 # --- Build local dictionary for colouring ---
@@ -2121,12 +2131,16 @@ z_ranking = z_ranking[required_cols]
 sig_parts = (
     tuple(sorted(selected_leagues)),
     int(min_minutes),
-    tuple(selected_groups),
+    tuple(sorted(selected_groups)),
     selected_position_template,
-    len(z_ranking),                         # size change
-    float(z_ranking["Score (0–100)"].sum()) # quick content checksum
+    len(z_ranking),
 )
 editor_key = f"ranking_editor_{hash(sig_parts)}"
+
+MAX_ROWS = 3000
+if len(z_ranking) > MAX_ROWS:
+    z_ranking = z_ranking.head(MAX_ROWS)
+    st.info(f"Ranking table limited to top {MAX_ROWS} players for stability.")
 
 edited_df = st.data_editor(
     z_ranking,
