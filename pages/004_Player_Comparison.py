@@ -27,11 +27,6 @@ if "is_processing" not in st.session_state:
 if "last_interaction_ts" not in st.session_state:
     st.session_state.last_interaction_ts = 0.0
 
-# ---------- Processing version guard ----------
-if "processing_version" not in st.session_state:
-    st.session_state.processing_version = 0
-if "active_version" not in st.session_state:
-    st.session_state.active_version = 0
 
 def lock_on_change():
     st.session_state.is_processing = True
@@ -1026,10 +1021,6 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
 
 
 
-# ---------- Begin heavy processing block ----------
-st.session_state.processing_version += 1
-current_version = st.session_state.processing_version
-st.session_state.active_version = current_version
 
 # ---------- Percentiles (match Statsbomb Radar page behaviour) ----------
 # Ensure metric columns exist and are numeric
@@ -1211,11 +1202,8 @@ A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
 B_vals = rowB_pct.values if rowB_pct is not None else None
 
 #
-# ---------- Unlock UI after processing ----------
-# If no new interaction happened during this run, unlock safely
-if st.session_state.is_processing:
-    if time.time() - st.session_state.last_interaction_ts > 0.2:
-        st.session_state.is_processing = False
+# ---------- GUARANTEED UNLOCK AT END OF RUN ----------
+st.session_state.is_processing = False
 
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
