@@ -52,19 +52,7 @@ def render_sidebar():
                 "pages/012_Historical_Statsbomb_Radar.py",
                 label="Historical StatsBomb Radar"
             )
-
-        # ---------- Scatter Plots ----------
-        with st.expander("📈 Scatter Plots"):
-            st.page_link(
-                "pages/008_Statsbomb_Scatter_Plot.py",
-                label="StatsBomb Scatter Plot"
-            )
-            st.divider()
-            st.page_link(
-                "pages/009_SkillCorner_Scatter_Plot.py",
-                label="SkillCorner Scatter Plot"
-            )
-
+            
         # ---------- Rankings & Comparison ----------
         with st.expander("🏆 Rankings & Comparison"):
             st.page_link(
@@ -79,7 +67,19 @@ def render_sidebar():
             st.divider()
             st.page_link(
                 "pages/014_League_Transfer_Analysis.py",
-                label="League Transfeer Analysis"
+                label="League Transfer Analysis"
+            )
+
+        # ---------- Scatter Plots ----------
+        with st.expander("📈 Scatter Plots"):
+            st.page_link(
+                "pages/008_Statsbomb_Scatter_Plot.py",
+                label="StatsBomb Scatter Plot"
+            )
+            st.divider()
+            st.page_link(
+                "pages/009_SkillCorner_Scatter_Plot.py",
+                label="SkillCorner Scatter Plot"
             )
 
         # ---------- Squad Tools ----------
