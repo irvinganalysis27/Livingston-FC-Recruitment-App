@@ -53,15 +53,14 @@ def _clean_pos_token(tok: str) -> str:
 RAW_TO_SIX = {
     "RIGHTBACK": "Full Back", "LEFTBACK": "Full Back",
     "RIGHTWINGBACK": "Full Back", "LEFTWINGBACK": "Full Back",
-    "CENTREBACK": "Centre Back", "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back",
-    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
-    "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
-    "CENTREMIDFIELDER": "Centre Midfield", "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
-    "CENTREATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
-    "LEFTWING": "Winger", "RIGHTWING": "Winger",
-    "LEFTMIDFIELDER": "Winger", "RIGHTMIDFIELDER": "Winger",
-    "CENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker",
-    "SECONDSTRIKER": "Striker", "10": "Striker",
+    "RIGHTCENTREBACK": "Centre Back", "LEFTCENTREBACK": "Centre Back", "CENTREBACK": "Centre Back",
+    "CENTREMIDFIELDER": "Centre Midfield",
+    "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
+    "DEFENSIVEMIDFIELDER": "Number 6", "RIGHTDEFENSIVEMIDFIELDER": "Number 6", "LEFTDEFENSIVEMIDFIELDER": "Number 6", "CENTREDEFENSIVEMIDFIELDER": "Number 6",
+    "CENTREATTACKINGMIDFIELDER": "Number 8", "ATTACKINGMIDFIELDER": "Number 8", "RIGHTATTACKINGMIDFIELDER": "Number 8", "LEFTATTACKINGMIDFIELDER": "Number 8",
+    "RIGHTWING": "Winger", "LEFTWING": "Winger",
+    "RIGHTMIDFIELDER": "Winger", "LEFTMIDFIELDER": "Winger",
+    "CENTREFORWARD": "Striker", "RIGHTCENTREFORWARD": "Striker", "LEFTCENTREFORWARD": "Striker", "SECONDSTRIKER": "Striker", "10": "Striker",
 }
 
 def map_first_position_to_group(primary_pos_cell) -> str:
@@ -79,12 +78,11 @@ position_metrics = {
             "Aerial Wins", "Aerial Win%"
         ],
         "groups": {
+            "NP Goals": "Attacking",
+            "Passing%": "Possession", "Pass OBV": "Possession", "Pr. Long Balls": "Possession", "UPr. Long Balls": "Possession", "OBV": "Possession", "Pr. Pass% Dif.": "Possession",
             "PAdj Interceptions": "Defensive", "PAdj Tackles": "Defensive", "Dribbles Stopped%": "Defensive",
             "Defensive Actions": "Defensive", "Aggressive Actions": "Defensive", "Fouls": "Defensive",
             "Aerial Wins": "Defensive", "Aerial Win%": "Defensive",
-            "Passing%": "Possession", "Pr. Pass% Dif.": "Possession", "Pr. Long Balls": "Possession",
-            "UPr. Long Balls": "Possession", "OBV": "Possession", "Pass OBV": "Possession",
-            "NP Goals": "Attacking",
         }
     },
     "Full Back": {
@@ -95,13 +93,10 @@ position_metrics = {
             "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
         ],
         "groups": {
-            "Passing%": "Possession", "Pr. Pass% Dif.": "Possession", "Successful Box Cross%": "Possession",
-            "Deep Progressions": "Possession", "Successful Dribbles": "Possession", "Turnovers": "Possession",
-            "OBV": "Possession", "Pass OBV": "Possession",
-            "Defensive Actions": "Defensive", "Aerial Win%": "Defensive",
-            "PAdj Pressures": "Defensive", "PAdj Tack&Int": "Defensive",
-            "Dribbles Stopped%": "Defensive", "Aggressive Actions": "Defensive",
-            "Player Season Ball Recoveries 90": "Defensive",
+            "Passing%": "Possession", "Pr. Pass% Dif.": "Possession", "Successful Box Cross%": "Possession", "Deep Progressions": "Possession",
+            "Successful Dribbles": "Possession", "Turnovers": "Possession", "OBV": "Possession", "Pass OBV": "Possession",
+            "Defensive Actions": "Defensive", "Aerial Win%": "Defensive", "PAdj Pressures": "Defensive", "PAdj Tack&Int": "Defensive",
+            "Dribbles Stopped%": "Defensive", "Aggressive Actions": "Defensive", "Player Season Ball Recoveries 90": "Defensive",
         }
     },
     "Number 6": {
@@ -113,11 +108,9 @@ position_metrics = {
         ],
         "groups": {
             "xGBuildup": "Attacking", "xG Assisted": "Attacking",
-            "Passing%": "Possession", "Deep Progressions": "Possession", "Turnovers": "Possession",
-            "OBV": "Possession", "Pass OBV": "Possession", "Pr. Pass% Dif.": "Possession",
-            "PAdj Interceptions": "Defensive", "PAdj Tackles": "Defensive", "Dribbles Stopped%": "Defensive",
-            "Aggressive Actions": "Defensive", "Aerial Win%": "Defensive", "Player Season Ball Recoveries 90": "Defensive",
-            "Pressure Regains": "Defensive",
+            "Passing%": "Possession", "Deep Progressions": "Possession", "Turnovers": "Possession", "OBV": "Possession", "Pass OBV": "Possession", "Pr. Pass% Dif.": "Possession",
+            "PAdj Interceptions": "Defensive", "PAdj Tackles": "Defensive", "Dribbles Stopped%": "Defensive", "Aggressive Actions": "Defensive",
+            "Aerial Win%": "Defensive", "Player Season Ball Recoveries 90": "Defensive", "Pressure Regains": "Defensive",
         }
     },
     "Number 8": {
@@ -129,10 +122,8 @@ position_metrics = {
         ],
         "groups": {
             "xGBuildup": "Attacking", "xG Assisted": "Attacking", "Shots": "Attacking", "xG": "Attacking", "NP Goals": "Attacking",
-            "Passing%": "Possession", "Deep Progressions": "Possession", "OP Passes Into Box": "Possession",
-            "Pass OBV": "Possession", "OBV": "Possession", "Deep Completions": "Possession",
-            "Pressure Regains": "Defensive", "PAdj Pressures": "Defensive",
-            "Player Season Fhalf Ball Recoveries 90": "Defensive", "Aggressive Actions": "Defensive",
+            "Passing%": "Possession", "Deep Progressions": "Possession", "OP Passes Into Box": "Possession", "Pass OBV": "Possession", "OBV": "Possession", "Deep Completions": "Possession",
+            "Pressure Regains": "Defensive", "PAdj Pressures": "Defensive", "Player Season Fhalf Ball Recoveries 90": "Defensive", "Aggressive Actions": "Defensive",
         }
     },
     "Number 10": {
@@ -143,21 +134,9 @@ position_metrics = {
             "Aggressive Actions", "PAdj Pressures",
         ],
         "groups": {
-            "Deep Progressions": "Possession",
-            "Deep Completions": "Possession",
-            "OBV": "Possession",
-            "OP Passes Into Box": "Possession",
-            "OP Key Passes": "Possession",
-            "Shots": "Attacking",
-            "xG": "Attacking",
-            "xG Assisted": "Attacking",
-            "Assists": "Attacking",
-            "NP Goals": "Attacking",
-            "xG/Shot": "Attacking",
-            "Touches In Box": "Attacking",
-            "Goal Conversion%": "Attacking",
-            "Aggressive Actions": "Defensive",
-            "PAdj Pressures": "Defensive",
+            "Deep Progressions": "Possession", "Deep Completions": "Possession", "OP Passes Into Box": "Possession", "OBV": "Possession", "OP Key Passes": "Possession",
+            "Shots": "Attacking", "xG": "Attacking", "xG Assisted": "Attacking", "Assists": "Attacking", "NP Goals": "Attacking", "xG/Shot": "Attacking", "Touches In Box": "Attacking", "Goal Conversion%": "Attacking",
+            "Aggressive Actions": "Defensive", "PAdj Pressures": "Defensive",
         }
     },
     "Winger": {
@@ -168,11 +147,9 @@ position_metrics = {
             "Player Season Fhalf Pressures 90",
         ],
         "groups": {
-            "NP Goals": "Attacking", "xG": "Attacking", "Shots": "Attacking", "xG/Shot": "Attacking",
-            "Touches In Box": "Attacking", "OP xG Assisted": "Attacking",
+            "xG": "Attacking", "Shots": "Attacking", "xG/Shot": "Attacking", "Touches In Box": "Attacking", "OP xG Assisted": "Attacking", "NP Goals": "Attacking",
             "OP Passes Into Box": "Possession", "Successful Box Cross%": "Possession", "Passing%": "Possession",
-            "Successful Dribbles": "Possession", "Fouls Won": "Possession", "Turnovers": "Possession",
-            "OBV": "Possession", "D&C OBV": "Possession", "Deep Progressions": "Possession",
+            "Successful Dribbles": "Possession", "Turnovers": "Possession", "OBV": "Possession", "D&C OBV": "Possession", "Fouls Won": "Possession", "Deep Progressions": "Possession",
             "Player Season Fhalf Pressures 90": "Defensive",
         }
     },
@@ -184,11 +161,10 @@ position_metrics = {
             "Aerial Win%", "Aerial Wins", "Player Season Fhalf Pressures 90",
         ],
         "groups": {
-            "NP Goals": "Attacking", "xG": "Attacking", "Shots": "Attacking", "xG/Shot": "Attacking",
+            "Aggressive Actions": "Defensive", "NP Goals": "Attacking", "xG": "Attacking", "Shots": "Attacking", "xG/Shot": "Attacking",
             "Goal Conversion%": "Attacking", "Touches In Box": "Attacking", "xG Assisted": "Attacking",
             "Fouls Won": "Possession", "Deep Completions": "Possession", "OP Key Passes": "Possession",
-            "Aerial Win%": "Defensive", "Aerial Wins": "Defensive", "Aggressive Actions": "Defensive",
-            "Player Season Fhalf Pressures 90": "Defensive",
+            "Aerial Win%": "Defensive", "Aerial Wins": "Defensive", "Player Season Fhalf Pressures 90": "Defensive",
         }
     },
 }
