@@ -21,11 +21,15 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 
 
 # ---------- Global UI processing lock ----------
+if "processing_version" not in st.session_state:
+    st.session_state.processing_version = 0
+if "active_version" not in st.session_state:
+    st.session_state.active_version = 0
 if "is_processing" not in st.session_state:
     st.session_state.is_processing = False
 
-# ---------- Interaction lock helper ----------
 def lock_on_change():
+    st.session_state.processing_version += 1
     st.session_state.is_processing = True
 
 
@@ -1004,8 +1008,10 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
     return (p * 100.0).round(1)
 
 
+
 # ---------- Begin heavy processing block ----------
-st.session_state.is_processing = True
+current_version = st.session_state.processing_version
+st.session_state.active_version = current_version
 
 # ---------- Percentiles (match Statsbomb Radar page behaviour) ----------
 # Ensure metric columns exist and are numeric
@@ -1268,5 +1274,7 @@ if pA and pB:
 else:
     st.info("Select two players to enable the AI comparison.")
 
-# ---------- Unlock UI ----------
-st.session_state.is_processing = False
+
+# ---------- Final unlock guard ----------
+if st.session_state.active_version == st.session_state.processing_version:
+    st.session_state.is_processing = False
