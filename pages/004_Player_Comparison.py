@@ -814,6 +814,11 @@ with c2:
             age_max = int(np.nanmax(df["_age_numeric"]))
             if "age_range_cmp" not in st.session_state:
                 st.session_state.age_range_cmp = (age_min, age_max)
+
+            # SAFETY: ensure range slider always receives a tuple
+            if not isinstance(st.session_state.age_range_cmp, (tuple, list)):
+                st.session_state.age_range_cmp = (age_min, age_max)
+
             sel_min, sel_max = st.slider(
                 "Age range",
                 min_value=age_min,
