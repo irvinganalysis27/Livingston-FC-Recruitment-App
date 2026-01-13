@@ -689,26 +689,32 @@ def load_all_historical_statsbomb(base_dir: Path) -> pd.DataFrame:
     return df_all
 
 # ---------- Load + preprocess historical data ----------
-df_all_raw = load_all_historical_statsbomb(HIST_DIR).copy()
 
-df_all_raw.columns = (
-    df_all_raw.columns.astype(str)
-    .str.strip()
-    .str.replace(u"\xa0", " ", regex=False)
-    .str.replace(r"\s+", " ", regex=True)
-)
+# --- Cached loader for all historical comparison data ---
+@st.cache_resource(show_spinner=True)
+def load_all_comparison_data(base_dir: Path) -> pd.DataFrame:
+    df_raw = load_all_historical_statsbomb(base_dir).copy()
 
-# Add Age column from Birth Date if available
-if "Birth Date" in df_all_raw.columns:
-    today = datetime.today()
-    df_all_raw["Age"] = pd.to_datetime(
-        df_all_raw["Birth Date"], errors="coerce"
-    ).apply(
-        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if pd.notna(dob) else np.nan
+    df_raw.columns = (
+        df_raw.columns.astype(str)
+        .str.strip()
+        .str.replace(u"\xa0", " ", regex=False)
+        .str.replace(r"\s+", " ", regex=True)
     )
 
-df_all = preprocess_df(df_all_raw)
+    # Add Age column from Birth Date if available
+    if "Birth Date" in df_raw.columns:
+        today = datetime.today()
+        df_raw["Age"] = pd.to_datetime(
+            df_raw["Birth Date"], errors="coerce"
+        ).apply(
+            lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if pd.notna(dob) else np.nan
+        )
+
+    return preprocess_df(df_raw)
+
+df_all = load_all_comparison_data(HIST_DIR)
 df = df_all.copy()
 
 # ---------- League filter ----------
