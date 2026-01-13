@@ -27,6 +27,12 @@ if "is_processing" not in st.session_state:
 if "last_interaction_ts" not in st.session_state:
     st.session_state.last_interaction_ts = 0.0
 
+# ---------- Processing version guard ----------
+if "processing_version" not in st.session_state:
+    st.session_state.processing_version = 0
+if "active_version" not in st.session_state:
+    st.session_state.active_version = 0
+
 def lock_on_change():
     st.session_state.is_processing = True
     st.session_state.last_interaction_ts = time.time()
@@ -1021,6 +1027,7 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
 
 
 # ---------- Begin heavy processing block ----------
+st.session_state.processing_version += 1
 current_version = st.session_state.processing_version
 st.session_state.active_version = current_version
 
