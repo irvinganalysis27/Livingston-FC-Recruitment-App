@@ -721,6 +721,12 @@ df[league_col] = df[league_col].astype(str).str.strip()
 # Collect all available leagues from the dataset
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
+# --- League select/clear action flags (prevent widget state collisions) ---
+if "select_all_leagues_flag" not in st.session_state:
+    st.session_state.select_all_leagues_flag = False
+if "clear_all_leagues_flag" not in st.session_state:
+    st.session_state.clear_all_leagues_flag = False
+
 st.markdown("#### Choose league(s)")
 
 # --- Ensure session state defaults are valid ---
@@ -733,20 +739,28 @@ else:
         l for l in st.session_state.league_selection if l in all_leagues
     ]
 
-# --- Buttons for quick select/clear ---
+# --- Buttons for quick select/clear (safe flags only) ---
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all"):
-        st.session_state.league_selection = all_leagues.copy()
+        st.session_state.select_all_leagues_flag = True
 with b2:
     if st.button("Clear all"):
-        st.session_state.league_selection = []
+        st.session_state.clear_all_leagues_flag = True
+
+# --- Apply select/clear actions BEFORE rendering the widget ---
+if st.session_state.select_all_leagues_flag:
+    st.session_state.league_selection = all_leagues.copy()
+    st.session_state.select_all_leagues_flag = False
+
+if st.session_state.clear_all_leagues_flag:
+    st.session_state.league_selection = []
+    st.session_state.clear_all_leagues_flag = False
 
 # --- Multiselect control ---
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    default=st.session_state.league_selection,
     key="league_selection",
     label_visibility="collapsed"
 )
