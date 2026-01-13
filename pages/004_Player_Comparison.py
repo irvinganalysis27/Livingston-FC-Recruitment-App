@@ -731,20 +731,14 @@ st.session_state[LEAGUE_KEY] = [
     l for l in st.session_state[LEAGUE_KEY] if l in all_leagues
 ]
 
- b1, b2, _ = st.columns([1, 1, 6])
- with b1:
-     if st.button(
-         "Select all",
-         key="league_select_all_btn",
-     ):
-         st.session_state[LEAGUE_KEY] = all_leagues.copy()
+b1, b2, _ = st.columns([1, 1, 6])
+with b1:
+    if st.button("Select all", key="league_select_all_btn"):
+        st.session_state[LEAGUE_KEY] = all_leagues.copy()
 
- with b2:
-     if st.button(
-         "Clear all",
-         key="league_clear_all_btn",
-     ):
-         st.session_state[LEAGUE_KEY] = []
+with b2:
+    if st.button("Clear all", key="league_clear_all_btn"):
+        st.session_state[LEAGUE_KEY] = []
 
 selected_leagues = st.multiselect(
     "Leagues",
@@ -771,20 +765,20 @@ minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
 
- c1, c2 = st.columns(2)
- with c1:
-     if "min_minutes_cmp" not in st.session_state:
-         st.session_state.min_minutes_cmp = 1000
-     st.session_state.min_minutes_cmp = st.number_input(
-         "Minimum minutes",
-         min_value=0,
-         value=st.session_state.min_minutes_cmp,
-         step=50,
-         key="min_minutes_cmp_input",
-     )
-     min_minutes = st.session_state.min_minutes_cmp
-     df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
-     df = df[df["_minutes_numeric"] >= min_minutes].copy()
+c1, c2 = st.columns(2)
+with c1:
+    if "min_minutes_cmp" not in st.session_state:
+        st.session_state.min_minutes_cmp = 1000
+    st.session_state.min_minutes_cmp = st.number_input(
+        "Minimum minutes",
+        min_value=0,
+        value=st.session_state.min_minutes_cmp,
+        step=50,
+        key="min_minutes_cmp_input",
+    )
+    min_minutes = st.session_state.min_minutes_cmp
+    df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+    df = df[df["_minutes_numeric"] >= min_minutes].copy()
 
 with c2:
     if "Age" in df.columns:
