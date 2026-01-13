@@ -11,7 +11,6 @@ from ui.sidebar import render_sidebar
 from openai import OpenAI
 import sys
 import os
-import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -21,16 +20,6 @@ if ROOT not in sys.path:
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
 
-# ---------- Global UI processing lock ----------
-if "is_processing" not in st.session_state:
-    st.session_state.is_processing = False
-if "last_interaction_ts" not in st.session_state:
-    st.session_state.last_interaction_ts = 0.0
-
-
-def lock_on_change():
-    st.session_state.is_processing = True
-    st.session_state.last_interaction_ts = time.time()
 
 # ---------- Authentication ----------
 if not check_password():
@@ -41,9 +30,6 @@ render_sidebar()
 show_branding()
 st.title("Player Comparison")
 
-# ---------- Optional: Show processing message after title ----------
-if st.session_state.is_processing:
-    st.info("Updating player comparison, please wait…")
 
 # ---------- Fixed group colours ----------
 group_colors = {
@@ -745,32 +731,26 @@ st.session_state[LEAGUE_KEY] = [
     l for l in st.session_state[LEAGUE_KEY] if l in all_leagues
 ]
 
-b1, b2, _ = st.columns([1, 1, 6])
-with b1:
-    if st.button(
-        "Select all",
-        key="league_select_all_btn",
-        disabled=st.session_state.is_processing,
-    ):
-        lock_on_change()
-        st.session_state[LEAGUE_KEY] = all_leagues.copy()
+ b1, b2, _ = st.columns([1, 1, 6])
+ with b1:
+     if st.button(
+         "Select all",
+         key="league_select_all_btn",
+     ):
+         st.session_state[LEAGUE_KEY] = all_leagues.copy()
 
-with b2:
-    if st.button(
-        "Clear all",
-        key="league_clear_all_btn",
-        disabled=st.session_state.is_processing,
-    ):
-        lock_on_change()
-        st.session_state[LEAGUE_KEY] = []
+ with b2:
+     if st.button(
+         "Clear all",
+         key="league_clear_all_btn",
+     ):
+         st.session_state[LEAGUE_KEY] = []
 
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
     key=LEAGUE_KEY,
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing,
-    on_change=lock_on_change
 )
 
 # --- Apply filter or stop if empty ---
@@ -791,21 +771,20 @@ minutes_col = "Minutes played"
 if minutes_col not in df.columns:
     df[minutes_col] = np.nan
 
-c1, c2 = st.columns(2)
-with c1:
-    if "min_minutes_cmp" not in st.session_state:
-        st.session_state.min_minutes_cmp = 1000
-    st.session_state.min_minutes_cmp = st.number_input(
-        "Minimum minutes",
-        min_value=0,
-        step=50,
-        key="min_minutes_cmp_input",
-        disabled=st.session_state.is_processing,
-        on_change=lock_on_change
-    )
-    min_minutes = st.session_state.min_minutes_cmp
-    df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
-    df = df[df["_minutes_numeric"] >= min_minutes].copy()
+ c1, c2 = st.columns(2)
+ with c1:
+     if "min_minutes_cmp" not in st.session_state:
+         st.session_state.min_minutes_cmp = 1000
+     st.session_state.min_minutes_cmp = st.number_input(
+         "Minimum minutes",
+         min_value=0,
+         value=st.session_state.min_minutes_cmp,
+         step=50,
+         key="min_minutes_cmp_input",
+     )
+     min_minutes = st.session_state.min_minutes_cmp
+     df["_minutes_numeric"] = pd.to_numeric(df[minutes_col], errors="coerce")
+     df = df[df["_minutes_numeric"] >= min_minutes].copy()
 
 with c2:
     if "Age" in df.columns:
@@ -827,8 +806,6 @@ with c2:
                 value=st.session_state.age_range_cmp,
                 step=1,
                 key="age_range_cmp_slider",
-                disabled=st.session_state.is_processing,
-                on_change=lock_on_change
             )
             st.session_state.age_range_cmp = (sel_min, sel_max)
             df = df[df["_age_numeric"].between(sel_min, sel_max)].copy()
@@ -851,8 +828,6 @@ selected_groups = st.multiselect(
     options=available_groups,
     key="pos_group_multiselect_cmp",
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing,
-    on_change=lock_on_change
 )
 st.session_state.selected_groups_cmp = selected_groups
 
@@ -895,8 +870,6 @@ selected_position_template = st.selectbox(
     index=template_names.index(st.session_state.template_select),
     key="template_select",
     label_visibility="collapsed",
-    disabled=st.session_state.is_processing,
-    on_change=lock_on_change
 )
 
 # Handle manual override
@@ -938,8 +911,6 @@ with c1:
         players,
         index=players.index(st.session_state.cmpA) if st.session_state.cmpA in players else 0,
         key="cmpA_sel",
-        disabled=st.session_state.is_processing,
-        on_change=lock_on_change
     )
     st.session_state.cmpA = pA
 
@@ -960,8 +931,6 @@ with c1:
             seasons_A,
             index=seasons_A.index(st.session_state.seasonA) if st.session_state.seasonA in seasons_A else 0,
             key="seasonA_sel",
-            disabled=st.session_state.is_processing,
-            on_change=lock_on_change
         )
         st.session_state.seasonA = seasonA
     else:
@@ -973,8 +942,6 @@ with c2:
         ["(none)"] + players,
         index=(players.index(st.session_state.cmpB) + 1) if st.session_state.cmpB in players else 0,
         key="cmpB_sel",
-        disabled=st.session_state.is_processing,
-        on_change=lock_on_change
     )
     pB = None if pB == "(none)" else pB
     st.session_state.cmpB = pB
@@ -996,8 +963,6 @@ with c2:
             seasons_B,
             index=seasons_B.index(st.session_state.seasonB) if st.session_state.seasonB in seasons_B else 0,
             key="seasonB_sel",
-            disabled=st.session_state.is_processing,
-            on_change=lock_on_change
         )
         st.session_state.seasonB = seasonB
     else:
@@ -1034,8 +999,6 @@ league_col = "Competition_norm" if "Competition_norm" in df.columns else "Compet
 compute_within_league = st.checkbox(
     "Percentiles within each league",
     key="percentiles_within_league_cmp",
-    disabled=st.session_state.is_processing,
-    on_change=lock_on_change
 )
 
 percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
@@ -1201,9 +1164,6 @@ labels_to_genre = {
 A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
 B_vals = rowB_pct.values if rowB_pct is not None else None
 
-#
-# ---------- GUARANTEED UNLOCK AT END OF RUN ----------
-st.session_state.is_processing = False
 
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
@@ -1280,7 +1240,7 @@ def generate_comparison_summary(player_a, player_b, df, metrics):
 st.markdown("### 🧠 AI Scouting Comparison")
 
 if pA and pB:
-    if st.button("Generate AI Comparison", key="ai_cmp_button", disabled=st.session_state.is_processing):
+    if st.button("Generate AI Comparison", key="ai_cmp_button"):
         with st.spinner("Generating AI scouting comparison..."):
             summary = generate_comparison_summary(pA, pB, df, metrics)
             st.markdown(summary)
