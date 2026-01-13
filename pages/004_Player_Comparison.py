@@ -44,62 +44,105 @@ DISPLAY_NAMES = {
 # --- League name normalisation: StatsBomb -> your Opta names ---
 LEAGUE_SYNONYMS = {
     "A-League": "Australia A-League Men",
-    "A-League": "Australia A-League",
+    "Australia A-League": "Australia A-League Men",
+    "Australia A-League Men": "Australia A-League Men",
     "2. Liga": "Austria 2. Liga",
     "Challenger Pro League": "Belgium Challenger Pro League",
+    "Belgium Challenger Pro League": "Belgium Challenger Pro League",
+    "Jupiler Pro League": "Jupiler Pro League",
+    "Belgium Pro League": "Jupiler Pro League",
+    "Belgian Pro League": "Jupiler Pro League",
+    "Belgium Jupiler Pro League": "Jupiler Pro League",
     "First League": "Bulgaria First League",
+    "Bulgaria First League": "Bulgaria First League",
     "1. HNL": "Croatia 1. HNL",
     "HNL": "Croatia 1. HNL",
+    "Croatia 1. HNL": "Croatia 1. HNL",
     "Czech Liga": "Czech First Tier",
+    "Czech First Tier": "Czech First Tier",
     "1st Division": "Denmark 1st Division",
+    "Denmark 1st Division": "Denmark 1st Division",
     "Superliga": "Denmark Superliga",
     "Denmark Superliga": "Denmark Superliga",
     "League One": "England League One",
+    "England League One": "England League One",
     "League Two": "England League Two",
+    "England League Two": "England League Two",
     "National League": "England National League",
+    "England National League": "England National League",
     "National League N / S": "England National League N/S",
+    "England National League N/S": "England National League N/S",
     "Premium Liiga": "Estonia Premium Liiga",
+    "Estonia Premium Liiga": "Estonia Premium Liiga",
     "Veikkausliiga": "Finland Veikkausliiga",
+    "Finland Veikkausliiga": "Finland Veikkausliiga",
     "Championnat National": "France National 1",
+    "France National 1": "France National 1",
     "Ligue 2": "Ligue 2",
     "France Ligue 2": "Ligue 2",
     "2. Bundesliga": "2. Bundesliga",
     "Germany 2. Bundesliga": "2. Bundesliga",
     "3. Liga": "Germany 3. Liga",
+    "Germany 3. Liga": "Germany 3. Liga",
     "Super League": "Greece Super League 1",
     "Greece Super League": "Greece Super League 1",
+    "Greece Super League 1": "Greece Super League 1",
     "NB I": "Hungary NB I",
+    "Hungary NB I": "Hungary NB I",
     "Besta deild karla": "Iceland Besta Deild",
+    "Iceland Besta Deild": "Iceland Besta Deild",
     "Serie C": "Italy Serie C",
+    "Italy Serie C": "Italy Serie C",
     "J2 League": "Japan J2 League",
+    "Japan J2 League": "Japan J2 League",
     "Virsliga": "Latvia Virsliga",
+    "Latvia Virsliga": "Latvia Virsliga",
     "A Lyga": "Lithuania A Lyga",
+    "Lithuania A Lyga": "Lithuania A Lyga",
     "Botola Pro": "Morocco Botola Pro",
+    "Morocco Botola Pro": "Morocco Botola Pro",
     "Eredivisie": "Eredivisie",
     "Netherlands Eredivisie": "Eredivisie",
     "Eerste Divisie": "Netherlands Eerste Divisie",
+    "Netherlands Eerste Divisie": "Netherlands Eerste Divisie",
     "1. Division": "Norway 1. Division",
+    "Norway 1. Division": "Norway 1. Division",
     "Eliteserien": "Norway Eliteserien",
+    "Norway Eliteserien": "Norway Eliteserien",
     "I Liga": "Poland 1 Liga",
+    "Poland 1 Liga": "Poland 1 Liga",
     "Ekstraklasa": "Poland Ekstraklasa",
+    "Poland Ekstraklasa": "Poland Ekstraklasa",
     "Segunda Liga": "Portugal Segunda Liga",
     "Liga Pro": "Portugal Segunda Liga",
+    "Portugal Segunda Liga": "Portugal Segunda Liga",
     "Premier Division": "Republic of Ireland Premier Division",
     "Ireland Premier Division": "Republic of Ireland Premier Division",
+    "Republic of Ireland Premier Division": "Republic of Ireland Premier Division",
     "Liga 1": "Romania Liga 1",
+    "Romania Liga 1": "Romania Liga 1",
     "Championship": "Scotland Championship",
+    "Scotland Championship": "Scotland Championship",
     "Premiership": "Scotland Premiership",
+    "Scotland Premiership": "Scotland Premiership",
     "Super Liga": "Serbia Super Liga",
+    "Serbia Super Liga": "Serbia Super Liga",
     "Slovakia Super Liga": "Slovakia 1. Liga",
     "Slovakia First League": "Slovakia 1. Liga",
     "1. Liga": "Slovakia 1. Liga",
+    "Slovakia 1. Liga": "Slovakia 1. Liga",
     "1. Liga (SVN)": "Slovenia 1. Liga",
-    "PSL": "South Africa Premier Division",
-    "Allsvenskan": "Sweden Allsvenskan",
-    "Superettan": "Sweden Superettan",
-    "Challenge League": "Switzerland Challenge League",
-    "Denmark 1. Division": "Denmark 1st Division",
     "Slovenia 1. SNL": "Slovenia 1. Liga",
+    "Slovenia 1. Liga": "Slovenia 1. Liga",
+    "PSL": "South Africa Premier Division",
+    "South Africa Premier Division": "South Africa Premier Division",
+    "Allsvenskan": "Sweden Allsvenskan",
+    "Sweden Allsvenskan": "Sweden Allsvenskan",
+    "Superettan": "Sweden Superettan",
+    "Sweden Superettan": "Sweden Superettan",
+    "Challenge League": "Switzerland Challenge League",
+    "Switzerland Challenge League": "Switzerland Challenge League",
+    "Denmark 1. Division": "Denmark 1st Division",
 
     # --- Tunisia fixes ---
     "Ligue 1": "Tunisia Ligue 1",      # bare 'Ligue 1' should always mean Tunisia
@@ -109,24 +152,11 @@ LEAGUE_SYNONYMS = {
 
     # --- USA ---
     "USL Championship": "USA USL Championship",
-
-    # --- Belgium top flight fixes ---
-    "Jupiler Pro League": "Jupiler Pro League",
-    "Belgium Pro League": "Jupiler Pro League",
-    "Belgian Pro League": "Jupiler Pro League",
-    "Belgium Jupiler Pro League": "Jupiler Pro League",
+    "USA USL Championship": "USA USL Championship",
 }
 
 # ========== Role groups shown in filters ==========
-SIX_GROUPS = [
-    "Full Back",
-    "Centre Back",
-    "Number 6",
-    "Number 8",
-    "Number 10",
-    "Winger",
-    "Striker"
-]
+SIX_GROUPS = ["Full Back", "Centre Back", "Number 6", "Number 8", "Number 10", "Winger", "Striker"]
 
 # ========== Position → group mapping ==========
 def _clean_pos_token(tok: str) -> str:
@@ -149,18 +179,25 @@ RAW_TO_SIX = {
     "CENTREMIDFIELDER": "Centre Midfield",
     "RIGHTCENTREMIDFIELDER": "Centre Midfield", "LEFTCENTREMIDFIELDER": "Centre Midfield",
 
-    # ✅ Defensive mids → 6 (includes CENTREDEFENSIVEMIDFIELDER)
+    # Defensive mids → 6
     "DEFENSIVEMIDFIELDER": "Number 6",
     "RIGHTDEFENSIVEMIDFIELDER": "Number 6",
     "LEFTDEFENSIVEMIDFIELDER": "Number 6",
     "CENTREDEFENSIVEMIDFIELDER": "Number 6",
 
-    # Attacking mids / 10 → Number 10
+    # Number 8
+    "CENTREBOXTOBOXMIDFIELDER": "Number 8",
+    "BOXTOBOXMIDFIELDER": "Number 8",
+    "RIGHTBOXTOBOXMIDFIELDER": "Number 8",
+    "LEFTBOXTOBOXMIDFIELDER": "Number 8",
+    "NUMBER8": "Number 8",
+
+    # Number 10
     "CENTREATTACKINGMIDFIELDER": "Number 10",
     "ATTACKINGMIDFIELDER": "Number 10",
     "SECONDSTRIKER": "Number 10",
     "10": "Number 10",
-    # Wide attacking midfielders → Number 10
+    "NUMBER10": "Number 10",
     "RIGHTATTACKINGMIDFIELDER": "Number 10",
     "LEFTATTACKINGMIDFIELDER": "Number 10",
 
@@ -187,6 +224,7 @@ DEFAULT_TEMPLATE = {
     "Centre Back": "Centre Back",
     "Number 6": "Number 6",
     "Number 8": "Number 8",
+    "Number 10": "Number 10",
     "Winger": "Winger",
     "Striker": "Striker"
 }
@@ -196,11 +234,8 @@ position_metrics = {
     # ---------- Centre Back ----------
     "Centre Back": {
         "metrics": [
-            # Attacking
             "NP Goals",
-            # Possession
             "Passing%", "Pass OBV", "Pr. Long Balls", "UPr. Long Balls", "OBV", "Pr. Pass% Dif.",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
             "Defensive Actions", "Aggressive Actions", "Fouls",
             "Aerial Wins", "Aerial Win%",
@@ -223,11 +258,10 @@ position_metrics = {
             "NP Goals": "Attacking",
         }
     },
-
     # ---------- Full Back ----------
     "Full Back": {
         "metrics": [
-            "Passing%", "Pr. Pass% Dif.", "Successful Crosses", "Crossing%", "Deep Progressions",
+            "Passing%", "Pr. Pass% Dif.", "Successful Box Cross%", "Crossing%", "Deep Progressions",
             "Successful Dribbles", "Turnovers", "OBV", "Pass OBV",
             "Defensive Actions", "Aerial Win%", "PAdj Pressures",
             "PAdj Tack&Int", "Dribbles Stopped%", "Aggressive Actions", "Player Season Ball Recoveries 90"
@@ -235,7 +269,7 @@ position_metrics = {
         "groups": {
             "Passing%": "Possession",
             "Pr. Pass% Dif.": "Possession",
-            "Successful Crosses": "Possession",
+            "Successful Box Cross%": "Possession",
             "Crossing%": "Possession",
             "Deep Progressions": "Possession",
             "Successful Dribbles": "Possession",
@@ -251,15 +285,11 @@ position_metrics = {
             "Player Season Ball Recoveries 90": "Defensive"
         }
     },
-
     # ---------- Number 6 ----------
     "Number 6": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted",
-            # Possession
             "Passing%", "Deep Progressions", "Turnovers", "OBV", "Pass OBV", "Pr. Pass% Dif.",
-            # Defensive
             "PAdj Interceptions", "PAdj Tackles", "Dribbles Stopped%",
             "Aggressive Actions", "Aerial Win%", "Player Season Ball Recoveries 90", "Pressure Regains",
         ],
@@ -281,15 +311,11 @@ position_metrics = {
             "xG Assisted": "Attacking",
         }
     },
-
     # ---------- Number 8 ----------
     "Number 8": {
         "metrics": [
-            # Attacking
             "xGBuildup", "xG Assisted", "Shots", "xG", "NP Goals",
-            # Possession
             "Passing%", "Deep Progressions", "OP Passes Into Box", "Pass OBV", "OBV", "Deep Completions",
-            # Defensive
             "Pressure Regains", "PAdj Pressures", "Player Season Fhalf Ball Recoveries 90",
             "Aggressive Actions",
         ],
@@ -311,7 +337,6 @@ position_metrics = {
             "OBV": "Possession",
         }
     },
-
     # ---------- Number 10 ----------
     "Number 10": {
         "metrics": [
@@ -326,7 +351,6 @@ position_metrics = {
             "OP Passes Into Box": "Possession",
             "OP Key Passes": "Possession",
             "OBV": "Possession",
-
             "Shots": "Attacking",
             "xG": "Attacking",
             "xG Assisted": "Attacking",
@@ -335,21 +359,16 @@ position_metrics = {
             "xG/Shot": "Attacking",
             "Touches In Box": "Attacking",
             "Goal Conversion%": "Attacking",
-
             "Aggressive Actions": "Defensive",
             "PAdj Pressures": "Defensive",
         }
     },
-
     # ---------- Winger ----------
     "Winger": {
         "metrics": [
-            # Attacking
             "xG", "Shots", "xG/Shot", "Touches In Box", "OP xG Assisted", "NP Goals",
-            # Possession
             "OP Passes Into Box", "Successful Box Cross%", "Passing%",
             "Successful Dribbles", "Turnovers", "OBV", "D&C OBV", "Fouls Won", "Deep Progressions",
-            # Defensive
             "Player Season Fhalf Pressures 90",
         ],
         "groups": {
@@ -370,7 +389,6 @@ position_metrics = {
             "Player Season Fhalf Pressures 90": "Defensive",
         }
     },
-
     # ---------- Striker ----------
     "Striker": {
         "metrics": [
