@@ -17,6 +17,13 @@ from supabase import create_client
 from lib.favourites_repo import upsert_favourite, hide_favourite, list_favourites
 from datetime import datetime, timezone
 from openai import OpenAI
+import sys
+import os
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+    
 client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
