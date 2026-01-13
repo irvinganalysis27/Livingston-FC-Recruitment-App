@@ -818,6 +818,7 @@ with c2:
                 "Age range",
                 min_value=age_min,
                 max_value=age_max,
+                value=st.session_state.age_range_cmp,
                 step=1,
                 key="age_range_cmp_slider",
                 disabled=st.session_state.is_processing,
