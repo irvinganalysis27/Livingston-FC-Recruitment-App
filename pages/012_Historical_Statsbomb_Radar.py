@@ -885,14 +885,29 @@ if st.session_state.selected_player:
 # ============================================================
 
 hist_df = load_historical_season_ratings(HIST_RATINGS_PATH)
-# --- Normalise competition column for historical ratings ---
-if "Competition_norm" not in hist_df.columns:
-    if "Competition" in hist_df.columns:
-        hist_df["Competition_norm"] = hist_df["Competition"].astype(str).str.strip()
-    elif "League" in hist_df.columns:
-        hist_df["Competition_norm"] = hist_df["League"].astype(str).str.strip()
-    else:
-        hist_df["Competition_norm"] = ""
+# --- HARD normalisation for historical file ---
+if not hist_df.empty:
+    hist_df.columns = hist_df.columns.str.strip()
+
+    if "Season" not in hist_df.columns and "Season Name" in hist_df.columns:
+        hist_df["Season"] = hist_df["Season Name"]
+
+    if "Minutes played" not in hist_df.columns:
+        if "Minutes" in hist_df.columns:
+            hist_df["Minutes played"] = hist_df["Minutes"]
+        else:
+            hist_df["Minutes played"] = 0
+
+    if "Six-Group Position" not in hist_df.columns:
+        hist_df["Six-Group Position"] = ""
+
+    if "Competition_norm" not in hist_df.columns:
+        if "Competition Name" in hist_df.columns:
+            hist_df["Competition_norm"] = hist_df["Competition Name"]
+        elif "Competition" in hist_df.columns:
+            hist_df["Competition_norm"] = hist_df["Competition"]
+        else:
+            hist_df["Competition_norm"] = ""
 
 if not hist_df.empty:
     show_history = st.checkbox(
@@ -931,45 +946,27 @@ if not hist_df.empty:
 
             hist_rows = hist_rows.loc[idx].copy()
 
-            # --- Normalise columns used for labels ---
-            if "Season" not in hist_rows.columns and "Season Name" in hist_rows.columns:
-                hist_rows["Season"] = hist_rows["Season Name"]
-
-            if "Minutes played" not in hist_rows.columns and "Minutes" in hist_rows.columns:
-                hist_rows["Minutes played"] = hist_rows["Minutes"]
-
-            if "Competition_norm" not in hist_rows.columns:
-                if "Competition Name" in hist_rows.columns:
-                    hist_rows["Competition_norm"] = hist_rows["Competition Name"]
-                elif "Competition" in hist_rows.columns:
-                    hist_rows["Competition_norm"] = hist_rows["Competition"]
-                else:
-                    hist_rows["Competition_norm"] = ""
-
+            # --- FINAL LABEL (stable, minimal, matches historical CSV structure) ---
             hist_rows["Minutes played"] = (
                 pd.to_numeric(hist_rows["Minutes played"], errors="coerce")
                 .fillna(0)
                 .astype(int)
-                .astype(str)
             )
 
-            hist_rows["Six-Group Position"] = hist_rows["Six-Group Position"].fillna("").astype(str)
-
-            # --- FINAL LABEL: top line league + team, bottom line season | minutes | position ---
             hist_rows["Season_Label"] = (
-                hist_rows["Competition_norm"].fillna("").astype(str)
+                hist_rows["Competition_norm"].astype(str)
                 + " | "
-                + hist_rows["Team"].fillna("").astype(str)
+                + hist_rows["Team"].astype(str)
                 + "\n"
-                + hist_rows["Season"].fillna("").astype(str)
+                + hist_rows["Season"].astype(str)
                 + " | "
-                + hist_rows["Minutes played"]
+                + hist_rows["Minutes played"].astype(str)
                 + " mins | "
-                + hist_rows["Six-Group Position"]
+                + hist_rows["Six-Group Position"].astype(str)
             )
 
             # --- Final ordering before plotting ---
-            hist_rows = hist_rows.sort_values(["Season", "Team", "Six-Group Position"])
+            hist_rows = hist_rows.sort_values("Season")
 
             # --- Plot: one bar per season, best score only ---
             fig2, ax2 = plt.subplots(figsize=(8, 3))
