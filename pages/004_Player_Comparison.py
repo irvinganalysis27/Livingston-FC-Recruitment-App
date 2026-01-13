@@ -11,6 +11,7 @@ from ui.sidebar import render_sidebar
 from openai import OpenAI
 import sys
 import os
+import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -21,17 +22,14 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 
 
 # ---------- Global UI processing lock ----------
-if "processing_version" not in st.session_state:
-    st.session_state.processing_version = 0
-if "active_version" not in st.session_state:
-    st.session_state.active_version = 0
 if "is_processing" not in st.session_state:
     st.session_state.is_processing = False
+if "last_interaction_ts" not in st.session_state:
+    st.session_state.last_interaction_ts = 0.0
 
 def lock_on_change():
-    st.session_state.processing_version += 1
     st.session_state.is_processing = True
-
+    st.session_state.last_interaction_ts = time.time()
 
 # ---------- Authentication ----------
 if not check_password():
@@ -748,11 +746,11 @@ st.session_state[LEAGUE_KEY] = [
 
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
-    if st.button("Select all", key="league_select_all_btn", disabled=st.session_state.is_processing):
+    if st.button("Select all", key="league_select_all_btn", disabled=st.session_state.is_processing, on_change=lock_on_change):
         st.session_state[LEAGUE_KEY] = all_leagues.copy()
 
 with b2:
-    if st.button("Clear all", key="league_clear_all_btn", disabled=st.session_state.is_processing):
+    if st.button("Clear all", key="league_clear_all_btn", disabled=st.session_state.is_processing, on_change=lock_on_change):
         st.session_state[LEAGUE_KEY] = []
 
 selected_leagues = st.multiselect(
@@ -789,7 +787,6 @@ with c1:
     st.session_state.min_minutes_cmp = st.number_input(
         "Minimum minutes",
         min_value=0,
-        value=st.session_state.min_minutes_cmp,
         step=50,
         key="min_minutes_cmp_input",
         disabled=st.session_state.is_processing,
@@ -811,7 +808,6 @@ with c2:
                 "Age range",
                 min_value=age_min,
                 max_value=age_max,
-                value=st.session_state.age_range_cmp,
                 step=1,
                 key="age_range_cmp_slider",
                 disabled=st.session_state.is_processing,
@@ -836,7 +832,6 @@ if "selected_groups_cmp" not in st.session_state:
 selected_groups = st.multiselect(
     "Position Groups",
     options=available_groups,
-    default=st.session_state.selected_groups_cmp,
     key="pos_group_multiselect_cmp",
     label_visibility="collapsed",
     disabled=st.session_state.is_processing,
@@ -1024,9 +1019,9 @@ for m in metrics:
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 compute_within_league = st.checkbox(
     "Percentiles within each league",
-    value=True,
     key="percentiles_within_league_cmp",
-    disabled=st.session_state.is_processing
+    disabled=st.session_state.is_processing,
+    on_change=lock_on_change
 )
 
 percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
@@ -1192,6 +1187,13 @@ labels_to_genre = {
 A_vals = rowA_pct.values if rowA_pct is not None else np.zeros(len(metrics))
 B_vals = rowB_pct.values if rowB_pct is not None else None
 
+#
+# ---------- Unlock UI after processing ----------
+# If no new interaction happened during this run, unlock safely
+if st.session_state.is_processing:
+    if time.time() - st.session_state.last_interaction_ts > 0.2:
+        st.session_state.is_processing = False
+
 fig = radar_compare(
     labels_clean, A_vals, B_vals,
     A_name=pA, B_name=pB,
@@ -1275,6 +1277,3 @@ else:
     st.info("Select two players to enable the AI comparison.")
 
 
-# ---------- Final unlock guard ----------
-if st.session_state.active_version == st.session_state.processing_version:
-    st.session_state.is_processing = False
