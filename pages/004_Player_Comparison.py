@@ -711,61 +711,46 @@ if "Birth Date" in df_all_raw.columns:
         if pd.notna(dob) else np.nan
     )
 
-df_all = preprocess_df(df_all_raw)
-df = df_all.copy()
+df_all = preprocess_df(df_all_raw).copy(deep=True)
+df = df_all.copy(deep=True)
 
 # ---------- League filter ----------
 league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
 df[league_col] = df[league_col].astype(str).str.strip()
 
-# Collect all available leagues from the dataset
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
-
-# --- League select/clear action flags (prevent widget state collisions) ---
-if "select_all_leagues_flag" not in st.session_state:
-    st.session_state.select_all_leagues_flag = False
-if "clear_all_leagues_flag" not in st.session_state:
-    st.session_state.clear_all_leagues_flag = False
 
 st.markdown("#### Choose league(s)")
 
-# --- Ensure session state defaults are valid ---
-if "league_selection" not in st.session_state:
-    # Initialise with all leagues selected
-    st.session_state.league_selection = all_leagues.copy()
-else:
-    # Remove any invalid or outdated leagues from the session state
-    st.session_state.league_selection = [
-        l for l in st.session_state.league_selection if l in all_leagues
-    ]
+# --- Shadow state to avoid widget mutation races ---
+if "league_selection_shadow" not in st.session_state:
+    st.session_state.league_selection_shadow = all_leagues.copy()
 
-# --- Buttons for quick select/clear (safe flags only) ---
+# Keep shadow state valid if leagues change
+st.session_state.league_selection_shadow = [
+    l for l in st.session_state.league_selection_shadow if l in all_leagues
+]
+
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all"):
-        st.session_state.select_all_leagues_flag = True
+        st.session_state.league_selection_shadow = all_leagues.copy()
+
 with b2:
     if st.button("Clear all"):
-        st.session_state.clear_all_leagues_flag = True
+        st.session_state.league_selection_shadow = []
 
-# --- Apply select/clear actions BEFORE rendering the widget ---
-if st.session_state.select_all_leagues_flag:
-    st.session_state.league_selection = all_leagues.copy()
-    st.session_state.select_all_leagues_flag = False
-
-if st.session_state.clear_all_leagues_flag:
-    st.session_state.league_selection = []
-    st.session_state.clear_all_leagues_flag = False
-
-# --- Multiselect control ---
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    key="league_selection",
+    default=st.session_state.league_selection_shadow,
+    key="league_selection_widget",
     label_visibility="collapsed"
 )
 
-# --- Apply filter or stop if empty ---
+# Sync shadow after widget render (safe point)
+st.session_state.league_selection_shadow = selected_leagues.copy()
+
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)].copy()
     st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
