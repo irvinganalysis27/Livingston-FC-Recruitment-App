@@ -716,39 +716,42 @@ df[league_col] = df[league_col].astype(str).str.strip()
 # Collect all available leagues from the dataset
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
-# --- League selection state (single source of truth = widget key) ---
-if "league_selection_widget" not in st.session_state:
-    st.session_state.league_selection_widget = all_leagues.copy()
-
 st.markdown("#### Choose league(s)")
+
+LEAGUE_KEY = "league_selection_widget"
+
+# Initialise once
+if LEAGUE_KEY not in st.session_state:
+    st.session_state[LEAGUE_KEY] = all_leagues.copy()
+
+# SAFETY CLAMP: always ensure state only contains valid options
+st.session_state[LEAGUE_KEY] = [
+    l for l in st.session_state[LEAGUE_KEY] if l in all_leagues
+]
 
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
-    if st.button("Select all"):
-        st.session_state.league_selection_widget = all_leagues.copy()
+    if st.button("Select all", key="league_select_all_btn"):
+        st.session_state[LEAGUE_KEY] = all_leagues.copy()
+        st.rerun()
 
 with b2:
-    if st.button("Clear all"):
-        st.session_state.league_selection_widget = []
+    if st.button("Clear all", key="league_clear_all_btn"):
+        st.session_state[LEAGUE_KEY] = []
+        st.rerun()
 
-# --- SAFETY CLAMP: ensure widget state only contains valid options ---
-st.session_state.league_selection_widget = [
-    x for x in st.session_state.league_selection_widget if x in all_leagues
-]
-
-# --- Multiselect bound directly to widget state ---
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    key="league_selection_widget",
+    key=LEAGUE_KEY,
     label_visibility="collapsed"
 )
 
 # --- Apply filter or stop if empty ---
-if st.session_state.league_selection_widget:
-    df = df[df[league_col].isin(st.session_state.league_selection_widget)].copy()
+if st.session_state[LEAGUE_KEY]:
+    df = df[df[league_col].isin(st.session_state[LEAGUE_KEY])].copy()
     st.caption(
-        f"Leagues selected: {len(st.session_state.league_selection_widget)} | Players: {len(df)}"
+        f"Leagues selected: {len(st.session_state[LEAGUE_KEY])} | Players: {len(df)}"
     )
     if df.empty:
         st.warning("No players match these leagues.")
