@@ -932,56 +932,65 @@ with c2:
     else:
         seasonB = None
 
-# ---------- Metrics where lower values are better ----------
+# ---------- Metrics where lower values are better (match Statsbomb Radar page) ----------
+# NOTE: only percentiles are inverted, raw values are unchanged.
 LOWER_IS_BETTER = {
     "Turnovers",
-    "Lost Balls",
     "Fouls",
     "Pr. Long Balls",
     "UPr. Long Balls",
 }
 
-# ---------- Percentiles ----------
-def compute_percentiles(metrics_list, group_df):
-    bench = group_df.copy()
-    for m in metrics_list:
-        if m not in bench.columns:
-            bench[m] = np.nan
-        bench[m] = pd.to_numeric(bench[m], errors="coerce")
+def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
+    """Match Statsbomb Radar page percentile behaviour."""
+    series = pd.to_numeric(series, errors="coerce").fillna(0)
+    r = series.rank(pct=True, ascending=True)
+    p = (1.0 - r) if lower_is_better else r
+    return (p * 100.0).round(1)
 
-    raw = bench[metrics_list].copy()
-    pct = pd.DataFrame(index=raw.index)
 
-    for m in metrics_list:
-        s = raw[m]
-        # invert ranking for "lower is better" metrics
-        ascending = not (m in LOWER_IS_BETTER)
-        pct[m] = s.rank(pct=True, ascending=ascending) * 100.0
+# ---------- Percentiles (match Statsbomb Radar page behaviour) ----------
+# Ensure metric columns exist and are numeric
+for m in metrics:
+    if m not in df.columns:
+        df[m] = 0
+    df[m] = pd.to_numeric(df[m], errors="coerce").fillna(0)
 
-    return raw, pct.round(1)
-
-# --- Ensure unique index for percentile lookup ---
-# After exploding positions, multiple rows per player-season can exist.
-# For radar plotting we must enforce ONE row per player-season.
-dedupe_cols = ["Player"]
-if season_col:
-    dedupe_cols.append(season_col)
-
-df_radar = (
-    df
-    .sort_values(dedupe_cols)
-    .drop_duplicates(subset=dedupe_cols, keep="first")
-    .copy()
+# A) Percentiles for RADAR BARS (within selected leagues vs pooled)
+league_col = "Competition_norm" if "Competition_norm" in df.columns else "Competition"
+compute_within_league = st.checkbox(
+    "Percentiles within each league",
+    value=True,
+    key="percentiles_within_league_cmp"
 )
-# Guard against duplicate column names before percentile lookup/reindexing
-df_radar = df_radar.loc[:, ~df_radar.columns.duplicated()].copy()
 
-raw_df, pct_df = compute_percentiles(metrics, df_radar)
+percentile_df_chart = pd.DataFrame(index=df.index, columns=metrics, dtype=float)
+if compute_within_league and league_col in df.columns:
+    for m in metrics:
+        try:
+            percentile_df_chart[m] = (
+                df.groupby(league_col, group_keys=False)[m]
+                  .apply(lambda s: pct_rank(s, lower_is_better=(m in LOWER_IS_BETTER)))
+            )
+        except Exception as e:
+            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
+            percentile_df_chart[m] = 50.0
+else:
+    for m in metrics:
+        try:
+            percentile_df_chart[m] = pct_rank(df[m], lower_is_better=(m in LOWER_IS_BETTER))
+        except Exception as e:
+            print(f"[DEBUG] Percentile calc failed for {m}: {e}")
+            percentile_df_chart[m] = 50.0
+
+percentile_df_chart = percentile_df_chart.fillna(50.0).round(1)
+
 
 def get_pct_row(player, season):
     if not player:
         return None
-    sub = df_radar[df_radar["Player"] == player]
+
+    sub = df[df["Player"] == player]
     if season_col and season:
         sub = sub[sub[season_col] == season]
 
@@ -989,7 +998,7 @@ def get_pct_row(player, season):
         return None
 
     idx = sub.index[0]
-    row = pct_df.loc[idx]
+    row = percentile_df_chart.loc[idx, metrics]
 
     # Ensure no duplicate metric labels before reindexing
     row = row[~row.index.duplicated(keep="first")]
@@ -1003,7 +1012,7 @@ rowB_pct = get_pct_row(pB, seasonB) if pB else None
 
 # --- Resolve single rows for title display (team / season) ---
 def get_player_row_for_title(player, season):
-    sub = df_radar[df_radar["Player"] == player]
+    sub = df[df["Player"] == player]
     if season_col and season:
         sub = sub[sub[season_col] == season]
     return sub.iloc[0] if not sub.empty else None
