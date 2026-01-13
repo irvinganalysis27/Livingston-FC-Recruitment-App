@@ -23,9 +23,6 @@ st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered"
 if "is_processing" not in st.session_state:
     st.session_state.is_processing = False
 
-# Lock UI at start of every run
-st.session_state.is_processing = True
-
 
 # ---------- Authentication ----------
 if not check_password():
@@ -994,6 +991,9 @@ def pct_rank(series: pd.Series, lower_is_better: bool) -> pd.Series:
     p = (1.0 - r) if lower_is_better else r
     return (p * 100.0).round(1)
 
+
+# ---------- Begin heavy processing block ----------
+st.session_state.is_processing = True
 
 # ---------- Percentiles (match Statsbomb Radar page behaviour) ----------
 # Ensure metric columns exist and are numeric
