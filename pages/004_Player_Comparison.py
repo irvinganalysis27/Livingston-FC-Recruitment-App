@@ -721,54 +721,40 @@ df[league_col] = df[league_col].astype(str).str.strip()
 # Collect all available leagues from the dataset
 all_leagues = sorted([x for x in df[league_col].dropna().unique() if x != ""])
 
-# --- League select/clear action flags (prevent widget state collisions) ---
-if "select_all_leagues_flag" not in st.session_state:
-    st.session_state.select_all_leagues_flag = False
-if "clear_all_leagues_flag" not in st.session_state:
-    st.session_state.clear_all_leagues_flag = False
+# --- Backing state for league selection (DO NOT bind widgets directly) ---
+if "league_selection_state" not in st.session_state:
+    st.session_state.league_selection_state = all_leagues.copy()
 
 st.markdown("#### Choose league(s)")
 
-# --- Ensure session state defaults are valid ---
-if "league_selection" not in st.session_state:
-    # Initialise with all leagues selected
-    st.session_state.league_selection = all_leagues.copy()
-else:
-    # Remove any invalid or outdated leagues from the session state
-    st.session_state.league_selection = [
-        l for l in st.session_state.league_selection if l in all_leagues
-    ]
-
-# --- Buttons for quick select/clear (safe flags only) ---
+# --- Buttons for quick select/clear (only mutate backing state) ---
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
     if st.button("Select all"):
-        st.session_state.select_all_leagues_flag = True
+        st.session_state.league_selection_state = all_leagues.copy()
+
 with b2:
     if st.button("Clear all"):
-        st.session_state.clear_all_leagues_flag = True
-
-# --- Apply select/clear actions BEFORE rendering the widget ---
-if st.session_state.select_all_leagues_flag:
-    st.session_state.league_selection = all_leagues.copy()
-    st.session_state.select_all_leagues_flag = False
-
-if st.session_state.clear_all_leagues_flag:
-    st.session_state.league_selection = []
-    st.session_state.clear_all_leagues_flag = False
+        st.session_state.league_selection_state = []
 
 # --- Multiselect control ---
 selected_leagues = st.multiselect(
     "Leagues",
     options=all_leagues,
-    key="league_selection",
+    default=st.session_state.league_selection_state,
+    key="league_selection_widget",
     label_visibility="collapsed"
 )
 
+# Sync widget → backing state
+st.session_state.league_selection_state = selected_leagues
+
 # --- Apply filter or stop if empty ---
-if selected_leagues:
-    df = df[df[league_col].isin(selected_leagues)].copy()
-    st.caption(f"Leagues selected: {len(selected_leagues)} | Players: {len(df)}")
+if st.session_state.league_selection_state:
+    df = df[df[league_col].isin(st.session_state.league_selection_state)].copy()
+    st.caption(
+        f"Leagues selected: {len(st.session_state.league_selection_state)} | Players: {len(df)}"
+    )
     if df.empty:
         st.warning("No players match these leagues.")
         st.stop()
