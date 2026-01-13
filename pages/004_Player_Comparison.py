@@ -9,7 +9,6 @@ from auth import check_password
 from branding import show_branding
 from ui.sidebar import render_sidebar
 from openai import OpenAI
-client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
 
 st.set_page_config(page_title="Livingston FC Recruitment App", layout="centered")
 
@@ -623,7 +622,9 @@ def preprocess_df(df_in: pd.DataFrame) -> pd.DataFrame:
         df["_six_groups_list"] = df.apply(map_positions_to_groups, axis=1)
         df = df.explode("_six_groups_list")
         df["Six-Group Position"] = df["_six_groups_list"]
-        df.drop(columns="_six_groups_list", inplace=True)
+        df.drop(columns=["_six_groups_list"], inplace=True, errors="ignore")
+        # After exploding positions, ensure a clean, unique index
+        df = df.reset_index(drop=True)
     else:
         df["Six-Group Position"] = np.nan
 
@@ -663,7 +664,7 @@ def load_all_historical_statsbomb(base_dir: Path) -> pd.DataFrame:
     return df_all
 
 # ---------- Load + preprocess historical data ----------
-df_all_raw = load_all_historical_statsbomb(HIST_DIR)
+df_all_raw = load_all_historical_statsbomb(HIST_DIR).copy()
 
 df_all_raw.columns = (
     df_all_raw.columns.astype(str)
@@ -972,23 +973,28 @@ df_radar = (
     .drop_duplicates(subset=dedupe_cols, keep="first")
     .copy()
 )
+# Guard against duplicate column names before percentile lookup/reindexing
+df_radar = df_radar.loc[:, ~df_radar.columns.duplicated()].copy()
 
 raw_df, pct_df = compute_percentiles(metrics, df_radar)
 
 def get_pct_row(player, season):
+    if not player:
+        return None
     sub = df_radar[df_radar["Player"] == player]
     if season_col and season:
         sub = sub[sub[season_col] == season]
+
     if sub.empty:
         return None
 
     idx = sub.index[0]
     row = pct_df.loc[idx]
 
-    # Ensure no duplicate index labels before reindexing
+    # Ensure no duplicate metric labels before reindexing
     row = row[~row.index.duplicated(keep="first")]
 
-    # Reindex safely to metrics order
+    # Reindex safely to the metrics order
     return row.reindex(metrics).fillna(0)
 
 
@@ -1016,6 +1022,15 @@ def radar_compare(labels, A_vals, B_vals=None, A_name="A", B_name="B",
         ax.axis("off")
         ax.text(0.5, 0.5, "No metrics", ha="center", va="center")
         return fig
+
+    # Defensive guard: prevent crashes if data lengths do not match labels
+    if A_vals is None or len(A_vals) != len(labels):
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.axis("off")
+        ax.text(0.5, 0.5, "Radar data unavailable", ha="center", va="center")
+        return fig
+    if B_vals is not None and len(B_vals) != len(labels):
+        B_vals = None
 
     # Colours to match Livingston badge
     color_A = "#C9A227"  # Gold
@@ -1113,10 +1128,15 @@ fig = radar_compare(
     labels_to_genre=labels_to_genre,
     genre_colors=group_colors
 )
-st.pyplot(fig, use_container_width=True)
+st.pyplot(fig, width="stretch")
 
 def generate_comparison_summary(player_a, player_b, df, metrics):
     """Generate AI comparison between two players using OpenAI."""
+    # Create OpenAI client lazily so the page doesn't crash if secrets are missing
+    try:
+        client = OpenAI(api_key=st.secrets["OpenAI"]["OPENAI_API_KEY"])
+    except Exception as e:
+        return f"⚠️ AI summary unavailable (OpenAI config error): {e}"
     if not player_a or not player_b:
         return "Please select two players to compare."
 
