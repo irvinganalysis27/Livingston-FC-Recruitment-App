@@ -746,11 +746,21 @@ st.session_state[LEAGUE_KEY] = [
 
 b1, b2, _ = st.columns([1, 1, 6])
 with b1:
-    if st.button("Select all", key="league_select_all_btn", disabled=st.session_state.is_processing, on_change=lock_on_change):
+    if st.button(
+        "Select all",
+        key="league_select_all_btn",
+        disabled=st.session_state.is_processing,
+    ):
+        lock_on_change()
         st.session_state[LEAGUE_KEY] = all_leagues.copy()
 
 with b2:
-    if st.button("Clear all", key="league_clear_all_btn", disabled=st.session_state.is_processing, on_change=lock_on_change):
+    if st.button(
+        "Clear all",
+        key="league_clear_all_btn",
+        disabled=st.session_state.is_processing,
+    ):
+        lock_on_change()
         st.session_state[LEAGUE_KEY] = []
 
 selected_leagues = st.multiselect(
