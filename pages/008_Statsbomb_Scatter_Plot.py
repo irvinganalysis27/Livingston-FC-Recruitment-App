@@ -332,7 +332,7 @@ if highlight_team and "Team" in df.columns:
             mode="markers",
             marker=dict(
                 color="#FFD700",
-                size=22,
+                size=18,
                 symbol="circle",
                 line=dict(color="black", width=2),
             ),
@@ -363,16 +363,19 @@ if "Name" in df.columns and "sb_player_highlight" in st.session_state:
             fig.add_scatter(
                 x=player_df[x_metric],
                 y=player_df[y_metric],
-                mode="markers",
+                mode="markers+text",
+                text=player_df["Name"],
+                textposition="top center",
                 marker=dict(
                     color="#FFD700",
-                    size=22,
+                    size=20,
                     symbol="circle",
                     line=dict(color="black", width=2),
                 ),
                 opacity=1.0,
                 name="Highlighted Players",
                 showlegend=True,
+                hoverlabel=dict(font_size=14),
             )
 
 # Draw Livingston FC highlight LAST (top layer)
