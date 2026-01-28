@@ -288,6 +288,8 @@ fig = px.scatter(
     height=650,
     title=f"{y_metric} vs {x_metric}",
 )
+# Ensure base layer is visually de-emphasised
+fig.update_traces(marker=dict(opacity=0.35, size=9), selector=dict(mode="markers"))
 
 # --- Average Lines ---
 fig.add_shape(type="line", x0=x_mean, x1=x_mean, y0=df[y_metric].min(), y1=df[y_metric].max(),
@@ -308,6 +310,7 @@ if highlight_outliers:
         name="Outliers",
     )
 
+team_highlight_args = None
 # --- Team Highlight (Gold, robust matching + team on tooltip) ---
 if highlight_team and "Team" in df.columns:
     # Clean both sides and match on lowercase to handle 'Livingston' vs 'Livingston FC'
@@ -318,26 +321,6 @@ if highlight_team and "Team" in df.columns:
     if team_mask.any():
         team_df = df[team_mask]
         other_df = df[~team_mask]
-
-        # Livingston FC (Gold)
-        fig.add_scatter(
-            x=team_df[x_metric],
-            y=team_df[y_metric],
-            mode="markers",
-            marker=dict(color="#FFD700", size=14, symbol="circle"),
-            name="Livingston FC",
-            text=team_df["Name"] if "Name" in team_df.columns else team_df["Team"],
-            customdata=np.stack(
-                [team_df["Team"]], axis=-1
-            ),  # pass Team column as custom data
-            hovertemplate=(
-                "%{text}<br>"
-                "Team: %{customdata[0]}<br>"
-                "%{xaxis.title.text}: %{x:.2f}<br>"
-                "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
-            ),
-            showlegend=True,
-        )
 
         # Other players (keep hover info)
         fig.add_scatter(
@@ -359,7 +342,34 @@ if highlight_team and "Team" in df.columns:
             showlegend=False,
         )
 
- # --- Specific Player Highlight ---
+        # Livingston FC (Gold) - save arguments to add later for draw order
+        team_highlight_args = dict(
+            x=team_df[x_metric],
+            y=team_df[y_metric],
+            mode="markers",
+            marker=dict(
+                color="#FFD700",
+                size=20,
+                symbol="star",
+                line=dict(color="black", width=2),
+            ),
+            opacity=1.0,
+            name="Livingston FC",
+            text=team_df["Name"] if "Name" in team_df.columns else team_df["Team"],
+            customdata=np.stack(
+                [team_df["Team"]], axis=-1
+            ),  # pass Team column as custom data
+            hovertemplate=(
+                "%{text}<br>"
+                "Team: %{customdata[0]}<br>"
+                "%{xaxis.title.text}: %{x:.2f}<br>"
+                "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
+            ),
+            showlegend=True,
+            hoverlabel=dict(font_size=14),
+        )
+
+# --- Specific Player Highlight ---
 if "Name" in df.columns and "sb_player_highlight" in st.session_state:
     selected_players = st.session_state.sb_player_highlight
     if selected_players:
@@ -374,11 +384,12 @@ if "Name" in df.columns and "sb_player_highlight" in st.session_state:
                 text=player_df["Name"],
                 textposition="top center",
                 marker=dict(
-                    color="#E10600",  # strong red highlight
-                    size=16,
+                    color="#E10600",
+                    size=22,
                     symbol="diamond",
-                    line=dict(color="black", width=1),
+                    line=dict(color="black", width=2),
                 ),
+                opacity=1.0,
                 name="Highlighted Players",
                 customdata=np.stack(
                     [player_df["Team"]] if "Team" in player_df.columns else [player_df["Name"]],
@@ -391,7 +402,12 @@ if "Name" in df.columns and "sb_player_highlight" in st.session_state:
                     + "%{yaxis.title.text}: %{y:.2f}<extra></extra>"
                 ),
                 showlegend=True,
+                hoverlabel=dict(font_size=14),
             )
+
+# Draw Livingston FC highlight after all others except player highlight, to ensure draw order
+if team_highlight_args is not None:
+    fig.add_scatter(**team_highlight_args)
 
 fig.update_layout(
     xaxis_title=x_metric,
