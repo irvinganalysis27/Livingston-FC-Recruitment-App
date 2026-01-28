@@ -46,6 +46,14 @@ except Exception as e:
     st.error(f"❌ Could not load data: {e}")
     st.stop()
 
+# --- Add Age column if birth date exists ---
+if "Birth Date" in df_all.columns:
+    today = pd.Timestamp.today()
+    df_all["Age"] = pd.to_datetime(df_all["Birth Date"], errors="coerce").apply(
+        lambda dob: today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if pd.notna(dob) else np.nan
+    )
+
 if df_all.empty:
     st.error("❌ No data found.")
     st.stop()
@@ -156,6 +164,25 @@ selected_leagues = st.multiselect(
 # --- Minutes Filter ---
 min_minutes = st.number_input("Minimum minutes (≥)", min_value=0, value=600, step=50, key="sb_min_minutes")
 
+# --- Age Filter ---
+if "Age" in df_all.columns and df_all["Age"].notna().any():
+    age_min = int(df_all["Age"].min())
+    age_max = int(df_all["Age"].max())
+
+    if "sb_age_range" not in st.session_state:
+        st.session_state.sb_age_range = (age_min, age_max)
+
+    sel_age_min, sel_age_max = st.slider(
+        "Age range",
+        min_value=age_min,
+        max_value=age_max,
+        value=st.session_state.sb_age_range,
+        step=1,
+        key="sb_age_range",
+    )
+else:
+    sel_age_min, sel_age_max = None, None
+
 # --- Position Filter ---
 pos_groups = [g for g in SIX_GROUPS if g in df_all[position_col].unique()]
 selected_positions = st.multiselect(
@@ -169,7 +196,12 @@ selected_positions = st.multiselect(
 df = df_all.copy()
 if selected_leagues:
     df = df[df[league_col].isin(selected_leagues)]
+
 df = df[pd.to_numeric(df[minutes_col], errors="coerce") >= min_minutes]
+
+if sel_age_min is not None:
+    df = df[df["Age"].between(sel_age_min, sel_age_max)]
+
 if selected_positions:
     df = df[df[position_col].isin(selected_positions)]
 
